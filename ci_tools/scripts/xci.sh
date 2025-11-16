@@ -297,6 +297,13 @@ patterns = [
 lines = log_text.splitlines()
 issues = []
 
+# DEBUG
+import sys
+print(f"DEBUG: Total lines in log: {len(lines)}", file=sys.stderr)
+print(f"DEBUG: Last 5 lines:", file=sys.stderr)
+for line in lines[-5:]:
+    print(f"  {repr(line)}", file=sys.stderr)
+
 # Find all errors in the log
 i = 0
 while i < len(lines):
@@ -308,12 +315,15 @@ while i < len(lines):
             end = min(len(lines), i + context_lines)
             issue_text = "\n".join(lines[start:end])
             issues.append(issue_text)
+            print(f"DEBUG: Matched pattern at line {i}: {repr(lines[i][:80])}", file=sys.stderr)
             # Skip ahead to avoid overlapping issues
             i = end
             matched = True
             break
     if not matched:
         i += 1
+
+print(f"DEBUG: Found {len(issues)} issues", file=sys.stderr)
 
 # Print each issue separated by a special delimiter
 for idx, issue in enumerate(issues, 1):
