@@ -497,8 +497,39 @@ PY
   # Extract all individual issues from this CI run
   all_issues_text=$(extract_all_issues "$log_tail")
 
-  # Parse issues into array
-  readarray -t issue_array < <(echo "$all_issues_text" | awk '/===ISSUE_[0-9]+===/{if(issue)print issue; issue=$0; next}{issue=issue"\n"$0}END{if(issue)print issue}' | grep -v '^===ISSUE_')
+  # Parse issues into array (bash 3.x compatible - no readarray)
+  issue_array=()
+  issue_idx=0
+  current_issue=""
+  in_issue=0
+
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^===ISSUE_[0-9]+===$ ]]; then
+      # Save previous issue if we have one
+      if [[ $in_issue -eq 1 && -n "$current_issue" ]]; then
+        issue_array[$issue_idx]="$current_issue"
+        ((issue_idx++))
+      fi
+      # Start new issue
+      current_issue=""
+      in_issue=1
+    else
+      # Accumulate issue content
+      if [[ $in_issue -eq 1 ]]; then
+        if [[ -z "$current_issue" ]]; then
+          current_issue="$line"
+        else
+          current_issue="${current_issue}"$'\n'"${line}"
+        fi
+      fi
+    fi
+  done <<< "$all_issues_text"
+
+  # Don't forget last issue
+  if [[ $in_issue -eq 1 && -n "$current_issue" ]]; then
+    issue_array[$issue_idx]="$current_issue"
+    ((issue_idx++))
+  fi
 
   issue_count=${#issue_array[@]}
   echo "[xci] Found ${issue_count} issue(s) in CI output"
