@@ -178,6 +178,18 @@ Examples:
     "cli_type": "codex"
   xci.sh
 
+Authentication Options:
+  Claude CLI:
+    - Requires Claude subscription (claude.ai/code)
+    - No API key option available
+    - Bills to subscription plan
+
+  Codex CLI:
+    - Option 1: Codex subscription (default)
+    - Option 2: OpenAI API key (bills to API credits)
+      Setup: echo "$OPENAI_API_KEY" | codex login --with-api-key
+      Or set in ~/.codex/config.toml: preferred_auth_method = "apikey"
+
 Documentation:
   See docs/automation.md for detailed usage and examples.
 
@@ -253,13 +265,7 @@ invoke_llm() {
   # Show what we're doing
   local prompt_size
   prompt_size=$(wc -c < "${prompt_file}" | tr -d ' ')
-  echo ""
-  echo "============================================================"
-  echo "[xci] PROMPT (${prompt_size} bytes) → ${CLI_TYPE} (${MODEL})"
-  echo "============================================================"
-  cat "${prompt_file}"
-  echo "============================================================"
-  echo ""
+  echo "[xci] Sending ${prompt_size} byte prompt to ${CLI_TYPE} (${MODEL})..."
 
   if [[ "${CLI_TYPE}" == "claude" ]]; then
     # Claude CLI: simple invocation with --print flag and skip permissions
@@ -280,7 +286,7 @@ invoke_llm() {
     response_size=$(wc -c < "${output_file}" | tr -d ' ')
     echo ""
     echo "============================================================"
-    echo "[xci] RESPONSE (${response_size} bytes) from ${CLI_TYPE}"
+    echo "[xci] ${CLI_TYPE} RESPONSE (${response_size} bytes)"
     echo "============================================================"
     cat "${output_file}"
     echo "============================================================"
