@@ -21,8 +21,8 @@ def test_xci_help_flag():
     assert result.returncode == 0, f"--help failed with exit code {result.returncode}"
     assert "xci.sh - Automated CI repair loop" in result.stdout
     assert "Usage: xci.sh [ci-command...]" in result.stdout
-    assert "Environment Variables:" in result.stdout
-    assert "XCI_MAX_ATTEMPTS" in result.stdout
+    assert "Configuration Options:" in result.stdout
+    assert "max_attempts" in result.stdout
     assert "Configuration File (xci.config.json):" in result.stdout
 
 

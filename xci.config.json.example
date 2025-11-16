@@ -1,21 +1,24 @@
 {
-  "_comment": "Example configuration for xci.sh - Copy to xci.config.json and customize",
-  "_usage": "Environment variables (XCI_*) override config file values",
+  "_comment": "Configuration for xci.sh - All settings use config file, no env variables needed",
+  "_default_cli": "Claude (claude-sonnet-4.5) - Change to 'codex' and 'gpt-5-codex' for Codex",
 
   "max_attempts": 5,
   "_max_attempts_help": "Maximum number of automated fix attempts before giving up",
 
   "log_tail": 200,
-  "_log_tail_help": "Number of log lines from CI failure to send to Codex for context",
+  "_log_tail_help": "Number of log lines from CI failure to send to LLM for context",
 
-  "codex_cli": "codex",
-  "_codex_cli_help": "Executable name or path to the Codex CLI binary",
+  "codex_cli": "claude",
+  "_codex_cli_help": "CLI executable name: 'claude' or 'codex'",
 
-  "model": "gpt-5-codex",
-  "_model_help": "Codex model to use (must be gpt-5-codex per CI requirements)",
+  "model": "claude-sonnet-4.5",
+  "_model_help": "Model to use: claude-sonnet-4.5 (Claude) or gpt-5-codex (Codex)",
 
-  "reasoning_effort": "high",
+  "reasoning_effort": "medium",
   "_reasoning_effort_help": "Reasoning effort level: low, medium, or high",
+
+  "cli_type": "claude",
+  "_cli_type_help": "CLI type: claude or codex",
 
   "log_file": ".xci.log",
   "_log_file_help": "Path to log file for CI output (relative to repository root)",

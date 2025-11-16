@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Automate the "run ci.sh, capture failure, ask Codex for a patch, retry" loop.
+# Automate the "run ci.sh, capture failure, ask LLM for a patch, retry" loop.
+# Supports both Codex (gpt-5-codex) and Claude (claude-sonnet-4.5) CLIs.
 set -euo pipefail
 
 DEFAULT_MAX_ATTEMPTS=5
 DEFAULT_TAIL_LINES=200
-DEFAULT_CODEX_CLI=codex
-DEFAULT_MODEL=gpt-5-codex
-DEFAULT_REASONING_EFFORT=""
+DEFAULT_CODEX_CLI=claude
+DEFAULT_MODEL=claude-sonnet-4.5
+DEFAULT_REASONING_EFFORT=medium
 DEFAULT_LOG_FILE=.xci.log
 DEFAULT_ARCHIVE_DIR=.xci/archive
 DEFAULT_TMP_DIR=.xci/tmp
+DEFAULT_CLI_TYPE=claude
 
 # Load configuration overrides from JSON to avoid exporting env vars.
 CONFIG_PATH=${XCI_CONFIG:-xci.config.json}
@@ -53,6 +55,7 @@ emit_str("CFG_REASONING_EFFORT", data.get("reasoning_effort"))
 emit_str("CFG_LOG_FILE", data.get("log_file"))
 emit_str("CFG_ARCHIVE_DIR", data.get("archive_dir"))
 emit_str("CFG_TMP_DIR", data.get("tmp_dir"))
+emit_str("CFG_CLI_TYPE", data.get("cli_type"))
 PY
 )
 else
@@ -67,12 +70,28 @@ REASONING_EFFORT=${XCI_REASONING_EFFORT:-${CFG_REASONING_EFFORT:-$DEFAULT_REASON
 LOG_FILE=${XCI_LOG_FILE:-${CFG_LOG_FILE:-$DEFAULT_LOG_FILE}}
 ARCHIVE_DIR=${XCI_ARCHIVE_DIR:-${CFG_ARCHIVE_DIR:-$DEFAULT_ARCHIVE_DIR}}
 TMP_DIR=${XCI_TMP_DIR:-${CFG_TMP_DIR:-$DEFAULT_TMP_DIR}}
+CLI_TYPE=${XCI_CLI_TYPE:-${CFG_CLI_TYPE:-$DEFAULT_CLI_TYPE}}
+
+# Auto-detect CLI type from executable name if set to "auto"
+if [[ "${CLI_TYPE}" == "auto" ]]; then
+  CLI_BASENAME=$(basename "${CODEX_CLI}")
+  if [[ "${CLI_BASENAME}" == "claude" ]]; then
+    CLI_TYPE="claude"
+  else
+    CLI_TYPE="codex"
+  fi
+fi
+
+# Set default model based on CLI type if not explicitly configured
+if [[ "${CLI_TYPE}" == "claude" ]] && [[ "${MODEL}" == "gpt-5-codex" ]]; then
+  MODEL="claude-sonnet-4.5"
+fi
 
 mkdir -p "${ARCHIVE_DIR}"
 if ! find "${ARCHIVE_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null; then
   true
 fi
-echo "[xci] Archiving Codex exchanges under ${ARCHIVE_DIR}"
+echo "[xci] Archiving LLM exchanges under ${ARCHIVE_DIR}"
 
 mkdir -p "${TMP_DIR}"
 if ! find "${TMP_DIR}" -mindepth 1 -maxdepth 1 -exec rm -f {} + 2>/dev/null; then
@@ -80,8 +99,12 @@ if ! find "${TMP_DIR}" -mindepth 1 -maxdepth 1 -exec rm -f {} + 2>/dev/null; the
 fi
 
 if ! command -v "${CODEX_CLI}" >/dev/null 2>&1; then
-  echo "[xci] ERROR: Codex CLI '${CODEX_CLI}' not found in PATH." >&2
-  echo "[xci] Install from: https://github.com/anthropics/anthropic-cli" >&2
+  echo "[xci] ERROR: CLI '${CODEX_CLI}' not found in PATH." >&2
+  if [[ "${CLI_TYPE}" == "claude" ]]; then
+    echo "[xci] Install from: https://github.com/anthropics/anthropic-cli" >&2
+  else
+    echo "[xci] Install from: https://github.com/anthropics/anthropic-cli" >&2
+  fi
   exit 2
 fi
 
@@ -90,49 +113,67 @@ if [[ $# -eq 1 ]]; then
   case "$1" in
     --help|-h|help)
       cat <<'EOF'
-xci.sh - Automated CI repair loop via Codex
+xci.sh - Automated CI repair loop via Claude (or Codex)
 
 Usage: xci.sh [ci-command...]
 
-Runs CI command in a loop, capturing failures and requesting patches from Codex
-until CI passes or maximum attempts are reached. Archives all Codex exchanges.
+Runs CI command in a loop, capturing failures and requesting patches from Claude
+until CI passes or maximum attempts are reached. Archives all exchanges.
+
+Default: Claude (claude-sonnet-4.5) - Configure via xci.config.json
 
 Arguments:
   [ci-command...]  Command to execute (default: auto-detect ./ci.sh or scripts/ci.sh)
 
-Environment Variables:
-  XCI_MAX_ATTEMPTS       Maximum fix attempts (default: 5)
-  XCI_LOG_TAIL           Log lines to send to Codex (default: 200)
-  XCI_CLI                Codex CLI executable name (default: codex)
-  XCI_MODEL              Codex model to use (default: gpt-5-codex)
-  XCI_REASONING_EFFORT   Reasoning effort: low, medium, high (default: high)
-  XCI_LOG_FILE           Log file path (default: .xci.log)
-  XCI_ARCHIVE_DIR        Archive directory (default: .xci/archive)
-  XCI_TMP_DIR            Temp directory (default: .xci/tmp)
-  XCI_CONFIG             Config file path (default: xci.config.json)
-
 Configuration File (xci.config.json):
+  All settings are configured via xci.config.json (copy from xci.config.json.example)
+
+  Default (Claude):
   {
     "max_attempts": 5,
     "log_tail": 200,
-    "codex_cli": "codex",
-    "model": "gpt-5-codex",
-    "reasoning_effort": "high",
-    "log_file": ".xci.log",
-    "archive_dir": ".xci/archive",
-    "tmp_dir": ".xci/tmp"
+    "codex_cli": "claude",
+    "model": "claude-sonnet-4.5",
+    "reasoning_effort": "medium",
+    "cli_type": "claude"
   }
 
+  For Codex instead:
+  {
+    "codex_cli": "codex",
+    "model": "gpt-5-codex",
+    "cli_type": "codex"
+  }
+
+Configuration Options:
+  max_attempts       Maximum fix attempts (default: 5)
+  log_tail           Log lines to send to LLM (default: 200)
+  codex_cli          CLI executable: "claude" or "codex" (default: claude)
+  model              Model: claude-sonnet-4.5 or gpt-5-codex (default: claude-sonnet-4.5)
+  reasoning_effort   Reasoning: low, medium, high (default: medium)
+  cli_type           CLI type: claude or codex (default: claude)
+  log_file           Log file path (default: .xci.log)
+  archive_dir        Archive directory (default: .xci/archive)
+  tmp_dir            Temp directory (default: .xci/tmp)
+
 Examples:
-  xci.sh                    # Auto-detect and run CI script
-  xci.sh ./scripts/ci.sh    # Explicit CI command
-  xci.sh pytest tests/      # Run pytest in repair loop
+  # Using Claude (default)
+  cp xci.config.json.example xci.config.json
+  xci.sh                    # Auto-detect and run CI script with claude
+  xci.sh ./scripts/ci.sh    # Explicit CI command with claude
+
+  # Switching to Codex
+  Edit xci.config.json:
+    "codex_cli": "codex"
+    "model": "gpt-5-codex"
+    "cli_type": "codex"
+  xci.sh
 
 Documentation:
   See docs/automation.md for detailed usage and examples.
 
 Note: For more advanced features (--dry-run, --patch-approval-mode, etc.),
-      use the Python interface: python -m ci_tools.ci --help
+      use the Python interface: python -m ci_tools --help
 EOF
       exit 0
       ;;
@@ -195,6 +236,24 @@ EOF
   fi
 }
 
+# Helper to invoke the appropriate LLM CLI
+invoke_llm() {
+  local prompt_file="$1"
+  local output_file="$2"
+
+  if [[ "${CLI_TYPE}" == "claude" ]]; then
+    # Claude CLI: simple invocation with --print flag
+    "${CODEX_CLI}" -p <"${prompt_file}" >"${output_file}"
+  else
+    # Codex CLI: uses exec subcommand with model and reasoning effort
+    if [[ -n "${REASONING_EFFORT}" ]]; then
+      "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${output_file}"
+    else
+      "${CODEX_CLI}" exec --model "${MODEL}" - <"${prompt_file}" >"${output_file}"
+    fi
+  fi
+}
+
 attempt=1
 while true; do
   echo "[xci] Attempt ${attempt}: ${CI_COMMAND[*]}"
@@ -230,20 +289,13 @@ EOF_COMMIT
       cp "${commit_prompt}" "${commit_prefix}_prompt.txt"
 
       commit_response=$(mktmp)
-      if [[ -n "${REASONING_EFFORT}" ]]; then
-        set +e
-        "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${commit_prompt}" >"${commit_response}"
-        commit_status=$?
-        set -e
-      else
-        set +e
-        "${CODEX_CLI}" exec --model "${MODEL}" - <"${commit_prompt}" >"${commit_response}"
-        commit_status=$?
-        set -e
-      fi
+      set +e
+      invoke_llm "${commit_prompt}" "${commit_response}"
+      commit_status=$?
+      set -e
 
       if [[ ${commit_status} -ne 0 ]]; then
-        echo "[xci] Codex commit message request failed (exit ${commit_status}); skipping suggestion." >&2
+        echo "[xci] LLM commit message request failed (exit ${commit_status}); skipping suggestion." >&2
       else
         cp "${commit_response}" "${commit_prefix}_response.txt"
         commit_message_file=$(mktmp)
@@ -366,22 +418,15 @@ If no change is needed, respond with NOOP.
 EOF_PROMPT
 
   response_file=$(mktmp)
-  if [[ -n "${REASONING_EFFORT}" ]]; then
-    set +e
-    "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${response_file}"
-    codex_status=$?
-    set -e
-  else
-    set +e
-    "${CODEX_CLI}" exec --model "${MODEL}" - <"${prompt_file}" >"${response_file}"
-    codex_status=$?
-    set -e
-  fi
+  set +e
+  invoke_llm "${prompt_file}" "${response_file}"
+  llm_status=$?
+  set -e
 
-  if [[ ${codex_status} -ne 0 ]]; then
+  if [[ ${llm_status} -ne 0 ]]; then
     echo "" >&2
     echo "========================================"  >&2
-    echo "[xci] ✗ FAILED: Codex CLI error (exit ${codex_status})" >&2
+    echo "[xci] ✗ FAILED: LLM CLI error (exit ${llm_status})" >&2
     echo "========================================"  >&2
     exit 3
   fi
