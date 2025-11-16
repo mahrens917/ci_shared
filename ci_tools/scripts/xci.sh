@@ -810,13 +810,24 @@ PY
       continue
     fi
 
-    # Capture git apply output for debugging
+    # Capture git apply output for debugging (disable set -e to handle errors properly)
+    set +e
     patch_error=$(git apply --check --whitespace=nowarn "${patch_file}" 2>&1)
     patch_status=$?
+    set -e
 
     if [[ ${patch_status} -eq 0 ]]; then
+      set +e
       git apply --allow-empty --whitespace=nowarn "${patch_file}"
-      echo "[xci] ✓ Applied patch for issue ${issue_num}/${issue_count}"
+      apply_status=$?
+      set -e
+      if [[ ${apply_status} -eq 0 ]]; then
+        echo "[xci] ✓ Applied patch for issue ${issue_num}/${issue_count}"
+      else
+        echo "[xci] ⚠️  Warning: git apply succeeded with --check but failed during actual apply (exit ${apply_status})" >&2
+        echo "[xci] Skipping to next issue..." >&2
+        continue
+      fi
     elif git apply --check --reverse --whitespace=nowarn "${patch_file}" 2>/dev/null; then
       echo "[xci] Patch for issue ${issue_num} already applied; continuing..."
     else
