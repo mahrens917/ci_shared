@@ -266,67 +266,83 @@ import sys
 import re
 
 log_text = sys.argv[1]
-
-# Common error patterns from CI tools
-# Format: (pattern, context_lines)
-# context_lines = 1 means just the error line itself (each line is a separate issue)
-patterns = [
-    # Structure guard bullet-point format - each "  - " line is one issue
-    (r'^\s+-\s+src/.+\.(py|ts|js):\d+\s+class\s+\S+\s+spans\s+\d+\s+lines', 1),
-
-    # Guard script errors (structure_guard, module_guard, etc.) - each ERROR is one issue
-    (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 1),
-
-    # Vulture errors (unused code) - each line is one issue
-    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: (unused|unreachable)', 1),
-
-    # Pylint errors - each line is one issue
-    (r'^[^:]+:\d+:\d+: [EWRCF]\d+: [^\n]+', 1),
-
-    # Pyright errors - each line is one issue
-    (r'^  [^:]+:\d+:\d+ - error: [^\n]+', 1),
-
-    # Ruff errors - each line is one issue
-    (r'^[^:]+:\d+:\d+: [A-Z]+\d+[^\n]+', 1),
-
-    # Policy guard violations - each line is one issue
-    (r'policy_guard: [^\n]+', 1),
-
-    # Pytest failures - each line is one issue
-    (r'FAILED [^\n]+', 1),
-
-    # Generic file:line: error pattern (fallback)
-    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: [^\n]+', 1),
-]
-
 lines = log_text.splitlines()
 issues = []
 
 # DEBUG
-import sys
 print(f"DEBUG: Total lines in log: {len(lines)}", file=sys.stderr)
 print(f"DEBUG: Last 5 lines:", file=sys.stderr)
 for line in lines[-5:]:
     print(f"  {repr(line)}", file=sys.stderr)
 
-# Find all errors in the log
 i = 0
 while i < len(lines):
-    matched = False
-    for pattern, context_lines in patterns:
-        if re.search(pattern, lines[i]):
-            # Found an error, extract it with context
-            start = max(0, i - 2)
-            end = min(len(lines), i + context_lines)
-            issue_text = "\n".join(lines[start:end])
-            issues.append(issue_text)
-            print(f"DEBUG: Matched pattern at line {i}: {repr(lines[i][:80])}", file=sys.stderr)
-            # Skip ahead to avoid overlapping issues
-            i = end
-            matched = True
-            break
-    if not matched:
+    line = lines[i]
+
+    # Structure/module/function guard: header line followed by bullet points
+    if re.search(r'Oversized (classes|modules|functions) detected\. Refactor', line):
+        # Found structure/module/function guard failure - collect header + all bullet points
+        issue_lines = [line]
         i += 1
+        # Collect all following bullet points
+        while i < len(lines) and re.match(r'^\s+-\s+src/', lines[i]):
+            issue_lines.append(lines[i])
+            i += 1
+        issues.append("\n".join(issue_lines))
+        print(f"DEBUG: Found guard failure with {len(issue_lines)-1} violations", file=sys.stderr)
+        continue
+
+    # Policy guard violations - typically multi-line blocks
+    if re.search(r'policy_guard.*violations? detected', line, re.IGNORECASE):
+        issue_lines = [line]
+        i += 1
+        # Collect violation details
+        while i < len(lines) and (lines[i].startswith('  ') or lines[i].strip() == ''):
+            if lines[i].strip():  # Skip blank lines
+                issue_lines.append(lines[i])
+            i += 1
+            if i < len(lines) and not lines[i].startswith('  '):
+                break
+        issues.append("\n".join(issue_lines))
+        print(f"DEBUG: Found policy guard failure", file=sys.stderr)
+        continue
+
+    # Vulture errors - each line is separate
+    if re.match(r'^[a-zA-Z0-9_/.-]+\.py:\d+: (unused|unreachable)', line):
+        issues.append(line)
+        print(f"DEBUG: Found vulture error at line {i}", file=sys.stderr)
+        i += 1
+        continue
+
+    # Pylint errors - each line is separate
+    if re.match(r'^[^:]+:\d+:\d+: [EWRCF]\d+:', line):
+        issues.append(line)
+        print(f"DEBUG: Found pylint error at line {i}", file=sys.stderr)
+        i += 1
+        continue
+
+    # Pyright errors - each line is separate
+    if re.match(r'^  [^:]+:\d+:\d+ - error:', line):
+        issues.append(line)
+        print(f"DEBUG: Found pyright error at line {i}", file=sys.stderr)
+        i += 1
+        continue
+
+    # Ruff errors - each line is separate
+    if re.match(r'^[^:]+:\d+:\d+: [A-Z]+\d+', line):
+        issues.append(line)
+        print(f"DEBUG: Found ruff error at line {i}", file=sys.stderr)
+        i += 1
+        continue
+
+    # Pytest failures - each FAILED line is separate
+    if re.match(r'^FAILED ', line):
+        issues.append(line)
+        print(f"DEBUG: Found pytest failure at line {i}", file=sys.stderr)
+        i += 1
+        continue
+
+    i += 1
 
 print(f"DEBUG: Found {len(issues)} issues", file=sys.stderr)
 
