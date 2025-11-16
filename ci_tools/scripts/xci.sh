@@ -261,11 +261,11 @@ EOF
 extract_all_issues() {
   local log_text="$1"
 
-  echo "$log_text" | python3 <<'PY'
+  python3 - "$log_text" <<'PY'
 import sys
 import re
 
-log_text = sys.stdin.read()
+log_text = sys.argv[1]
 
 # Common error patterns from CI tools
 patterns = [
