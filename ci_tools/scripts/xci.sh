@@ -461,6 +461,14 @@ STRICT REQUIREMENTS - YOU MUST FOLLOW THESE RULES:
 8. If a module/class/function is too large, REFACTOR it into smaller pieces
 9. If there's a policy violation, FIX the code to comply with the policy
 
+SIZE REDUCTION TARGETS - AIM FOR 70% OF LIMITS:
+When refactoring oversized code, target 70% of the stated limit to provide headroom:
+- Class limit 100 lines → target 70 lines
+- Class limit 120 lines → target 84 lines
+- Module limit 400 lines → target 280 lines
+- Function limit 80 lines → target 56 lines
+This prevents violations from recurring as code evolves.
+
 Your job is to fix the code quality issues, not to bypass the quality checks.
 
 Please respond with a unified diff (starting with \`diff --git\`) that fixes the failure.
@@ -524,6 +532,14 @@ STRICT REQUIREMENTS - YOU MUST FOLLOW THESE RULES:
 7. NEVER modify CI configuration files (Makefile, ci.sh, xci.sh, etc.)
 8. If a module/class/function is too large, REFACTOR it into smaller pieces
 9. If there's a policy violation, FIX the code to comply with the policy
+
+SIZE REDUCTION TARGETS - AIM FOR 70% OF LIMITS:
+When refactoring oversized code, target 70% of the stated limit to provide headroom:
+- Class limit 100 lines → target 70 lines
+- Class limit 120 lines → target 84 lines
+- Module limit 400 lines → target 280 lines
+- Function limit 80 lines → target 56 lines
+This prevents violations from recurring as code evolves.
 
 Please respond with a unified diff (starting with \`diff --git\`) that fixes ONLY ONE issue.
 If you truly cannot fix even a single small issue, respond with NOOP.
