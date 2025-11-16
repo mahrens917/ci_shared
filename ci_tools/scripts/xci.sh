@@ -272,6 +272,9 @@ patterns = [
     # Guard script errors (structure_guard, module_guard, etc.)
     (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 10),
 
+    # Vulture errors (unused code)
+    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: (unused|unreachable)', 3),
+
     # Pylint errors
     (r'^[^:]+:\d+:\d+: [EWRCF]\d+: [^\n]+', 5),
 
@@ -287,7 +290,7 @@ patterns = [
     # Pytest failures
     (r'FAILED [^\n]+', 5),
 
-    # Generic file:line: error pattern
+    # Generic file:line: error pattern (fallback)
     (r'^[a-zA-Z0-9_/.-]+\.py:\d+: [^\n]+', 3),
 ]
 
@@ -495,7 +498,12 @@ PY
   log_tail=$(tail -n "${TAIL_LINES}" "${LOG_FILE}" 2>/dev/null || true)
 
   # Extract all individual issues from this CI run
+  echo "[xci] DEBUG: Log tail length: $(echo "$log_tail" | wc -l) lines" >&2
+  echo "[xci] DEBUG: Sample of log tail:" >&2
+  echo "$log_tail" | tail -n 20 | head -n 10 >&2
   all_issues_text=$(extract_all_issues "$log_tail")
+  echo "[xci] DEBUG: Extracted issues:" >&2
+  echo "$all_issues_text" | head -n 30 >&2
 
   # Parse issues into array (bash 3.x compatible - no readarray)
   issue_array=()
