@@ -257,6 +257,73 @@ EOF
   fi
 }
 
+# Extract all individual issues from CI log
+extract_all_issues() {
+  local log_text="$1"
+
+  echo "$log_text" | python3 <<'PY'
+import sys
+import re
+
+log_text = sys.stdin.read()
+
+# Common error patterns from CI tools
+patterns = [
+    # Guard script errors (structure_guard, module_guard, etc.)
+    (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 10),
+
+    # Pylint errors
+    (r'^[^:]+:\d+:\d+: [EWRCF]\d+: [^\n]+', 5),
+
+    # Pyright errors
+    (r'^  [^:]+:\d+:\d+ - error: [^\n]+', 5),
+
+    # Ruff errors
+    (r'^[^:]+:\d+:\d+: [A-Z]+\d+[^\n]+', 3),
+
+    # Policy guard violations
+    (r'policy_guard: [^\n]+', 8),
+
+    # Pytest failures
+    (r'FAILED [^\n]+', 5),
+
+    # Generic file:line: error pattern
+    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: [^\n]+', 3),
+]
+
+lines = log_text.splitlines()
+issues = []
+
+# Find all errors in the log
+i = 0
+while i < len(lines):
+    matched = False
+    for pattern, context_lines in patterns:
+        if re.search(pattern, lines[i]):
+            # Found an error, extract it with context
+            start = max(0, i - 2)
+            end = min(len(lines), i + context_lines)
+            issue_text = "\n".join(lines[start:end])
+            issues.append(issue_text)
+            # Skip ahead to avoid overlapping issues
+            i = end
+            matched = True
+            break
+    if not matched:
+        i += 1
+
+# Print each issue separated by a special delimiter
+for idx, issue in enumerate(issues, 1):
+    print(f"===ISSUE_{idx}===")
+    print(issue)
+
+if not issues:
+    # No specific errors found, return last 20 lines as one issue
+    print("===ISSUE_1===")
+    print("\n".join(lines[-20:]))
+PY
+}
+
 # Helper to invoke the appropriate LLM CLI
 invoke_llm() {
   local prompt_file="$1"
@@ -423,18 +490,42 @@ PY
     exit 1
   fi
 
-  echo "[xci] CI failed (exit ${ci_status}); preparing ${CLI_TYPE} prompt..."
+  echo "[xci] CI failed (exit ${ci_status}); extracting issues from log..."
 
   log_tail=$(tail -n "${TAIL_LINES}" "${LOG_FILE}" 2>/dev/null || true)
-  git_status=$(git status --short 2>/dev/null || true)
-  git_diff=$(limit_diff_size "$(git diff 2>/dev/null || true)")
 
-  prompt_file=$(mktmp)
-  cat >"${prompt_file}" <<EOF_PROMPT
+  # Extract all individual issues from this CI run
+  all_issues_text=$(extract_all_issues "$log_tail")
+
+  # Parse issues into array
+  readarray -t issue_array < <(echo "$all_issues_text" | awk '/===ISSUE_[0-9]+===/{if(issue)print issue; issue=$0; next}{issue=issue"\n"$0}END{if(issue)print issue}' | grep -v '^===ISSUE_')
+
+  issue_count=${#issue_array[@]}
+  echo "[xci] Found ${issue_count} issue(s) in CI output"
+
+  # Process each issue one at a time
+  for issue_idx in "${!issue_array[@]}"; do
+    issue_num=$((issue_idx + 1))
+    current_issue="${issue_array[$issue_idx]}"
+
+    echo ""
+    echo "[xci] ──────────────────────────────────────────────────────────"
+    echo "[xci] Processing issue ${issue_num}/${issue_count} from attempt ${attempt}"
+    echo "[xci] ──────────────────────────────────────────────────────────"
+
+    git_status=$(git status --short 2>/dev/null || true)
+    git_diff=$(limit_diff_size "$(git diff 2>/dev/null || true)")
+
+    prompt_file=$(mktmp)
+    cat >"${prompt_file}" <<EOF_PROMPT
 You are assisting with automated CI repairs for the repository at $(pwd).
 
+IMPORTANT: Fix ONLY THIS SPECIFIC ISSUE shown below. We are processing multiple issues from one CI run.
+After all issues are fixed, we will re-run CI to verify.
+
 Run details:
-- Attempt: ${attempt}
+- CI attempt: ${attempt}
+- Issue: ${issue_num}/${issue_count}
 - CI command: ${CI_COMMAND[*]}
 
 Git status:
@@ -445,9 +536,9 @@ Current diff:
 ${git_diff:-/* no diff */}
 \`\`\`
 
-Most recent CI log tail:
+CI failure to fix:
 \`\`\`
-${log_tail}
+${current_issue}
 \`\`\`
 
 STRICT REQUIREMENTS - YOU MUST FOLLOW THESE RULES:
@@ -475,124 +566,37 @@ Please respond with a unified diff (starting with \`diff --git\`) that fixes the
 If no change is needed, respond with NOOP.
 EOF_PROMPT
 
-  response_file=$(mktmp)
-  set +e
-  invoke_llm "${prompt_file}" "${response_file}"
-  llm_status=$?
-  set -e
-
-  if [[ ${llm_status} -ne 0 ]]; then
-    echo "" >&2
-    echo "========================================"  >&2
-    echo "[xci] ✗ FAILED: LLM CLI error (exit ${llm_status})" >&2
-    echo "========================================"  >&2
-    exit 3
-  fi
-
-  timestamp=$(date +"%Y%m%dT%H%M%S")
-  archive_prefix="${ARCHIVE_DIR}/attempt${attempt}_${timestamp}"
-  cp "${prompt_file}" "${archive_prefix}_prompt.txt"
-  cp "${response_file}" "${archive_prefix}_response.txt"
-  echo "[xci] Archived prompt → ${archive_prefix}_prompt.txt"
-  echo "[xci] Archived response → ${archive_prefix}_response.txt"
-
-  if grep -qi '^NOOP$' "${response_file}"; then
-    echo "[xci] ${CLI_TYPE} returned NOOP (no automated fix for all issues)"
-    echo "[xci] Sending follow-up: asking to fix just ONE small issue..."
-
-    # Create follow-up prompt asking to fix just one issue
-    followup_prompt=$(mktmp)
-    cat > "${followup_prompt}" <<EOF_FOLLOWUP
-The previous CI failure shows multiple issues. Instead of trying to fix everything at once:
-
-1. Pick the SMALLEST, EASIEST issue from the failures below
-2. Provide a patch that fixes ONLY that one issue
-3. Ignore all other failures for now
-
-Previous CI failure log:
-\`\`\`
-${log_tail}
-\`\`\`
-
-Git status:
-${git_status:-<clean>}
-
-Current diff:
-\`\`\`diff
-${git_diff:-/* no diff */}
-\`\`\`
-
-STRICT REQUIREMENTS - YOU MUST FOLLOW THESE RULES:
-1. Fix the UNDERLYING CODE ISSUES, not the tests or CI checks
-2. NEVER add --baseline arguments to any guard scripts in Makefiles or CI configurations
-3. NEVER create baseline files (e.g., module_guard_baseline.txt, function_size_guard_baseline.txt)
-4. NEVER add exemption comments like "policy_guard: allow-*", "# noqa", or "pylint: disable"
-5. NEVER add --exclude arguments to guard scripts to bypass checks
-6. NEVER modify guard scripts themselves (policy_guard.py, module_guard.py, structure_guard.py, function_size_guard.py, etc.)
-7. NEVER modify CI configuration files (Makefile, ci.sh, xci.sh, etc.)
-8. If a module/class/function is too large, REFACTOR it into smaller pieces
-9. If there's a policy violation, FIX the code to comply with the policy
-
-SIZE REDUCTION TARGETS - AIM FOR 70% OF LIMITS:
-When refactoring oversized code, target 70% of the stated limit to provide headroom:
-- Class limit 100 lines → target 70 lines
-- Class limit 120 lines → target 84 lines
-- Module limit 400 lines → target 280 lines
-- Function limit 80 lines → target 56 lines
-This prevents violations from recurring as code evolves.
-
-Please respond with a unified diff (starting with \`diff --git\`) that fixes ONLY ONE issue.
-If you truly cannot fix even a single small issue, respond with NOOP.
-EOF_FOLLOWUP
-
-    followup_response=$(mktmp)
+    response_file=$(mktmp)
     set +e
-    invoke_llm "${followup_prompt}" "${followup_response}"
-    followup_status=$?
+    invoke_llm "${prompt_file}" "${response_file}"
+    llm_status=$?
     set -e
 
-    if [[ ${followup_status} -ne 0 ]]; then
+    if [[ ${llm_status} -ne 0 ]]; then
       echo "" >&2
       echo "========================================"  >&2
-      echo "[xci] ✗ FAILED: Follow-up LLM request failed (exit ${followup_status})" >&2
+      echo "[xci] ✗ FAILED: LLM CLI error (exit ${llm_status})" >&2
       echo "========================================"  >&2
       exit 3
     fi
 
-    # Archive follow-up exchange
-    cp "${followup_prompt}" "${archive_prefix}_followup_prompt.txt"
-    cp "${followup_response}" "${archive_prefix}_followup_response.txt"
-    echo "[xci] Archived follow-up prompt → ${archive_prefix}_followup_prompt.txt"
-    echo "[xci] Archived follow-up response → ${archive_prefix}_followup_response.txt"
+    timestamp=$(date +"%Y%m%dT%H%M%S")
+    archive_prefix="${ARCHIVE_DIR}/attempt${attempt}_issue${issue_num}_${timestamp}"
+    cp "${prompt_file}" "${archive_prefix}_prompt.txt"
+    cp "${response_file}" "${archive_prefix}_response.txt"
+    echo "[xci] Archived prompt → ${archive_prefix}_prompt.txt"
+    echo "[xci] Archived response → ${archive_prefix}_response.txt"
 
-    # Check if follow-up is also NOOP
-    if grep -qi '^NOOP$' "${followup_response}"; then
-      echo "" >&2
-      echo "========================================"  >&2
-      echo "[xci] ✗ FAILED: ${CLI_TYPE} returned NOOP even for single issue" >&2
-      echo "========================================"  >&2
-      echo "The failures require manual intervention." >&2
-      echo "" >&2
-      echo "Common reasons:" >&2
-      echo "  • Architectural refactoring needed (too many oversized classes)" >&2
-      echo "  • Complex policy violations requiring design decisions" >&2
-      echo "  • Issues are interdependent and cannot be fixed individually" >&2
-      echo "" >&2
-      echo "Review the CI output and archived responses:" >&2
-      echo "  Initial response: ${archive_prefix}_response.txt" >&2
-      echo "  Follow-up response: ${archive_prefix}_followup_response.txt" >&2
-      echo "========================================"  >&2
-      exit 4
+    # If LLM returns NOOP for this issue, skip to next issue
+    if grep -qi '^NOOP$' "${response_file}"; then
+      echo "[xci] ${CLI_TYPE} returned NOOP for issue ${issue_num} (cannot fix automatically)"
+      echo "[xci] Skipping to next issue..."
+      continue
     fi
 
-    # Use the follow-up response for patch extraction
-    echo "[xci] ${CLI_TYPE} provided a patch for one issue; proceeding..."
-    cp "${followup_response}" "${response_file}"
-  fi
-
-  patch_file=$(mktmp)
-  extract_result=$(mktmp)
-  if ! python - "${response_file}" "${patch_file}" "${extract_result}" <<'PY'
+    patch_file=$(mktmp)
+    extract_result=$(mktmp)
+    if ! python - "${response_file}" "${patch_file}" "${extract_result}" <<'PY'
 import pathlib
 import sys
 
@@ -635,10 +639,26 @@ if any(phrase in text.lower() for phrase in [
             hash_part = line[6:].split()[0]
             if ".." in hash_part:
                 before, after = hash_part.split("..", 1)
-                if (before.isdigit() or after.isdigit() or
-                    len(set(before)) <= 2 or len(set(after)) <= 2 or
-                    before in ["0000000", "1111111", "1234567", "abcdefg"]):
-                    continue
+                # Detect fake hashes: sequential patterns, low entropy, known fakes
+                def looks_fake(h):
+                    if not h or len(h) < 7:
+                        return True
+                    if h.isdigit():  # All digits like "1234567"
+                        return True
+                    if len(set(h)) <= 3:  # Very low diversity like "0000000" or "aaaaaaa"
+                        return True
+                    # Sequential patterns like "abcd1234" or "7d5e1234"
+                    if h in ["0000000", "1111111", "1234567", "abcdefg", "7d5e1234", "abcd1234"]:
+                        return True
+                    # Check for ascending/descending sequences
+                    if h.isalnum():
+                        diffs = [ord(h[i+1]) - ord(h[i]) for i in range(len(h)-1)]
+                        if all(d == diffs[0] for d in diffs):  # All same step size
+                            return True
+                    return False
+
+                if looks_fake(before) or looks_fake(after):
+                    continue  # Skip this fake index line
         cleaned_lines.append(line)
 
     patch_path.write_text("".join(cleaned_lines))
@@ -657,122 +677,131 @@ for line in raw_patch.splitlines(keepends=True):
     # Skip index lines with fake/placeholder hashes (not valid git blob IDs)
     if line.startswith("index "):
         # Valid git hashes are 7+ hex chars like: index a1b2c3d..e4f5g6h
-        # LLMs often generate fake ones like: index 1234567..abcdefg or index 0000000..1111111
+        # LLMs often generate fake ones like: index 1234567..abcdefg or index 7d5e1234..abcd1234
         hash_part = line[6:].split()[0]  # Get "a1b2c3d..e4f5g6h" part
         if ".." in hash_part:
             before, after = hash_part.split("..", 1)
-            # Check if either hash looks fake (sequential digits, all same char, etc.)
-            if (before.isdigit() or after.isdigit() or
-                len(set(before)) <= 2 or len(set(after)) <= 2 or
-                before in ["0000000", "1111111", "1234567", "abcdefg"]):
+
+            # Detect fake hashes: sequential patterns, low entropy, known fakes
+            def looks_fake(h):
+                if not h or len(h) < 7:
+                    return True
+                if h.isdigit():  # All digits like "1234567"
+                    return True
+                if len(set(h)) <= 3:  # Very low diversity like "0000000" or "aaaaaaa"
+                    return True
+                # Sequential patterns like "abcd1234" or "7d5e1234"
+                if h in ["0000000", "1111111", "1234567", "abcdefg", "7d5e1234", "abcd1234"]:
+                    return True
+                # Check for ascending/descending sequences
+                if h.isalnum():
+                    diffs = [ord(h[i+1]) - ord(h[i]) for i in range(len(h)-1)]
+                    if all(d == diffs[0] for d in diffs):  # All same step size
+                        return True
+                return False
+
+            if looks_fake(before) or looks_fake(after):
                 continue  # Skip this fake index line
     cleaned_lines.append(line)
 
 patch_path.write_text("".join(cleaned_lines))
 result_path.write_text("SUCCESS")
 PY
-  then
-    extract_status=$(cat "${extract_result}" 2>/dev/null || echo "UNKNOWN")
+    then
+      extract_status=$(cat "${extract_result}" 2>/dev/null || echo "UNKNOWN")
 
-    case "${extract_status}" in
-      EMPTY_RESPONSE)
-        echo "" >&2
-        echo "========================================"  >&2
-        echo "[xci] ✗ FAILED: ${CLI_TYPE} returned empty response" >&2
-        echo "========================================"  >&2
-        echo "This usually means the task is too complex for automated fixes." >&2
-        echo "" >&2
-        echo "Review the CI failures and consider:" >&2
-        echo "  • Breaking large classes/functions into smaller pieces" >&2
-        echo "  • Refactoring complex code manually" >&2
-        echo "  • Addressing architectural issues" >&2
-        echo "" >&2
-        echo "Prompt saved at: ${archive_prefix}_prompt.txt" >&2
-        echo "Response saved at: ${archive_prefix}_response.txt" >&2
-        echo "========================================"  >&2
-        exit 5
-        ;;
-      REQUIRES_MANUAL)
-        echo "" >&2
-        echo "========================================"  >&2
-        echo "[xci] ✗ FAILED: Changes require manual intervention" >&2
-        echo "========================================"  >&2
-        echo "${CLI_TYPE} indicated this issue cannot be fixed automatically." >&2
-        echo "" >&2
-        echo "Common reasons:" >&2
-        echo "  • Classes/functions too large (need architectural refactoring)" >&2
-        echo "  • Complex policy violations (require design decisions)" >&2
-        echo "  • Structural issues (need breaking changes)" >&2
-        echo "" >&2
-        echo "See ${CLI_TYPE} explanation at: ${archive_prefix}_response.txt" >&2
-        echo "========================================"  >&2
-        exit 6
-        ;;
-      NO_DIFF|*)
-        if (( attempt >= MAX_ATTEMPTS - 1 )); then
+      case "${extract_status}" in
+        EMPTY_RESPONSE)
           echo "" >&2
           echo "========================================"  >&2
-          echo "[xci] ✗ FAILED: Unable to extract fixes from ${CLI_TYPE}" >&2
+          echo "[xci] ✗ FAILED: ${CLI_TYPE} returned empty response for issue ${issue_num}" >&2
           echo "========================================"  >&2
-          echo "After ${attempt} attempts, ${CLI_TYPE} has not provided usable patches." >&2
-          echo "" >&2
-          echo "This typically indicates:" >&2
-          echo "  • The violations are too numerous/complex for automated fixing" >&2
-          echo "  • The codebase needs manual architectural improvements" >&2
-          echo "  • The CI failures require design decisions" >&2
-          echo "" >&2
-          echo "Latest prompt: ${archive_prefix}_prompt.txt" >&2
-          echo "Latest response: ${archive_prefix}_response.txt" >&2
-          echo "========================================"  >&2
-          exit 7
-        else
-          echo "[xci] Unable to extract diff from ${CLI_TYPE} response; will retry. (Response saved at ${archive_prefix}_response.txt)" >&2
-          ((attempt+=1))
+          echo "Skipping to next issue..." >&2
           continue
-        fi
-        ;;
-    esac
-  fi
+          ;;
+        REQUIRES_MANUAL)
+          echo "" >&2
+          echo "========================================"  >&2
+          echo "[xci] Issue ${issue_num} requires manual intervention" >&2
+          echo "========================================"  >&2
+          echo "${CLI_TYPE} indicated this issue cannot be fixed automatically." >&2
+          echo "See ${CLI_TYPE} explanation at: ${archive_prefix}_response.txt" >&2
+          echo "Skipping to next issue..." >&2
+          echo "========================================"  >&2
+          continue
+          ;;
+        NO_DIFF|*)
+          echo "[xci] Unable to extract diff for issue ${issue_num}; skipping..." >&2
+          continue
+          ;;
+      esac
+    fi
 
-  cp "${patch_file}" "${archive_prefix}_patch.diff"
-  echo "[xci] Archived patch → ${archive_prefix}_patch.diff"
+    cp "${patch_file}" "${archive_prefix}_patch.diff"
+    echo "[xci] Archived patch → ${archive_prefix}_patch.diff"
 
-  # Validate patch doesn't modify protected CI infrastructure
-  FORBIDDEN_PATHS="ci_tools/|scripts/ci\.sh|Makefile|xci\.sh|/ci\.py"
-  forbidden_files=$(grep "^diff --git" "${patch_file}" | grep -E "${FORBIDDEN_PATHS}" || true)
-  if [[ -n "${forbidden_files}" ]]; then
-    echo "" >&2
-    echo "========================================"  >&2
-    echo "[xci] ✗ REJECTED: Patch modifies protected CI infrastructure" >&2
-    echo "========================================"  >&2
-    echo "Forbidden files detected:" >&2
-    echo "${forbidden_files}" >&2
-    echo "" >&2
-    echo "Only application code should be modified, not CI tools." >&2
-    echo "The following paths are protected:" >&2
-    echo "  - ci_tools/" >&2
-    echo "  - scripts/ci.sh" >&2
-    echo "  - Makefile" >&2
-    echo "  - xci.sh" >&2
-    echo "  - ci.py" >&2
-    echo "========================================"  >&2
-    ((attempt+=1))
-    continue
-  fi
+    # Validate patch doesn't modify protected CI infrastructure
+    FORBIDDEN_PATHS="ci_tools/|scripts/ci\.sh|Makefile|xci\.sh|/ci\.py"
+    forbidden_files=$(grep "^diff --git" "${patch_file}" | grep -E "${FORBIDDEN_PATHS}" || true)
+    if [[ -n "${forbidden_files}" ]]; then
+      echo "" >&2
+      echo "========================================"  >&2
+      echo "[xci] ✗ REJECTED: Patch for issue ${issue_num} modifies protected CI infrastructure" >&2
+      echo "========================================"  >&2
+      echo "Forbidden files detected:" >&2
+      echo "${forbidden_files}" >&2
+      echo "" >&2
+      echo "Skipping to next issue..." >&2
+      echo "========================================"  >&2
+      continue
+    fi
 
-  if git apply --check --whitespace=nowarn "${patch_file}" 2>/dev/null; then
-    git apply --allow-empty --whitespace=nowarn "${patch_file}"
-    echo "[xci] Applied patch from ${CLI_TYPE} (see ${patch_file})."
-    echo "[xci] Full exchange archived at: ${archive_prefix}_prompt.txt and ${archive_prefix}_response.txt"
-  elif git apply --check --reverse --whitespace=nowarn "${patch_file}" 2>/dev/null; then
-    echo "[xci] Patch already applied; rerunning CI with existing changes."
-    ((attempt+=1))
-    continue
-  else
-    echo "[xci] Patch failed dry-run; will retry with fresh ${CLI_TYPE} request. (Response saved at ${archive_prefix}_response.txt)" >&2
-    ((attempt+=1))
-    continue
-  fi
+    # Capture git apply output for debugging
+    patch_error=$(git apply --check --whitespace=nowarn "${patch_file}" 2>&1)
+    patch_status=$?
+
+    if [[ ${patch_status} -eq 0 ]]; then
+      git apply --allow-empty --whitespace=nowarn "${patch_file}"
+      echo "[xci] ✓ Applied patch for issue ${issue_num}/${issue_count}"
+    elif git apply --check --reverse --whitespace=nowarn "${patch_file}" 2>/dev/null; then
+      echo "[xci] Patch for issue ${issue_num} already applied; continuing..."
+    else
+      echo "" >&2
+      echo "╔════════════════════════════════════════════════════════════════════════════╗" >&2
+      echo "║                                                                            ║" >&2
+      echo "║                    ⚠️  PATCH APPLICATION FAILED ⚠️                         ║" >&2
+      echo "║                                                                            ║" >&2
+      echo "╚════════════════════════════════════════════════════════════════════════════╝" >&2
+      echo "" >&2
+      echo "Issue: ${issue_num}/${issue_count}" >&2
+      echo "Attempt: ${attempt}" >&2
+      echo "Patch file: ${archive_prefix}_patch.diff" >&2
+      echo "" >&2
+      echo "Git apply error:" >&2
+      echo "────────────────────────────────────────────────────────────────────────────" >&2
+      echo "${patch_error}" >&2
+      echo "────────────────────────────────────────────────────────────────────────────" >&2
+      echo "" >&2
+      echo "Common causes:" >&2
+      echo "  • Patch contains fake git blob IDs (check index lines)" >&2
+      echo "  • File has been modified since CI run" >&2
+      echo "  • Line numbers/context don't match current file state" >&2
+      echo "  • Patch format is malformed" >&2
+      echo "" >&2
+      echo "Next steps:" >&2
+      echo "  • Review patch at: ${archive_prefix}_patch.diff" >&2
+      echo "  • Check LLM response at: ${archive_prefix}_response.txt" >&2
+      echo "  • Skipping to next issue..." >&2
+      echo "" >&2
+      echo "════════════════════════════════════════════════════════════════════════════" >&2
+      echo "" >&2
+      continue
+    fi
+  done
+
+  echo ""
+  echo "[xci] Finished processing ${issue_count} issue(s) from attempt ${attempt}"
+  echo "[xci] Re-running CI to verify fixes..."
 
   ((attempt+=1))
 done
