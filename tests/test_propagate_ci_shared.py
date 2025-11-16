@@ -256,10 +256,12 @@ def test_update_submodule_in_repo_no_changes(tmp_path):
     repo_path = tmp_path / "repo"
     with patch("ci_tools.scripts.propagate_ci_shared._validate_repo_state") as mock1:
         with patch("ci_tools.scripts.propagate_ci_shared._sync_repo_configs") as mock2:
-            mock1.return_value = True
-            mock2.return_value = False
-            result = update_submodule_in_repo(repo_path, "Test commit", source_root=tmp_path)
-            assert result is False
+            with patch("ci_tools.scripts.propagate_ci_shared._reinstall_ci_shared") as mock3:
+                mock1.return_value = True
+                mock2.return_value = False
+                mock3.return_value = True
+                result = update_submodule_in_repo(repo_path, "Test commit", source_root=tmp_path)
+                assert result is False
 
 
 def test_update_submodule_in_repo_success(tmp_path):
@@ -268,11 +270,15 @@ def test_update_submodule_in_repo_success(tmp_path):
     with patch("ci_tools.scripts.propagate_ci_shared._validate_repo_state") as mock1:
         with patch("ci_tools.scripts.propagate_ci_shared._sync_repo_configs") as mock2:
             with patch("ci_tools.scripts.propagate_ci_shared._commit_and_push_update") as mock3:
-                mock1.return_value = True
-                mock2.return_value = True
-                mock3.return_value = True
-                result = update_submodule_in_repo(repo_path, "Test commit", source_root=tmp_path)
-                assert result is True
+                with patch("ci_tools.scripts.propagate_ci_shared._reinstall_ci_shared") as mock4:
+                    mock1.return_value = True
+                    mock2.return_value = True
+                    mock3.return_value = True
+                    mock4.return_value = True
+                    result = update_submodule_in_repo(
+                        repo_path, "Test commit", source_root=tmp_path
+                    )
+                    assert result is True
 
 
 def test_process_repositories(tmp_path):
