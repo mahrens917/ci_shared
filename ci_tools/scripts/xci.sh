@@ -367,7 +367,7 @@ PY
             echo "  ${commit_message}"
             cp "${commit_message_file}" "${commit_prefix}_message.txt"
           else
-            echo "[xci] Codex response did not contain a commit summary."
+            echo "[xci] ${CLI_TYPE} response did not contain a commit summary."
           fi
         else
           echo "[xci] Failed to parse Codex commit response; see ${commit_prefix}_response.txt." >&2
@@ -410,14 +410,14 @@ PY
     echo "" >&2
     echo "Next steps:" >&2
     echo "  1. Review CI output above to understand the failures" >&2
-    echo "  2. Check .xci/archive/ for Codex's attempted solutions" >&2
+    echo "  2. Check .xci/archive/ for ${CLI_TYPE}'s attempted solutions" >&2
     echo "  3. Address the root architectural issues manually" >&2
     echo "  4. Consider breaking down large components" >&2
     echo "========================================"  >&2
     exit 1
   fi
 
-  echo "[xci] CI failed (exit ${ci_status}); preparing Codex prompt..."
+  echo "[xci] CI failed (exit ${ci_status}); preparing ${CLI_TYPE} prompt..."
 
   log_tail=$(tail -n "${TAIL_LINES}" "${LOG_FILE}" 2>/dev/null || true)
   git_status=$(git status --short 2>/dev/null || true)
