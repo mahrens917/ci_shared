@@ -268,30 +268,32 @@ import re
 log_text = sys.argv[1]
 
 # Common error patterns from CI tools
+# Format: (pattern, context_lines)
+# context_lines = 1 means just the error line itself (each line is a separate issue)
 patterns = [
-    # Guard script errors (structure_guard, module_guard, etc.)
-    (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 10),
+    # Guard script errors (structure_guard, module_guard, etc.) - each ERROR is one issue
+    (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 1),
 
-    # Vulture errors (unused code)
-    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: (unused|unreachable)', 3),
+    # Vulture errors (unused code) - each line is one issue
+    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: (unused|unreachable)', 1),
 
-    # Pylint errors
-    (r'^[^:]+:\d+:\d+: [EWRCF]\d+: [^\n]+', 5),
+    # Pylint errors - each line is one issue
+    (r'^[^:]+:\d+:\d+: [EWRCF]\d+: [^\n]+', 1),
 
-    # Pyright errors
-    (r'^  [^:]+:\d+:\d+ - error: [^\n]+', 5),
+    # Pyright errors - each line is one issue
+    (r'^  [^:]+:\d+:\d+ - error: [^\n]+', 1),
 
-    # Ruff errors
-    (r'^[^:]+:\d+:\d+: [A-Z]+\d+[^\n]+', 3),
+    # Ruff errors - each line is one issue
+    (r'^[^:]+:\d+:\d+: [A-Z]+\d+[^\n]+', 1),
 
-    # Policy guard violations
-    (r'policy_guard: [^\n]+', 8),
+    # Policy guard violations - each line is one issue
+    (r'policy_guard: [^\n]+', 1),
 
-    # Pytest failures
-    (r'FAILED [^\n]+', 5),
+    # Pytest failures - each line is one issue
+    (r'FAILED [^\n]+', 1),
 
     # Generic file:line: error pattern (fallback)
-    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: [^\n]+', 3),
+    (r'^[a-zA-Z0-9_/.-]+\.py:\d+: [^\n]+', 1),
 ]
 
 lines = log_text.splitlines()
