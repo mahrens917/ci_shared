@@ -220,7 +220,7 @@ mktmp() {
   mktemp "${TMP_DIR}/xci.XXXXXX"
 }
 
-# Helper to limit diff size for Codex prompt to prevent context window overflow
+# Helper to limit diff size for LLM prompt to prevent context window overflow
 limit_diff_size() {
   local diff_text="$1"
   local max_chars=50000
@@ -370,7 +370,7 @@ PY
             echo "[xci] ${CLI_TYPE} response did not contain a commit summary."
           fi
         else
-          echo "[xci] Failed to parse Codex commit response; see ${commit_prefix}_response.txt." >&2
+          echo "[xci] Failed to parse ${CLI_TYPE} commit response; see ${commit_prefix}_response.txt." >&2
         fi
       fi
     else
@@ -546,7 +546,7 @@ PY
       EMPTY_RESPONSE)
         echo "" >&2
         echo "========================================"  >&2
-        echo "[xci] ✗ FAILED: Codex returned empty response" >&2
+        echo "[xci] ✗ FAILED: ${CLI_TYPE} returned empty response" >&2
         echo "========================================"  >&2
         echo "This usually means the task is too complex for automated fixes." >&2
         echo "" >&2
@@ -565,14 +565,14 @@ PY
         echo "========================================"  >&2
         echo "[xci] ✗ FAILED: Changes require manual intervention" >&2
         echo "========================================"  >&2
-        echo "Codex indicated this issue cannot be fixed automatically." >&2
+        echo "${CLI_TYPE} indicated this issue cannot be fixed automatically." >&2
         echo "" >&2
         echo "Common reasons:" >&2
         echo "  • Classes/functions too large (need architectural refactoring)" >&2
         echo "  • Complex policy violations (require design decisions)" >&2
         echo "  • Structural issues (need breaking changes)" >&2
         echo "" >&2
-        echo "See Codex explanation at: ${archive_prefix}_response.txt" >&2
+        echo "See ${CLI_TYPE} explanation at: ${archive_prefix}_response.txt" >&2
         echo "========================================"  >&2
         exit 6
         ;;
@@ -580,9 +580,9 @@ PY
         if (( attempt >= MAX_ATTEMPTS - 1 )); then
           echo "" >&2
           echo "========================================"  >&2
-          echo "[xci] ✗ FAILED: Unable to extract fixes from Codex" >&2
+          echo "[xci] ✗ FAILED: Unable to extract fixes from ${CLI_TYPE}" >&2
           echo "========================================"  >&2
-          echo "After ${attempt} attempts, Codex has not provided usable patches." >&2
+          echo "After ${attempt} attempts, ${CLI_TYPE} has not provided usable patches." >&2
           echo "" >&2
           echo "This typically indicates:" >&2
           echo "  • The violations are too numerous/complex for automated fixing" >&2
@@ -594,7 +594,7 @@ PY
           echo "========================================"  >&2
           exit 7
         else
-          echo "[xci] Unable to extract diff from Codex response; will retry. (Response saved at ${archive_prefix}_response.txt)" >&2
+          echo "[xci] Unable to extract diff from ${CLI_TYPE} response; will retry. (Response saved at ${archive_prefix}_response.txt)" >&2
           ((attempt+=1))
           continue
         fi

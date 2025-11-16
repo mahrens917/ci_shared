@@ -197,7 +197,7 @@ def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments for the workflow CLI."""
-    parser = argparse.ArgumentParser(description="Automate CI fixes via Codex.")
+    parser = argparse.ArgumentParser(description="Automate CI fixes via LLM (Codex or Claude).")
     parser.add_argument(
         "--command",
         help="Command to run for CI (initial: ./scripts/ci.sh)",
@@ -205,26 +205,26 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--max-iterations",
         type=int,
-        help="Maximum Codex-assisted fix attempts (initial: 5)",
+        help="Maximum LLM-assisted fix attempts (initial: 5)",
     )
     parser.add_argument(
         "--log-tail",
         type=int,
-        help="Number of log lines from the failure to send to Codex (initial: 200)",
+        help="Number of log lines from the failure to send to LLM (initial: 200)",
     )
     parser.add_argument(
         "--model",
-        help=f"Codex model name (required: {REQUIRED_MODEL})",
+        help=f"LLM model name (required: {REQUIRED_MODEL})",
     )
     parser.add_argument(
         "--reasoning-effort",
         choices=REASONING_EFFORT_CHOICES,
-        help=f"Reasoning effort hint for Codex (initial: {DEFAULT_REASONING_EFFORT})",
+        help=f"Reasoning effort hint for LLM (initial: {DEFAULT_REASONING_EFFORT})",
     )
     parser.add_argument(
         "--max-patch-lines",
         type=int,
-        help="Abort if Codex suggests touching more than this many lines (initial: 1500)",
+        help="Abort if LLM suggests touching more than this many lines (initial: 1500)",
     )
     parser.add_argument(
         "--patch-approval-mode",
@@ -239,7 +239,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--commit-message",
         action="store_true",
-        help="Request a commit message from Codex after CI succeeds.",
+        help="Request a commit message from LLM after CI succeeds.",
     )
     parser.add_argument(
         "--commit-extra-context",
@@ -248,11 +248,11 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Run the CI command once and exit without contacting Codex.",
+        help="Run the CI command once and exit without contacting LLM.",
     )
     parser.add_argument(
         "--env-file",
-        help="Path to dotenv file for Codex CLI environment initial values (initial: ~/.env)",
+        help="Path to dotenv file for LLM CLI environment initial values (initial: ~/.env)",
     )
     parser.add_argument(
         "--patch-retries",
