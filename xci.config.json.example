@@ -2,7 +2,7 @@
   "_comment": "Configuration for xci.sh - All settings use config file, no env variables needed",
   "_default_cli": "Claude (claude-sonnet-4.5) - Change to 'codex' and 'gpt-5-codex' for Codex",
 
-  "max_attempts": 5,
+  "max_attempts": 10,
   "_max_attempts_help": "Maximum number of automated fix attempts before giving up",
 
   "log_tail": 200,

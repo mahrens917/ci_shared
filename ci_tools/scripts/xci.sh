@@ -3,7 +3,7 @@
 # Supports both Codex (gpt-5-codex) and Claude (claude-sonnet-4.5) CLIs.
 set -euo pipefail
 
-DEFAULT_MAX_ATTEMPTS=5
+DEFAULT_MAX_ATTEMPTS=10
 DEFAULT_TAIL_LINES=200
 DEFAULT_CODEX_CLI=claude
 DEFAULT_MODEL=claude-sonnet-4.5
@@ -139,7 +139,7 @@ Configuration File (xci.config.json):
 
   Default (Claude):
   {
-    "max_attempts": 5,
+    "max_attempts": 10,
     "log_tail": 200,
     "codex_cli": "claude",
     "model": "claude-sonnet-4.5",
@@ -155,7 +155,7 @@ Configuration File (xci.config.json):
   }
 
 Configuration Options:
-  max_attempts       Maximum fix attempts (default: 5)
+  max_attempts       Maximum fix attempts (default: 10)
   log_tail           Log lines to send to LLM (default: 200)
   codex_cli          CLI executable: "claude" or "codex" (default: claude)
   model              Model: claude-sonnet-4.5 or gpt-5-codex (default: claude-sonnet-4.5)
