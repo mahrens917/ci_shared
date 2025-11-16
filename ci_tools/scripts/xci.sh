@@ -626,7 +626,22 @@ if any(phrase in text.lower() for phrase in [
     idx = text.find(marker)
     if idx == -1:
         sys.exit(1)
-    patch_path.write_text(text[idx:])
+
+    # Clean up fake index lines
+    raw_patch = text[idx:]
+    cleaned_lines = []
+    for line in raw_patch.splitlines(keepends=True):
+        if line.startswith("index "):
+            hash_part = line[6:].split()[0]
+            if ".." in hash_part:
+                before, after = hash_part.split("..", 1)
+                if (before.isdigit() or after.isdigit() or
+                    len(set(before)) <= 2 or len(set(after)) <= 2 or
+                    before in ["0000000", "1111111", "1234567", "abcdefg"]):
+                    continue
+        cleaned_lines.append(line)
+
+    patch_path.write_text("".join(cleaned_lines))
     sys.exit(0)
 
 marker = "diff --git "
@@ -635,7 +650,25 @@ if idx == -1:
     result_path.write_text("NO_DIFF")
     sys.exit(1)
 
-patch_path.write_text(text[idx:])
+# Extract patch and clean up fake index lines
+raw_patch = text[idx:]
+cleaned_lines = []
+for line in raw_patch.splitlines(keepends=True):
+    # Skip index lines with fake/placeholder hashes (not valid git blob IDs)
+    if line.startswith("index "):
+        # Valid git hashes are 7+ hex chars like: index a1b2c3d..e4f5g6h
+        # LLMs often generate fake ones like: index 1234567..abcdefg or index 0000000..1111111
+        hash_part = line[6:].split()[0]  # Get "a1b2c3d..e4f5g6h" part
+        if ".." in hash_part:
+            before, after = hash_part.split("..", 1)
+            # Check if either hash looks fake (sequential digits, all same char, etc.)
+            if (before.isdigit() or after.isdigit() or
+                len(set(before)) <= 2 or len(set(after)) <= 2 or
+                before in ["0000000", "1111111", "1234567", "abcdefg"]):
+                continue  # Skip this fake index line
+    cleaned_lines.append(line)
+
+patch_path.write_text("".join(cleaned_lines))
 result_path.write_text("SUCCESS")
 PY
   then
