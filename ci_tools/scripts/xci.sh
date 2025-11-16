@@ -72,18 +72,27 @@ ARCHIVE_DIR=${XCI_ARCHIVE_DIR:-${CFG_ARCHIVE_DIR:-$DEFAULT_ARCHIVE_DIR}}
 TMP_DIR=${XCI_TMP_DIR:-${CFG_TMP_DIR:-$DEFAULT_TMP_DIR}}
 CLI_TYPE=${XCI_CLI_TYPE:-${CFG_CLI_TYPE:-$DEFAULT_CLI_TYPE}}
 
-# Auto-detect CLI type from executable name if set to "auto"
-if [[ "${CLI_TYPE}" == "auto" ]]; then
+# Auto-detect CLI type from executable name or model if not explicitly set
+if [[ "${CLI_TYPE}" == "auto" ]] || [[ -z "${CFG_CLI_TYPE:-}" ]]; then
   CLI_BASENAME=$(basename "${CODEX_CLI}")
-  if [[ "${CLI_BASENAME}" == "claude" ]]; then
-    CLI_TYPE="claude"
-  else
+  # If executable is named 'codex' or model is gpt-5-codex, use codex
+  if [[ "${CLI_BASENAME}" == "codex" ]] || [[ "${MODEL}" == "gpt-5-codex" ]]; then
     CLI_TYPE="codex"
+  # If executable is named 'claude' or model is claude-*, use claude
+  elif [[ "${CLI_BASENAME}" == "claude" ]] || [[ "${MODEL}" == claude-* ]]; then
+    CLI_TYPE="claude"
+  # Otherwise default to the executable basename
+  elif [[ "${CLI_BASENAME}" == "codex" ]]; then
+    CLI_TYPE="codex"
+  else
+    CLI_TYPE="claude"
   fi
 fi
 
 # Set default model based on CLI type if not explicitly configured
-if [[ "${CLI_TYPE}" == "claude" ]] && [[ "${MODEL}" == "gpt-5-codex" ]]; then
+if [[ "${CLI_TYPE}" == "codex" ]] && [[ "${MODEL}" == "claude-sonnet-4.5" ]]; then
+  MODEL="gpt-5-codex"
+elif [[ "${CLI_TYPE}" == "claude" ]] && [[ "${MODEL}" == "gpt-5-codex" ]]; then
   MODEL="claude-sonnet-4.5"
 fi
 
@@ -252,9 +261,9 @@ invoke_llm() {
   else
     # Codex CLI: uses exec subcommand with model and reasoning effort
     if [[ -n "${REASONING_EFFORT}" ]]; then
-      "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${output_file}" 2>&1
+      "${CODEX_CLI}" --dangerously-bypass-approvals-and-sandbox exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${output_file}" 2>&1
     else
-      "${CODEX_CLI}" exec --model "${MODEL}" - <"${prompt_file}" >"${output_file}" 2>&1
+      "${CODEX_CLI}" --dangerously-bypass-approvals-and-sandbox exec --model "${MODEL}" - <"${prompt_file}" >"${output_file}" 2>&1
     fi
   fi
 
