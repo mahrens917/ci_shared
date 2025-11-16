@@ -28,6 +28,7 @@ COVERAGE_GUARD_THRESHOLD := 80
 ENABLE_PYLINT := 1
 COMPLEXITY_MAX_CYCLOMATIC := 10
 COMPLEXITY_MAX_COGNITIVE := 15
+STRUCTURE_MAX_CLASS_LINES ?= 100
 MODULE_MAX_LINES := 400
 FUNCTION_MAX_LINES := 80
 METHOD_MAX_PUBLIC := 15
@@ -54,6 +55,7 @@ SHARED_PYTEST_COV_TARGET := $(SHARED_SOURCE_ROOT)
 # ============================================================================
 # GUARD ARGUMENTS (strict standards applied - uses constants above)
 # ============================================================================
+STRUCTURE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-class-lines $(STRUCTURE_MAX_CLASS_LINES)
 COMPLEXITY_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-cyclomatic $(COMPLEXITY_MAX_CYCLOMATIC) --max-cognitive $(COMPLEXITY_MAX_COGNITIVE)
 MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-module-lines $(MODULE_MAX_LINES)
 FUNCTION_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-function-lines $(FUNCTION_MAX_LINES)
@@ -73,7 +75,6 @@ SHARED_CLEANUP_ROOTS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) script
 
 PYTEST_NODES ?= $(shell $(PYTHON) -c "import os; print(max(1, os.cpu_count() - 1))")
 PYTHON ?= python
-# MAX_CLASS_LINES moved to config/ci_config.json
 
 export PYTHONDONTWRITEBYTECODE=1
 
@@ -126,7 +127,7 @@ shared-checks:
 	fi
 	$(PYTHON) -m ci_tools.scripts.policy_guard
 	$(PYTHON) -m ci_tools.scripts.data_guard
-	$(PYTHON) -m ci_tools.scripts.structure_guard --root $(SHARED_SOURCE_ROOT)
+	$(PYTHON) -m ci_tools.scripts.structure_guard $(STRUCTURE_GUARD_ARGS)
 	$(PYTHON) -m ci_tools.scripts.complexity_guard $(COMPLEXITY_GUARD_ARGS)
 	$(PYTHON) -m ci_tools.scripts.module_guard $(MODULE_GUARD_ARGS)
 	$(PYTHON) -m ci_tools.scripts.function_size_guard $(FUNCTION_GUARD_ARGS)
