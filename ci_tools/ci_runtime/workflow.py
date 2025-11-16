@@ -197,7 +197,9 @@ def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments for the workflow CLI."""
-    parser = argparse.ArgumentParser(description="Automate CI fixes via LLM (Codex or Claude).")
+    parser = argparse.ArgumentParser(
+        description="Automate CI fixes via LLM (Codex or Claude)."
+    )
     parser.add_argument(
         "--command",
         help="Command to run for CI (initial: ./scripts/ci.sh)",
