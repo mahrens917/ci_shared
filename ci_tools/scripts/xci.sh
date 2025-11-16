@@ -483,12 +483,89 @@ EOF_PROMPT
   echo "[xci] Archived response → ${archive_prefix}_response.txt"
 
   if grep -qi '^NOOP$' "${response_file}"; then
-    echo "" >&2
-    echo "========================================"  >&2
-    echo "[xci] ✗ FAILED: ${CLI_TYPE} returned NOOP (no fix suggested)" >&2
-    echo "Response saved at: ${archive_prefix}_response.txt" >&2
-    echo "========================================"  >&2
-    exit 4
+    echo "[xci] ${CLI_TYPE} returned NOOP (no automated fix for all issues)"
+    echo "[xci] Sending follow-up: asking to fix just ONE small issue..."
+
+    # Create follow-up prompt asking to fix just one issue
+    followup_prompt=$(mktmp)
+    cat > "${followup_prompt}" <<EOF_FOLLOWUP
+The previous CI failure shows multiple issues. Instead of trying to fix everything at once:
+
+1. Pick the SMALLEST, EASIEST issue from the failures below
+2. Provide a patch that fixes ONLY that one issue
+3. Ignore all other failures for now
+
+Previous CI failure log:
+\`\`\`
+${log_tail}
+\`\`\`
+
+Git status:
+${git_status:-<clean>}
+
+Current diff:
+\`\`\`diff
+${git_diff:-/* no diff */}
+\`\`\`
+
+STRICT REQUIREMENTS - YOU MUST FOLLOW THESE RULES:
+1. Fix the UNDERLYING CODE ISSUES, not the tests or CI checks
+2. NEVER add --baseline arguments to any guard scripts in Makefiles or CI configurations
+3. NEVER create baseline files (e.g., module_guard_baseline.txt, function_size_guard_baseline.txt)
+4. NEVER add exemption comments like "policy_guard: allow-*", "# noqa", or "pylint: disable"
+5. NEVER add --exclude arguments to guard scripts to bypass checks
+6. NEVER modify guard scripts themselves (policy_guard.py, module_guard.py, structure_guard.py, function_size_guard.py, etc.)
+7. NEVER modify CI configuration files (Makefile, ci.sh, xci.sh, etc.)
+8. If a module/class/function is too large, REFACTOR it into smaller pieces
+9. If there's a policy violation, FIX the code to comply with the policy
+
+Please respond with a unified diff (starting with \`diff --git\`) that fixes ONLY ONE issue.
+If you truly cannot fix even a single small issue, respond with NOOP.
+EOF_FOLLOWUP
+
+    followup_response=$(mktmp)
+    set +e
+    invoke_llm "${followup_prompt}" "${followup_response}"
+    followup_status=$?
+    set -e
+
+    if [[ ${followup_status} -ne 0 ]]; then
+      echo "" >&2
+      echo "========================================"  >&2
+      echo "[xci] ✗ FAILED: Follow-up LLM request failed (exit ${followup_status})" >&2
+      echo "========================================"  >&2
+      exit 3
+    fi
+
+    # Archive follow-up exchange
+    cp "${followup_prompt}" "${archive_prefix}_followup_prompt.txt"
+    cp "${followup_response}" "${archive_prefix}_followup_response.txt"
+    echo "[xci] Archived follow-up prompt → ${archive_prefix}_followup_prompt.txt"
+    echo "[xci] Archived follow-up response → ${archive_prefix}_followup_response.txt"
+
+    # Check if follow-up is also NOOP
+    if grep -qi '^NOOP$' "${followup_response}"; then
+      echo "" >&2
+      echo "========================================"  >&2
+      echo "[xci] ✗ FAILED: ${CLI_TYPE} returned NOOP even for single issue" >&2
+      echo "========================================"  >&2
+      echo "The failures require manual intervention." >&2
+      echo "" >&2
+      echo "Common reasons:" >&2
+      echo "  • Architectural refactoring needed (too many oversized classes)" >&2
+      echo "  • Complex policy violations requiring design decisions" >&2
+      echo "  • Issues are interdependent and cannot be fixed individually" >&2
+      echo "" >&2
+      echo "Review the CI output and archived responses:" >&2
+      echo "  Initial response: ${archive_prefix}_response.txt" >&2
+      echo "  Follow-up response: ${archive_prefix}_followup_response.txt" >&2
+      echo "========================================"  >&2
+      exit 4
+    fi
+
+    # Use the follow-up response for patch extraction
+    echo "[xci] ${CLI_TYPE} provided a patch for one issue; proceeding..."
+    cp "${followup_response}" "${response_file}"
   fi
 
   patch_file=$(mktmp)
