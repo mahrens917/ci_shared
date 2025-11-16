@@ -106,6 +106,23 @@ def _sync_repo_configs(repo_path: Path, repo_name: str, source_root: Path) -> bo
     return True
 
 
+def _reinstall_ci_shared(repo_path: Path, repo_name: str, source_root: Path) -> bool:
+    """Reinstall ci_shared package to update xci.sh script in bin directory."""
+    print(f"Reinstalling ci_shared in {repo_name} to update xci.sh...")
+    result = run_command(
+        [sys.executable, "-m", "pip", "install", "-e", str(source_root)],
+        cwd=repo_path,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(f"⚠️  Failed to reinstall ci_shared in {repo_name}")
+        print(f"   Error: {result.stderr}")
+        return False
+
+    print(f"✓ Successfully reinstalled ci_shared in {repo_name}")
+    return True
+
+
 def _commit_and_push_update(
     repo_path: Path, repo_name: str, ci_shared_commit_msg: str
 ) -> bool:
@@ -169,7 +186,12 @@ def update_submodule_in_repo(
     if not _validate_repo_state(repo_path, repo_name):
         return False
 
-    if not _sync_repo_configs(repo_path, repo_name, source_root):
+    has_changes = _sync_repo_configs(repo_path, repo_name, source_root)
+
+    # Always reinstall ci_shared to update xci.sh, even if no config changes
+    _reinstall_ci_shared(repo_path, repo_name, source_root)
+
+    if not has_changes:
         return False
 
     return _commit_and_push_update(repo_path, repo_name, ci_shared_commit_msg)
