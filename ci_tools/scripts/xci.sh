@@ -241,17 +241,43 @@ invoke_llm() {
   local prompt_file="$1"
   local output_file="$2"
 
+  # Show what we're doing
+  local prompt_size
+  prompt_size=$(wc -c < "${prompt_file}" | tr -d ' ')
+  echo "[xci] Sending ${prompt_size} byte prompt to ${CLI_TYPE} (${MODEL})..."
+
   if [[ "${CLI_TYPE}" == "claude" ]]; then
-    # Claude CLI: simple invocation with --print flag
-    "${CODEX_CLI}" -p <"${prompt_file}" >"${output_file}"
+    # Claude CLI: simple invocation with --print flag and skip permissions
+    "${CODEX_CLI}" --dangerously-skip-permissions -p <"${prompt_file}" >"${output_file}" 2>&1
   else
     # Codex CLI: uses exec subcommand with model and reasoning effort
     if [[ -n "${REASONING_EFFORT}" ]]; then
-      "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${output_file}"
+      "${CODEX_CLI}" exec --model "${MODEL}" -c "model_reasoning_effort=${REASONING_EFFORT}" - <"${prompt_file}" >"${output_file}" 2>&1
     else
-      "${CODEX_CLI}" exec --model "${MODEL}" - <"${prompt_file}" >"${output_file}"
+      "${CODEX_CLI}" exec --model "${MODEL}" - <"${prompt_file}" >"${output_file}" 2>&1
     fi
   fi
+
+  local exit_code=$?
+
+  if [[ ${exit_code} -eq 0 ]]; then
+    local response_size
+    response_size=$(wc -c < "${output_file}" | tr -d ' ')
+    echo "[xci] Received ${response_size} byte response from ${CLI_TYPE}."
+
+    # Show first 200 chars of response for visibility
+    local preview
+    preview=$(head -c 200 "${output_file}")
+    echo "[xci] Response preview: ${preview}..."
+  else
+    echo "[xci] ERROR: ${CLI_TYPE} returned exit code ${exit_code}" >&2
+    if [[ -s "${output_file}" ]]; then
+      echo "[xci] Error output:" >&2
+      head -20 "${output_file}" >&2
+    fi
+  fi
+
+  return ${exit_code}
 }
 
 attempt=1
@@ -439,7 +465,7 @@ EOF_PROMPT
   if grep -qi '^NOOP$' "${response_file}"; then
     echo "" >&2
     echo "========================================"  >&2
-    echo "[xci] ✗ FAILED: Codex returned NOOP (no fix suggested)" >&2
+    echo "[xci] ✗ FAILED: ${CLI_TYPE} returned NOOP (no fix suggested)" >&2
     echo "Response saved at: ${archive_prefix}_response.txt" >&2
     echo "========================================"  >&2
     exit 4
@@ -583,13 +609,14 @@ PY
 
   if git apply --check --whitespace=nowarn "${patch_file}" 2>/dev/null; then
     git apply --allow-empty --whitespace=nowarn "${patch_file}"
-    echo "[xci] Applied patch from Codex (see ${patch_file})."
+    echo "[xci] Applied patch from ${CLI_TYPE} (see ${patch_file})."
+    echo "[xci] Full exchange archived at: ${archive_prefix}_prompt.txt and ${archive_prefix}_response.txt"
   elif git apply --check --reverse --whitespace=nowarn "${patch_file}" 2>/dev/null; then
     echo "[xci] Patch already applied; rerunning CI with existing changes."
     ((attempt+=1))
     continue
   else
-    echo "[xci] Patch failed dry-run; will retry with fresh Codex request. (Response saved at ${archive_prefix}_response.txt)" >&2
+    echo "[xci] Patch failed dry-run; will retry with fresh ${CLI_TYPE} request. (Response saved at ${archive_prefix}_response.txt)" >&2
     ((attempt+=1))
     continue
   fi
