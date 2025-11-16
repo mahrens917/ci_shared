@@ -253,7 +253,13 @@ invoke_llm() {
   # Show what we're doing
   local prompt_size
   prompt_size=$(wc -c < "${prompt_file}" | tr -d ' ')
-  echo "[xci] Sending ${prompt_size} byte prompt to ${CLI_TYPE} (${MODEL})..."
+  echo ""
+  echo "============================================================"
+  echo "[xci] PROMPT (${prompt_size} bytes) → ${CLI_TYPE} (${MODEL})"
+  echo "============================================================"
+  cat "${prompt_file}"
+  echo "============================================================"
+  echo ""
 
   if [[ "${CLI_TYPE}" == "claude" ]]; then
     # Claude CLI: simple invocation with --print flag and skip permissions
@@ -272,12 +278,13 @@ invoke_llm() {
   if [[ ${exit_code} -eq 0 ]]; then
     local response_size
     response_size=$(wc -c < "${output_file}" | tr -d ' ')
-    echo "[xci] Received ${response_size} byte response from ${CLI_TYPE}."
-
-    # Show first 200 chars of response for visibility
-    local preview
-    preview=$(head -c 200 "${output_file}")
-    echo "[xci] Response preview: ${preview}..."
+    echo ""
+    echo "============================================================"
+    echo "[xci] RESPONSE (${response_size} bytes) from ${CLI_TYPE}"
+    echo "============================================================"
+    cat "${output_file}"
+    echo "============================================================"
+    echo ""
   else
     echo "[xci] ERROR: ${CLI_TYPE} returned exit code ${exit_code}" >&2
     if [[ -s "${output_file}" ]]; then
@@ -322,6 +329,7 @@ Use the provided diff for context. Do not run shell commands such as `diff --git
 EOF_COMMIT
 
       cp "${commit_prompt}" "${commit_prefix}_prompt.txt"
+      echo "[xci] Archived commit prompt → ${commit_prefix}_prompt.txt"
 
       commit_response=$(mktmp)
       set +e
@@ -333,6 +341,7 @@ EOF_COMMIT
         echo "[xci] LLM commit message request failed (exit ${commit_status}); skipping suggestion." >&2
       else
         cp "${commit_response}" "${commit_prefix}_response.txt"
+        echo "[xci] Archived commit response → ${commit_prefix}_response.txt"
         commit_message_file=$(mktmp)
         if python - "${commit_response}" "${commit_message_file}" <<'PY'
 import pathlib
@@ -470,6 +479,8 @@ EOF_PROMPT
   archive_prefix="${ARCHIVE_DIR}/attempt${attempt}_${timestamp}"
   cp "${prompt_file}" "${archive_prefix}_prompt.txt"
   cp "${response_file}" "${archive_prefix}_response.txt"
+  echo "[xci] Archived prompt → ${archive_prefix}_prompt.txt"
+  echo "[xci] Archived response → ${archive_prefix}_response.txt"
 
   if grep -qi '^NOOP$' "${response_file}"; then
     echo "" >&2
@@ -592,6 +603,7 @@ PY
   fi
 
   cp "${patch_file}" "${archive_prefix}_patch.diff"
+  echo "[xci] Archived patch → ${archive_prefix}_patch.diff"
 
   # Validate patch doesn't modify protected CI infrastructure
   FORBIDDEN_PATHS="ci_tools/|scripts/ci\.sh|Makefile|xci\.sh|/ci\.py"
