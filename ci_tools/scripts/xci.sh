@@ -271,6 +271,9 @@ log_text = sys.argv[1]
 # Format: (pattern, context_lines)
 # context_lines = 1 means just the error line itself (each line is a separate issue)
 patterns = [
+    # Structure guard bullet-point format - each "  - " line is one issue
+    (r'^\s+-\s+src/.+\.(py|ts|js):\d+\s+class\s+\S+\s+spans\s+\d+\s+lines', 1),
+
     # Guard script errors (structure_guard, module_guard, etc.) - each ERROR is one issue
     (r'ERROR: (?:Class|Function|Module|File) [^\n]+', 1),
 
