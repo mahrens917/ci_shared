@@ -82,74 +82,135 @@ export PYTHONDONTWRITEBYTECODE=1
 .PHONY: shared-checks
 shared-checks:
 	@echo "Running shared CI checks..."
-	isort --profile black $(FORMAT_TARGETS)
-	black $(FORMAT_TARGETS)
-	@if [ -n "$(SHARED_CODESPELL_IGNORE)" ] && [ -f "$(SHARED_CODESPELL_IGNORE)" ]; then \
+	@FAILED_CHECKS=0; \
+	\
+	echo "→ Running isort..."; \
+	isort --profile black $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running black..."; \
+	black $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running codespell..."; \
+	if [ -n "$(SHARED_CODESPELL_IGNORE)" ] && [ -f "$(SHARED_CODESPELL_IGNORE)" ]; then \
 		IGNORE_FLAG="--ignore-words=$(SHARED_CODESPELL_IGNORE)"; \
 	else \
 		IGNORE_FLAG=""; \
 	fi; \
-		CODESPELL_SKIP=".git,artifacts,artifacts/*,trash,trash/*,models,node_modules,logs,htmlcov,*.json,*.csv"; \
-		codespell --skip="$$CODESPELL_SKIP" --quiet-level=2 $$IGNORE_FLAG
-	vulture $(FORMAT_TARGETS) --min-confidence 80
-	deptry --config pyproject.toml .
-	@# Security checks
-	@if command -v gitleaks >/dev/null 2>&1; then \
+	CODESPELL_SKIP=".git,artifacts,artifacts/*,trash,trash/*,models,node_modules,logs,htmlcov,*.json,*.csv"; \
+	codespell --skip="$$CODESPELL_SKIP" --quiet-level=2 $$IGNORE_FLAG || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running vulture..."; \
+	vulture $(FORMAT_TARGETS) --min-confidence 80 || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running deptry..."; \
+	deptry --config pyproject.toml . || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running gitleaks..."; \
+	if command -v gitleaks >/dev/null 2>&1; then \
 		if [ -n "$(GITLEAKS_CONFIG_PATH)" ]; then \
 			CONFIG_FLAG="--config $(GITLEAKS_CONFIG_PATH)"; \
 		else \
 			CONFIG_FLAG=""; \
 		fi; \
-		echo "Running gitleaks secret scan..."; \
 		SCAN_TARGETS="$(GITLEAKS_SOURCE_DIRS)"; \
 		if [ -z "$$SCAN_TARGETS" ]; then \
 			SCAN_TARGETS="."; \
 		fi; \
+		GITLEAKS_FAILED=0; \
 		for TARGET in $$SCAN_TARGETS; do \
 			if [ -e "$$TARGET" ]; then \
 				echo "  → scanning $$TARGET"; \
-				gitleaks detect $$CONFIG_FLAG --no-git --source "$$TARGET" --verbose || exit 1; \
+				gitleaks detect $$CONFIG_FLAG --no-git --source "$$TARGET" --verbose || GITLEAKS_FAILED=1; \
 			fi; \
 		done; \
+		if [ $$GITLEAKS_FAILED -eq 1 ]; then \
+			FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+		fi; \
 	else \
 		echo "⚠️  gitleaks not installed - skipping secret scan"; \
 		echo "   Install: brew install gitleaks (macOS) or see https://github.com/gitleaks/gitleaks#installing"; \
-	fi
+	fi; \
+	\
+	echo "→ Running bandit..."; \
 	BANDIT_BASELINE_FLAG=""; \
 	if [ -n "$(BANDIT_BASELINE)" ] && [ -f "$(BANDIT_BASELINE)" ]; then \
 		BANDIT_BASELINE_FLAG="-b $(BANDIT_BASELINE)"; \
 	fi; \
-	$(PYTHON) -m ci_tools.scripts.bandit_wrapper -c pyproject.toml -r $(FORMAT_TARGETS) -q --exclude $(BANDIT_EXCLUDE) $$BANDIT_BASELINE_FLAG
-	@# Skip safety in CI automation to avoid rate limits, run manually
-	@if [ -z "$(CI_AUTOMATION)" ]; then \
-		echo "Running safety vulnerability scan..."; \
+	$(PYTHON) -m ci_tools.scripts.bandit_wrapper -c pyproject.toml -r $(FORMAT_TARGETS) -q --exclude $(BANDIT_EXCLUDE) $$BANDIT_BASELINE_FLAG || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	if [ -z "$(CI_AUTOMATION)" ]; then \
+		echo "→ Running safety..."; \
 		$(PYTHON) -m safety scan --json --cache tail || echo "⚠️  safety scan failed or rate limited"; \
-	fi
-	$(PYTHON) -m ci_tools.scripts.policy_guard
-	$(PYTHON) -m ci_tools.scripts.data_guard
-	$(PYTHON) -m ci_tools.scripts.structure_guard $(STRUCTURE_GUARD_ARGS)
-	$(PYTHON) -m ci_tools.scripts.complexity_guard $(COMPLEXITY_GUARD_ARGS)
-	$(PYTHON) -m ci_tools.scripts.module_guard $(MODULE_GUARD_ARGS)
-	$(PYTHON) -m ci_tools.scripts.function_size_guard $(FUNCTION_GUARD_ARGS)
-	$(PYTHON) -m ci_tools.scripts.inheritance_guard --root $(SHARED_SOURCE_ROOT) --max-depth $(INHERITANCE_MAX_DEPTH)
-	$(PYTHON) -m ci_tools.scripts.method_count_guard $(METHOD_COUNT_GUARD_ARGS)
-	$(PYTHON) -m ci_tools.scripts.dependency_guard --root $(SHARED_SOURCE_ROOT) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS)
-	$(PYTHON) -m ci_tools.scripts.unused_module_guard $(UNUSED_MODULE_GUARD_ARGS) --strict
-	$(PYTHON) -m ci_tools.scripts.documentation_guard --root $(SHARED_DOC_ROOT)
-	ruff check --target-version=py310 --fix $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT)
-	pyright --warnings $(SHARED_PYRIGHT_TARGETS)
-	pylint -j $(PYTEST_NODES) $(PYLINT_ARGS) $(SHARED_PYLINT_TARGETS)
-	@for DIR in $(SHARED_CLEANUP_ROOTS); do \
+	fi; \
+	\
+	echo "→ Running policy_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.policy_guard || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running data_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.data_guard || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running structure_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.structure_guard $(STRUCTURE_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running complexity_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.complexity_guard $(COMPLEXITY_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running module_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.module_guard $(MODULE_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running function_size_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.function_size_guard $(FUNCTION_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running inheritance_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.inheritance_guard --root $(SHARED_SOURCE_ROOT) --max-depth $(INHERITANCE_MAX_DEPTH) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running method_count_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.method_count_guard $(METHOD_COUNT_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running dependency_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.dependency_guard --root $(SHARED_SOURCE_ROOT) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running unused_module_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.unused_module_guard $(UNUSED_MODULE_GUARD_ARGS) --strict || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running documentation_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.documentation_guard --root $(SHARED_DOC_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running ruff..."; \
+	ruff check --target-version=py310 --fix $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running pyright..."; \
+	pyright --warnings $(SHARED_PYRIGHT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running pylint..."; \
+	pylint -j $(PYTEST_NODES) $(PYLINT_ARGS) $(SHARED_PYLINT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Cleaning bytecode..."; \
+	for DIR in $(SHARED_CLEANUP_ROOTS); do \
 		if [ -d "$$DIR" ]; then \
 			find "$$DIR" -name "*.pyc" -delete 2>/dev/null || true; \
 		fi; \
-	done
-	@for DIR in $(SHARED_CLEANUP_ROOTS); do \
+	done; \
+	for DIR in $(SHARED_CLEANUP_ROOTS); do \
 		if [ -d "$$DIR" ]; then \
 			find "$$DIR" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true; \
 		fi; \
-	done
-	pytest -n $(PYTEST_NODES) $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) -W error $(SHARED_PYTEST_EXTRA)
-	$(PYTHON) -m ci_tools.scripts.coverage_guard --threshold $(COVERAGE_GUARD_THRESHOLD) --data-file "$(CURDIR)/.coverage"
-	$(PYTHON) -m compileall $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT)
-	@echo "✅ All shared CI checks passed!"
+	done; \
+	\
+	echo "→ Running pytest..."; \
+	pytest -n $(PYTEST_NODES) $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) -W error $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running coverage_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.coverage_guard --threshold $(COVERAGE_GUARD_THRESHOLD) --data-file "$(CURDIR)/.coverage" || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running compileall..."; \
+	$(PYTHON) -m compileall $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo ""; \
+	if [ $$FAILED_CHECKS -eq 0 ]; then \
+		echo "✅ All shared CI checks passed!"; \
+		exit 0; \
+	else \
+		echo "❌ $$FAILED_CHECKS check(s) failed"; \
+		exit 1; \
+	fi

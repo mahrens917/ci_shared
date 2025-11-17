@@ -416,68 +416,31 @@ while true; do
     echo "[xci] CI passed on attempt ${attempt}."
     status_after_ci=$(git status --short 2>/dev/null || true)
     if [[ -n "${status_after_ci}" ]]; then
-      diff_after_ci=$(limit_diff_size "$(git diff 2>/dev/null || true)")
       timestamp=$(date +"%Y%m%dT%H%M%S")
       commit_prefix="${ARCHIVE_DIR}/commit_${timestamp}"
-      commit_prompt=$(mktmp)
-      cat >"${commit_prompt}" <<EOF_COMMIT
-You are preparing an imperative, single-line git commit message (<=72 characters)
-for the current working tree. Provide only the commit summary line; do not
-include additional commentary unless a short body is absolutely necessary.
 
-Repository status (git status --short):
-${status_after_ci}
+      # Stage all changes for commit message generation
+      echo "[xci] Staging changes for commit message generation..."
+      git add -A
 
-Diff (git diff):
-```diff
-${diff_after_ci}
-```
-Use the provided diff for context. Do not run shell commands such as `diff --git`.
-EOF_COMMIT
-
-      cp "${commit_prompt}" "${commit_prefix}_prompt.txt"
-      echo "[xci] Archived commit prompt → ${commit_prefix}_prompt.txt"
-
-      commit_response=$(mktmp)
+      commit_message_file=$(mktmp)
       set +e
-      invoke_llm "${commit_prompt}" "${commit_response}"
+      python -m ci_tools.scripts.generate_commit_message --output "${commit_message_file}"
       commit_status=$?
       set -e
 
       if [[ ${commit_status} -ne 0 ]]; then
-        echo "[xci] LLM commit message request failed (exit ${commit_status}); skipping suggestion." >&2
+        echo "[xci] Commit message generation failed (exit ${commit_status}); skipping suggestion." >&2
       else
-        cp "${commit_response}" "${commit_prefix}_response.txt"
-        echo "[xci] Archived commit response → ${commit_prefix}_response.txt"
-        commit_message_file=$(mktmp)
-        if python - "${commit_response}" "${commit_message_file}" <<'PY'
-import pathlib
-import sys
+        cp "${commit_message_file}" "${commit_prefix}_message.txt"
+        echo "[xci] Archived commit message → ${commit_prefix}_message.txt"
 
-response_path = pathlib.Path(sys.argv[1])
-out_path = pathlib.Path(sys.argv[2])
-
-text = response_path.read_text().strip()
-if text.startswith("assistant:"):
-    text = text.partition("\n")[2]
-
-text = text.strip()
-if text:
-    out_path.write_text(text)
-else:
-    out_path.write_text("")
-PY
-        then
-          commit_message=$(head -n 1 "${commit_message_file}" | tr -d '\r')
-          if [[ -n "${commit_message}" ]]; then
-            echo "[xci] Suggested commit message:"
-            echo "  ${commit_message}"
-            cp "${commit_message_file}" "${commit_prefix}_message.txt"
-          else
-            echo "[xci] ${CLI_TYPE} response did not contain a commit summary."
-          fi
+        commit_message=$(head -n 1 "${commit_message_file}" | tr -d '\r')
+        if [[ -n "${commit_message}" ]]; then
+          echo "[xci] Suggested commit message:"
+          echo "  ${commit_message}"
         else
-          echo "[xci] Failed to parse ${CLI_TYPE} commit response; see ${commit_prefix}_response.txt." >&2
+          echo "[xci] Commit message response was empty."
         fi
       fi
     else
