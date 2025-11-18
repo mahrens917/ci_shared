@@ -50,6 +50,9 @@ omit = [
     "tests/*",           # Exclude test directory
     "*/tests/*",         # Exclude tests in any subdirectory
     "*_test_*.py",       # Exclude test utility files (e.g., api_test_utils.py)
+    "*/dependency_injector/*.pyx",    # Exclude Cython files that can't be parsed
+    "*/dependency_injector/**/*.pyx", # Exclude all nested Cython files
+    "*/site-packages/*", # Exclude all third-party packages
 ]
 
 [tool.bandit]

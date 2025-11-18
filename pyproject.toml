@@ -108,6 +108,9 @@ omit = [
     "tests/*",
     "*/tests/*",
     "*_test_*.py",
+    "*/dependency_injector/*.pyx",
+    "*/dependency_injector/**/*.pyx",
+    "*/site-packages/*",
 ]
 
 [tool.pytest]
