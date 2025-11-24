@@ -16,6 +16,7 @@ pytest-cov>=4.1.0
 pytest-xdist>=3.5.0
 pytest-asyncio>=0.23.0
 pytest-env>=1.1.0
+pytest-timeout>=2.3.1
 
 # Code Quality
 vulture>=2.11

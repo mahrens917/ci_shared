@@ -36,10 +36,73 @@
 # =============================================================================
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 addopts = [
-    "--tb=short",  # Shorter tracebacks
-    "-q",          # Quiet mode (less output)
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+    "--durations=10",
+    "--durations-min=0.1",
+    "-ra",
+    "-p",
+    "pytest_asyncio",
+    "-p",
+    "no:jaxtyping",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+consider_namespace_packages = true
+norecursedirs = ["tests/manual"]
+env = [
+    "PYTHONDONTWRITEBYTECODE=1",
+    "REDIS_HOST=localhost",
+    "REDIS_PORT=6379",
+    "REDIS_DB=0",
+    "REDIS_PASSWORD=",
+    "REDIS_SSL=false",
+    "REDIS_RETRY_ON_TIMEOUT=false",
+    "REDIS_SOCKET_TIMEOUT=30",
+    "REDIS_SOCKET_CONNECT_TIMEOUT=30",
+]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+timeout = 30
+timeout_method = "thread"
+markers = [
+    "unit: Unit tests - fast, isolated tests (< 1 second each)",
+    "integration: Integration tests - test component interactions (< 15 seconds each)",
+    "e2e: End-to-end tests - full system tests (< 2 minutes each)",
+    "slow: Tests that take longer to run (> 1 second)",
+    "fast: Fast running tests (< 1 second)",
+    "pdf: PDF processing related tests",
+    "redis: Tests requiring Redis connection",
+    "external: Tests requiring external services",
+    "performance: Performance-critical tests with timing requirements",
+    "parallel_safe: Tests explicitly verified safe for parallel execution (unused in sequential mode)",
+    "sequential_only: Tests that must run sequentially (now default behavior)",
+    "cache_population: Tests that populate cache for other tests (run first)",
+    "multi_currency: Tests that use both BTC and ETH data",
+    "btc_specific: Tests specific to BTC currency",
+    "eth_specific: Tests specific to ETH currency",
+    "cache_dependent: Tests that benefit from populated cache (run after cache population)",
+    "pnl: PnL (Profit and Loss) system related tests",
+    "slowpdf: Deterministic PDF performance regression tests",
+]
+junit_family = "xunit2"
+junit_duration_report = "total"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:The optimal value found.*is close to the specified.*bound.*:UserWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::ResourceWarning",
+    "ignore::UserWarning:sklearn",
+    "ignore::FutureWarning:sklearn",
+    "ignore::FutureWarning",
 ]
 
 [tool.coverage.run]
