@@ -198,7 +198,7 @@ shared-checks:
 	done; \
 	\
 	echo "→ Running pytest..."; \
-	pytest -q -n $(PYTEST_NODES) $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) -W error $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	pytest -q $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) -W error $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running coverage_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.coverage_guard --threshold $(COVERAGE_GUARD_THRESHOLD) --data-file "$(CURDIR)/.coverage" || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
