@@ -90,19 +90,30 @@ fi
 
 COMMIT_BODY=""
 if [ -z "${COMMIT_MESSAGE}" ]; then
-  if command -v codex >/dev/null 2>&1; then
-    echo "Requesting commit message from Codex..."
+  # Prefer Claude CLI if available, fall back to Codex
+  if command -v claude >/dev/null 2>&1; then
+    CLI_NAME="Claude"
+    export CI_CLI_TYPE=claude
+  elif command -v codex >/dev/null 2>&1; then
+    CLI_NAME="Codex"
+    export CI_CLI_TYPE=codex
+  else
+    CLI_NAME=""
+  fi
+
+  if [ -n "${CLI_NAME}" ]; then
+    echo "Requesting commit message from ${CLI_NAME}..."
     COMMIT_OUTPUT_FILE="$(mktemp)"
     if python -m ci_tools.scripts.generate_commit_message --output "${COMMIT_OUTPUT_FILE}"; then
       COMMIT_MESSAGE="$(head -n 1 "${COMMIT_OUTPUT_FILE}")"
       COMMIT_BODY="$(tail -n +2 "${COMMIT_OUTPUT_FILE}")"
       if [ -n "${COMMIT_MESSAGE//[[:space:]]/}" ]; then
-        echo "Using Codex commit summary: ${COMMIT_MESSAGE}"
+        echo "Using ${CLI_NAME} commit summary: ${COMMIT_MESSAGE}"
       else
-        echo "Codex returned an empty commit summary; falling back to manual entry." >&2
+        echo "${CLI_NAME} returned an empty commit summary; falling back to manual entry." >&2
       fi
     else
-      echo "Codex commit message generation failed; falling back to manual entry." >&2
+      echo "${CLI_NAME} commit message generation failed; falling back to manual entry." >&2
     fi
     rm -f "${COMMIT_OUTPUT_FILE}"
   fi

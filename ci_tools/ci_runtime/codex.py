@@ -1,7 +1,8 @@
-"""Codex CLI interaction helpers."""
+"""Codex/Claude CLI interaction helpers."""
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import textwrap
@@ -13,8 +14,29 @@ from .models import CodexCliError, PatchPrompt
 from .process import _stream_pipe, log_codex_interaction
 
 
+def _detect_cli_type(model: str) -> str:
+    """Detect which CLI to use based on environment or model name."""
+    cli_type = os.environ.get("CI_CLI_TYPE", "").lower()
+    if cli_type in ("claude", "codex"):
+        return cli_type
+    if model.startswith("claude"):
+        return "claude"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "claude"
+    return "codex"
+
+
 def build_codex_command(model: str, reasoning_effort: Optional[str]) -> list[str]:
-    """Return the CLI invocation for the codex binary."""
+    """Return the CLI invocation for the codex or claude binary."""
+    cli_type = _detect_cli_type(model)
+    if cli_type == "claude":
+        command = ["claude", "-p", "-"]
+        # Only pass --model if a Claude model is explicitly requested
+        # Skip passing non-Claude models (e.g., gpt-5-codex) - Claude CLI uses its default
+        if model and model.startswith("claude"):
+            command.insert(1, "--model")
+            command.insert(2, model)
+        return command
     command = ["codex", "exec", "--model", model, "-"]
     if reasoning_effort:
         command.insert(-1, "-c")
