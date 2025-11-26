@@ -40,7 +40,9 @@ def _derive_runtime_flags(
     else:
         command_basename = ""
     automation_mode = command_basename == "ci.sh"
-    command_env = {"CI_AUTOMATION": "1"} if automation_mode else {}
+    command_env: dict[str, str] = {}
+    if automation_mode:
+        command_env["CI_AUTOMATION"] = "1"
     auto_stage_enabled = args.auto_stage or automation_mode
     commit_message_enabled = args.commit_message or automation_mode
     auto_push_enabled = automation_mode

@@ -105,13 +105,19 @@ def should_include(path: Path, prefixes: Sequence[Path]) -> bool:
     )
 
 
-def is_omitted(path: Path, cov: Coverage) -> bool:
-    """Check if a file should be omitted based on coverage config omit patterns."""
-    omit_patterns = cov.config.report_omit or []
-    path_str = str(path)
-    for pattern in omit_patterns:
+def _matches_omit_pattern(path_str: str, patterns: Sequence[str]) -> bool:
+    """Check if path matches any omit pattern."""
+    for pattern in patterns:
         if fnmatch.fnmatch(path_str, pattern):
             return True
+    return False
+
+
+def is_omitted(path: Path, cov: Coverage) -> bool:
+    """Check if a file should be omitted based on coverage config omit patterns."""
+    patterns = cov.config.report_omit
+    if patterns is not None:
+        return _matches_omit_pattern(str(path), patterns)
     return False
 
 

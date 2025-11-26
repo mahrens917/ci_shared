@@ -29,7 +29,10 @@ def _load_config() -> dict[str, Any]:
 def _get_commit_config() -> dict[str, Any]:
     """Get the commit_message section from config."""
     config = _load_config()
-    return config.get("commit_message", {})
+    section = config.get("commit_message")
+    if section is None:
+        raise KeyError("commit_message section required in ci_shared.config.json")
+    return section
 
 
 def _resolve_model_arg(cli_arg: str | None, config: dict[str, Any]) -> str | None:

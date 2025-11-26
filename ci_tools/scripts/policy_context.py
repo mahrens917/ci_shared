@@ -231,9 +231,11 @@ def contains_literal_dataset(node: ast.AST) -> bool:
 
 
 def is_non_none_literal(node: ast.AST | None) -> bool:
-    """Check if a node is a non-None literal constant."""
+    """Check if a node is a non-None literal constant, dict, or list."""
     if isinstance(node, ast.Constant):
         return node.value is not None
+    if isinstance(node, (ast.Dict, ast.List, ast.Tuple, ast.Set)):
+        return True
     return False
 
 

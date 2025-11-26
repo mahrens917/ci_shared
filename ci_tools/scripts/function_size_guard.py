@@ -36,12 +36,10 @@ class FunctionSizeGuard(GuardRunner):
             help="Maximum allowed lines per function (default: 80).",
         )
 
-    def scan_file(self, path: Path, args: argparse.Namespace) -> List[str]:
-        """Scan a file for function size violations."""
-        tree = parse_python_ast(path, raise_on_error=False)
-        if tree is None:
-            return []
-
+    def _collect_violations(
+        self, path: Path, tree: ast.AST, args: argparse.Namespace
+    ) -> List[str]:
+        """Collect function size violations from AST."""
         violations: List[str] = []
         for node in iter_ast_nodes(tree, (ast.FunctionDef, ast.AsyncFunctionDef)):
             assert isinstance(
@@ -54,8 +52,14 @@ class FunctionSizeGuard(GuardRunner):
                     f"{rel_path}::{node.name} (line {node.lineno}) contains {line_count} lines "
                     f"(limit {args.max_function_lines})"
                 )
-
         return violations
+
+    def scan_file(self, path: Path, args: argparse.Namespace) -> List[str]:
+        """Scan a file for function size violations."""
+        tree = parse_python_ast(path, raise_on_error=False)
+        if tree is not None:
+            return self._collect_violations(path, tree, args)
+        return []
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""

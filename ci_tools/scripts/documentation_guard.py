@@ -32,15 +32,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _should_check_directory(
+    base_dir: Path, has_content_check: Callable[[Path], bool] | None
+) -> bool:
+    """Check if directory should be checked for README requirement."""
+    if has_content_check is not None:
+        return has_content_check(base_dir)
+    return True
+
+
 def check_single_directory(
     base_dir: Path,
     readme_path: str | None,
     has_content_check: Callable[[Path], bool] | None,
 ) -> List[str]:
     """Check if a single directory requires a README."""
-    if has_content_check and not has_content_check(base_dir):
+    if not _should_check_directory(base_dir, has_content_check):
         return []
-    return [readme_path] if readme_path else []
+    if readme_path is not None:
+        return [readme_path]
+    return []
 
 
 def should_skip_directory(item: Path) -> bool:
