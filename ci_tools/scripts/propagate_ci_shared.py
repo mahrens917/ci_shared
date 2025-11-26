@@ -107,8 +107,8 @@ def _sync_repo_configs(repo_path: Path, repo_name: str, source_root: Path) -> bo
 
 
 def _reinstall_ci_shared(repo_path: Path, repo_name: str, source_root: Path) -> bool:
-    """Reinstall ci_shared package to update xci.sh script in bin directory."""
-    print(f"Reinstalling ci_shared in {repo_name} to update xci.sh...")
+    """Reinstall ci_shared package to update scripts in bin directory."""
+    print(f"Reinstalling ci_shared in {repo_name}...")
     result = run_command(
         [sys.executable, "-m", "pip", "install", "-e", str(source_root)],
         cwd=repo_path,
@@ -188,7 +188,7 @@ def update_submodule_in_repo(
 
     has_changes = _sync_repo_configs(repo_path, repo_name, source_root)
 
-    # Always reinstall ci_shared to update xci.sh, even if no config changes
+    # Reinstall ci_shared to update scripts
     _reinstall_ci_shared(repo_path, repo_name, source_root)
 
     if not has_changes:
@@ -210,20 +210,16 @@ def _process_repositories(
     for repo in consuming_repos:
         repo_path = repo.path
         repo_name = repo.name
-        try:
-            success = update_submodule_in_repo(
-                repo_path,
-                commit_msg,
-                display_name=repo_name,
-                source_root=source_root,
-            )
-            if success:
-                updated.append(repo_name)
-            else:
-                skipped.append(repo_name)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"❌ Error updating {repo_name}: {e}", file=sys.stderr)
-            failed.append(repo_name)
+        success = update_submodule_in_repo(
+            repo_path,
+            commit_msg,
+            display_name=repo_name,
+            source_root=source_root,
+        )
+        if success:
+            updated.append(repo_name)
+        else:
+            skipped.append(repo_name)
 
     return updated, skipped, failed
 
@@ -279,7 +275,9 @@ def main() -> int:
 
     _print_summary(updated, skipped, failed)
 
-    return 0 if not failed else 1
+    if failed:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

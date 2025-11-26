@@ -71,7 +71,8 @@ def summarize_failure(log_excerpt: str) -> tuple[str, List[str]]:
     if pyright_matches:
         unique_files: dict[str, str] = {}
         for rel_path, lineno in pyright_matches:
-            unique_files.setdefault(rel_path, lineno)
+            if rel_path not in unique_files:
+                unique_files[rel_path] = lineno
         summary_lines = [
             "pyright reported type errors:",
             *[f"- {path}:{lineno}" for path, lineno in unique_files.items()],

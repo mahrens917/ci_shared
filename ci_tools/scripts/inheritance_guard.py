@@ -49,6 +49,12 @@ def build_class_hierarchy(tree: ast.AST) -> Dict[str, List[str]]:
     return hierarchy
 
 
+def _new_visited_set() -> Set[str]:
+    """Create a new empty visited set."""
+    result: Set[str] = set()
+    return result
+
+
 def calculate_depth(
     class_name: str,
     hierarchy: Dict[str, List[str]],
@@ -59,7 +65,7 @@ def calculate_depth(
     Returns 0 for classes with no bases, 1 for direct inheritance, etc.
     """
     if visited is None:
-        visited = set()
+        visited = _new_visited_set()
 
     # Cycle detection
     if class_name in visited:
@@ -86,7 +92,9 @@ def calculate_depth(
         max_base_depth = max(max_base_depth, base_depth)
 
     # Only count depth if there were non-skipped bases
-    return max_base_depth + 1 if has_real_bases else 0
+    if has_real_bases:
+        return max_base_depth + 1
+    return 0
 
 
 class InheritanceGuard(GuardRunner):
@@ -124,7 +132,10 @@ class InheritanceGuard(GuardRunner):
             if depth > args.max_depth:
                 base_names = extract_base_names(node)
                 rel_path = relative_path(path, self.repo_root)
-                bases_str = ", ".join(base_names) if base_names else "(none)"
+                if base_names:
+                    bases_str = ", ".join(base_names)
+                else:
+                    bases_str = "(none)"
                 violations.append(
                     f"{rel_path}:{node.lineno} class {node.name} has inheritance "
                     f"depth {depth} (limit {args.max_depth}) - bases: {bases_str}"

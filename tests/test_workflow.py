@@ -60,11 +60,11 @@ class TestResolveModelChoice:
             result = resolve_model_choice(None, validate=True)
             assert result == "gpt-5-codex"
 
-    def test_defaults_to_required_model(self):
-        """Test defaulting to required model when no arg or env."""
+    def test_raises_when_no_model_provided(self):
+        """Test raising exception when no model is provided."""
         with patch.dict(os.environ, {}, clear=True):
-            result = resolve_model_choice(None, validate=True)
-            assert result == "gpt-5-codex"
+            with pytest.raises(ModelSelectionAbort):
+                resolve_model_choice(None, validate=True)
 
     def test_rejects_env_var_with_wrong_model(self):
         """Test rejecting wrong model from environment variable."""
@@ -104,11 +104,11 @@ class TestResolveReasoningChoice:
             result = resolve_reasoning_choice(None, validate=True)
             assert result == "medium"
 
-    def test_defaults_to_high(self):
-        """Test defaulting to 'high' when no arg or env."""
+    def test_raises_when_no_reasoning_provided(self):
+        """Test raising exception when no reasoning effort is provided."""
         with patch.dict(os.environ, {}, clear=True):
-            result = resolve_reasoning_choice(None, validate=True)
-            assert result == "high"
+            with pytest.raises(ReasoningEffortAbort):
+                resolve_reasoning_choice(None, validate=True)
 
     def test_case_insensitive_env_var(self):
         """Test environment variable is case-insensitive."""
@@ -312,7 +312,7 @@ class TestPerformDryRun:
 class TestCollectWorktreeDiffs:
     """Tests for _collect_worktree_diffs function."""
 
-    @patch("ci_tools.ci_runtime.workflow.gather_git_diff")
+    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
     def test_collects_unstaged_and_staged_diffs(self, mock_gather):
         """Test collecting both unstaged and staged diffs."""
         mock_gather.side_effect = ["unstaged content", "staged content"]
@@ -350,7 +350,7 @@ class TestStageIfNeeded:
     """Tests for _stage_if_needed function."""
 
     @patch("ci_tools.ci_runtime.workflow.run_command")
-    @patch("ci_tools.ci_runtime.workflow.gather_git_diff")
+    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
     def test_stages_all_changes_when_enabled(self, mock_gather, mock_run):
         """Test staging all changes when auto-stage is enabled."""
         mock_gather.return_value = "new staged diff"
@@ -447,14 +447,12 @@ class TestMaybePushOrNotify:
 
         mock_commit.assert_called_once_with("commit summary", ["body line"], push=True)
 
-    @patch("ci_tools.ci_runtime.workflow.commit_and_push")
-    def test_uses_default_summary_when_none(self, mock_commit):
-        """Test using default summary when None provided."""
+    def test_raises_when_summary_is_none_with_auto_push(self):
+        """Test raises ValueError when summary is None with auto-push enabled."""
         options = Mock(auto_push_enabled=True)
 
-        _maybe_push_or_notify(options, None, [])
-
-        mock_commit.assert_called_once_with("Automated commit", [], push=True)
+        with pytest.raises(ValueError, match="Commit summary is required"):
+            _maybe_push_or_notify(options, None, [])
 
     def test_prints_notification_when_auto_push_disabled(self, capsys):
         """Test printing notification when auto-push is disabled."""

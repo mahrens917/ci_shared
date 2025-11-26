@@ -10,12 +10,14 @@ from ci_tools.ci_runtime.models import (
     CiAbort,
     CiError,
     CodexCliError,
+    CommandConfig,
     CommandResult,
     CommitMessageError,
     CoverageCheckResult,
     CoverageDeficit,
     FailureContext,
     GitCommandAbort,
+    ModelConfig,
     ModelSelectionAbort,
     PatchApplyError,
     PatchAttemptState,
@@ -24,6 +26,7 @@ from ci_tools.ci_runtime.models import (
     ReasoningEffortAbort,
     RepositoryStateAbort,
     RuntimeOptions,
+    WorkflowConfig,
 )
 
 
@@ -244,15 +247,15 @@ class TestRuntimeOptions:
     def test_creation_with_all_fields(self):
         """Test RuntimeOptions with all fields."""
         options = RuntimeOptions(
-            command_tokens=["make", "test"],
-            command_env={"FOO": "bar"},
-            patch_approval_mode="prompt",
-            automation_mode=True,
-            auto_stage_enabled=False,
-            commit_message_enabled=True,
-            auto_push_enabled=False,
-            model_name="gpt-5-codex",
-            reasoning_effort="high",
+            command=CommandConfig(tokens=["make", "test"], env={"FOO": "bar"}),
+            workflow=WorkflowConfig(
+                patch_approval_mode="prompt",
+                automation_mode=True,
+                auto_stage_enabled=False,
+                commit_message_enabled=True,
+                auto_push_enabled=False,
+            ),
+            model=ModelConfig(name="gpt-5-codex", reasoning_effort="high"),
         )
         assert options.command_tokens == ["make", "test"]
         assert options.command_env == {"FOO": "bar"}

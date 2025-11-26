@@ -5,23 +5,30 @@ from __future__ import annotations
 import os
 import subprocess
 import textwrap
-from typing import List, Optional
+from typing import List
 
 from .codex import invoke_codex
 from .models import CommitMessageError, GitCommandAbort
 from .process import run_command
 
 
+def _format_staged_diff(staged_diff: str) -> str:
+    """Format staged diff for display."""
+    if staged_diff:
+        return staged_diff
+    return "/* no staged diff */"
+
+
 def request_commit_message(
     *,
     model: str,
-    reasoning_effort: Optional[str],
+    reasoning_effort: str,
     staged_diff: str,
     extra_context: str,
     detailed: bool = False,
 ) -> tuple[str, List[str]]:
     """Ask Codex to produce a commit message for the staged diff."""
-    effort_display = reasoning_effort or "default"
+    effort_display = reasoning_effort
     if detailed:
         instructions = textwrap.dedent(
             """\
@@ -42,6 +49,7 @@ def request_commit_message(
             """
         ).strip()
     extra_block = extra_context.strip()
+    diff_display = _format_staged_diff(staged_diff)
     prompt = textwrap.dedent(
         f"""\
         You write high-quality git commit messages.
@@ -52,7 +60,7 @@ def request_commit_message(
 
         Diff for the staged changes:
         ```diff
-        {staged_diff or '/* no staged diff */'}
+        {diff_display}
         ```
 
         {instructions}
@@ -95,14 +103,16 @@ def commit_and_push(
     if not push:
         return
 
-    remote = os.environ.get("GIT_REMOTE") or "origin"
+    remote_env = os.environ.get("GIT_REMOTE")
+    if not remote_env:
+        raise GitCommandAbort.missing_remote()
     branch_result = run_command(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"], check=True
     )
     branch = branch_result.stdout.strip()
-    print(f"[info] Pushing to {remote}/{branch}...")
+    print(f"[info] Pushing to {remote_env}/{branch}...")
     try:
-        run_command(["git", "push", remote, branch], check=True, live=True)
+        run_command(["git", "push", remote_env, branch], check=True, live=True)
     except subprocess.CalledProcessError as exc:  # pragma: no cover - defensive
         raise GitCommandAbort.push_failed(exc) from exc
 

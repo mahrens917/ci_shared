@@ -1,1 +1,1 @@
-"""Compatibility shims used by shared CI tooling."""
+"""Vendored dependencies for shared CI tooling."""

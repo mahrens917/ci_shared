@@ -21,7 +21,6 @@ def main() -> int:  # pragma: no cover - thin wrapper
     return _run_policy_checks()
 
 
-# pylint: disable=duplicate-code
 if __name__ == "__main__":  # pragma: no cover
     try:
         sys.exit(main())

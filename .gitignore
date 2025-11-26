@@ -30,14 +30,13 @@ config.json
 *config*.json
 !ci_shared.config.json
 !.ci_shared.config.json
-!xci.config.json.example
 
 # API keys and tokens
 *.token
 *.apikey
 .netrc
 
-# XCI runtime files (logs and temp files)
+# CI runtime files (logs and temp files)
 .xci/
 .xci.log
 

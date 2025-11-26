@@ -37,10 +37,10 @@ def get_class_line_span(node: ast.ClassDef) -> tuple[int, int]:
     Returns:
         Tuple of (start_line, end_line)
     """
-    start = getattr(node, "lineno", 0)
-    end = getattr(node, "end_lineno", None)
+    start = node.lineno
+    end = node.end_lineno
     if end is None:
-        # Fallback: walk all child nodes to find maximum line number
+        # Walk all child nodes to find maximum line number
         end = start
         for inner in ast.walk(node):
             inner_end = getattr(inner, "end_lineno", None)

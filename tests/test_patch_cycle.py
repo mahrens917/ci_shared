@@ -295,7 +295,7 @@ class TestShouldApplyPatch:
 class TestRequestAndApplyPatches:
     """Tests for request_and_apply_patches function."""
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -343,7 +343,7 @@ class TestRequestAndApplyPatches:
         mock_obtain.assert_called_once()
         mock_apply.assert_called_once()
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -390,7 +390,7 @@ class TestRequestAndApplyPatches:
 
         assert mock_obtain.call_count == 2
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -438,7 +438,7 @@ class TestRequestAndApplyPatches:
         assert mock_obtain.call_count == 2
         assert mock_should_apply.call_count == 2
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -485,7 +485,7 @@ class TestRequestAndApplyPatches:
 
         assert mock_apply.call_count == 2
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -533,7 +533,7 @@ class TestRequestAndApplyPatches:
 
         assert "exhausting retries" in str(exc_info.value)
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -583,7 +583,7 @@ class TestRequestAndApplyPatches:
         assert "git status after patch" in captured.out
         assert "M file.py" in captured.out
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -633,7 +633,7 @@ class TestRequestAndApplyPatches:
         assert "Working tree is clean" in captured.out
     # pylint: disable=too-many-arguments,too-many-positional-arguments
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -690,7 +690,7 @@ class TestRequestAndApplyPatches:
     # pylint: disable=too-many-arguments,too-many-positional-arguments
         assert prompt.attempt == 1
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")
@@ -741,7 +741,7 @@ class TestRequestAndApplyPatches:
         # The error is stored in state which is passed to prompt
         assert prompt.attempt == 2
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     def test_raises_on_missing_patch(self, mock_obtain, mock_status, mock_diff):
@@ -773,7 +773,7 @@ class TestRequestAndApplyPatches:
                 seen_patches=seen_patches,
             )
 
-    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff")
+    @patch("ci_tools.ci_runtime.patch_cycle.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.patch_cycle.gather_git_status")
     @patch("ci_tools.ci_runtime.patch_cycle._obtain_patch_diff")
     @patch("ci_tools.ci_runtime.patch_cycle._validate_patch_candidate")

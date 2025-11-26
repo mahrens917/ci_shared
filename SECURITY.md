@@ -66,12 +66,6 @@ git diff --cached
 git diff --cached | grep -i "password\|secret\|key\|token"
 ```
 
-## XCI Configuration
-
-If you create an `xci.config.json` file with custom settings:
-- Add it to `.gitignore` if it contains sensitive paths or credentials
-- Consider creating an `xci.config.json.example` with dummy values for documentation
-
 ## Reporting Security Issues
 
 If you discover sensitive data was accidentally committed:

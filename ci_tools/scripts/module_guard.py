@@ -39,7 +39,7 @@ class ModuleGuard(GuardRunner):
         try:
             tree = parse_python_ast(path, raise_on_error=True)
         except RuntimeError as exc:
-            # Re-raise with consistent error message for backward compatibility
+            # Re-raise with consistent error message format
             raise RuntimeError(
                 str(exc).replace("failed to parse", "failed to read")
             ) from exc.__cause__

@@ -244,7 +244,8 @@ def group_missing_docs(
     grouped: dict[str, List[str]] = {label: [] for label, _ in CATEGORY_KEYS}
     for doc in missing:
         for label, key in CATEGORY_KEYS:
-            if doc in discovery_info.get(key, []):
+            category_docs = discovery_info.get(key)
+            if category_docs is not None and doc in category_docs:
                 grouped[label].append(doc)
                 break
     return grouped

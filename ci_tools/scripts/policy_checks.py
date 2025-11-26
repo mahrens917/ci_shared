@@ -49,7 +49,6 @@ def main() -> int:
 __all__ = ["PolicyViolation", "main", "purge_bytecode_artifacts"]
 
 
-# pylint: disable=duplicate-code
 if __name__ == "__main__":
     try:
         sys.exit(main())

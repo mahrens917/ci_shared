@@ -27,10 +27,12 @@ def get_module_name(file_path: Path, root: Path) -> str:
     if parts[-1] == "__init__":
         parts = parts[:-1]
 
-    return ".".join(parts) if parts else ""
+    if parts:
+        return ".".join(parts)
+    return ""
 
 
-class ImportCollector(ast.NodeVisitor):  # pylint: disable=invalid-name
+class ImportCollector(ast.NodeVisitor):
     """Collects all import statements from a Python file."""
 
     def __init__(self, file_path: Optional[Path] = None, root: Optional[Path] = None):
@@ -38,8 +40,8 @@ class ImportCollector(ast.NodeVisitor):  # pylint: disable=invalid-name
         self.file_path = file_path
         self.root = root
 
-    def visit_Import(self, node: ast.Import) -> None:  # pylint: disable=invalid-name
-        """Visit 'import foo' statements."""
+    def visit_Import(self, node: ast.Import) -> None:
+        """Handle 'import foo' statements."""
         for alias in node.names:
             module = alias.name
             if module.startswith("src."):
@@ -48,6 +50,14 @@ class ImportCollector(ast.NodeVisitor):  # pylint: disable=invalid-name
             for i in range(len(parts)):
                 self.imports.add(".".join(parts[: i + 1]))
         self.generic_visit(node)
+
+    def _compute_base_module(self, parts: list[str], level: int) -> str:
+        """Compute base module from parts and import level."""
+        if level > 1:
+            base_parts = parts[: -level + 1]
+        else:
+            base_parts = parts[:-1]
+        return ".".join(base_parts)
 
     def _resolve_relative_import(self, node: ast.ImportFrom) -> None:
         """Handle relative imports like 'from . import X'."""
@@ -62,15 +72,18 @@ class ImportCollector(ast.NodeVisitor):  # pylint: disable=invalid-name
         if node.level > len(parts):
             return
 
-        base_parts = parts[: -node.level + 1] if node.level > 1 else parts[:-1]
-        base_module = ".".join(base_parts) if base_parts else ""
+        base_module = self._compute_base_module(parts, node.level)
+        self._add_relative_imports(node.names, base_module)
 
-        for alias in node.names:
-            if alias.name != "*":
-                if base_module:
-                    self.imports.add(f"{base_module}.{alias.name}")
-                else:
-                    self.imports.add(alias.name)
+    def _add_relative_imports(self, names: list, base_module: str) -> None:
+        """Add relative imports to the imports set."""
+        for alias in names:
+            if alias.name == "*":
+                continue
+            if base_module:
+                self.imports.add(f"{base_module}.{alias.name}")
+            else:
+                self.imports.add(alias.name)
 
     def _resolve_absolute_import(self, module: str, names: list) -> None:
         """Handle absolute imports like 'from foo import bar'."""
@@ -85,10 +98,8 @@ class ImportCollector(ast.NodeVisitor):  # pylint: disable=invalid-name
             if alias.name != "*":
                 self.imports.add(f"{module}.{alias.name}")
 
-    def visit_ImportFrom(  # pylint: disable=invalid-name
-        self, node: ast.ImportFrom
-    ) -> None:
-        """Visit 'from foo import bar' statements."""
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Handle 'from foo import bar' statements."""
         if node.module is None and node.level > 0:
             self._resolve_relative_import(node)
         elif node.module:

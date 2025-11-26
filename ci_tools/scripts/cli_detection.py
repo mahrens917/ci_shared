@@ -100,8 +100,13 @@ def is_cli_entry_point(py_file: Path) -> bool:
     CLI entry points are meant to be executed directly (e.g., python -m module)
     rather than imported, so they don't need to appear in import statements.
     """
+    return _check_cli_entry_point_patterns(py_file)
+
+
+def _check_cli_entry_point_patterns(py_file: Path) -> bool:
+    """Check if file matches CLI entry point patterns."""
     tree = parse_python_ast(py_file, raise_on_error=False)
-    if tree is None:
+    if not tree:
         return False
 
     # Pattern 1: Module-level main() function

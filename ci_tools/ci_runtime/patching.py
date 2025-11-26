@@ -14,6 +14,16 @@ from .models import PatchApplyError
 MIN_DIFF_HEADER_PARTS = 4
 
 
+def _combine_process_output(result: subprocess.CompletedProcess[str]) -> str:
+    """Combine stdout and stderr from a subprocess result into a single string."""
+    parts: list[str] = []
+    if result.stdout:
+        parts.append(result.stdout)
+    if result.stderr:
+        parts.append(result.stderr)
+    return "".join(parts)
+
+
 def _extract_diff_paths(patch_text: str) -> set[str]:
     """Return protected file paths touched by the diff headers."""
     protected_paths: set[str] = set()
@@ -67,7 +77,7 @@ def _apply_patch_with_git(patch_text: str) -> tuple[bool, str]:
         stderr=subprocess.PIPE,
         check=False,
     )
-    check_output = (git_check.stdout or "") + (git_check.stderr or "")
+    check_output = _combine_process_output(git_check)
     if git_check.returncode != 0:
         return False, check_output
     git_apply = subprocess.run(
@@ -79,7 +89,7 @@ def _apply_patch_with_git(patch_text: str) -> tuple[bool, str]:
         check=False,
     )
     if git_apply.returncode != 0:
-        output = (git_apply.stdout or "") + (git_apply.stderr or "")
+        output = _combine_process_output(git_apply)
         raise PatchApplyError.git_apply_failed(output=output)
     if git_apply.stdout:
         print(git_apply.stdout.rstrip())
@@ -107,7 +117,7 @@ def _apply_patch_with_patch_tool(
     *,
     check_output: str,
 ) -> None:
-    """Fallback to the `patch` utility when git cannot apply the diff."""
+    """Use the POSIX `patch` utility when git cannot apply the diff."""
     env = dict(os.environ)
     if "PATCH_CREATE_BACKUP" not in env:
         env["PATCH_CREATE_BACKUP"] = "no"
@@ -129,7 +139,7 @@ def _apply_patch_with_patch_tool(
         check=False,
     )
     if dry_run.returncode != 0:
-        dry_output = (dry_run.stdout or "") + (dry_run.stderr or "")
+        dry_output = _combine_process_output(dry_run)
         raise PatchApplyError.preflight_failed(
             check_output=check_output,
             dry_output=dry_output,
@@ -146,14 +156,14 @@ def _apply_patch_with_patch_tool(
         check=False,
     )
     if actual.returncode != 0:
-        output = (actual.stdout or "") + (actual.stderr or "")
+        output = _combine_process_output(actual)
         raise PatchApplyError.patch_exit(returncode=actual.returncode, output=output)
     if actual.stdout:
         print(actual.stdout.rstrip())
 
 
 def apply_patch(patch_text: str) -> None:
-    """Apply a diff using git when possible, then fall back to POSIX patch."""
+    """Apply a diff using git when possible, otherwise try POSIX patch."""
     normalized = _ensure_trailing_newline(patch_text)
     applied, check_output = _apply_patch_with_git(normalized)
     if applied:

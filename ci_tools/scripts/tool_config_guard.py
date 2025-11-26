@@ -22,14 +22,15 @@ Exit codes:
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Any
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    import tomli as tomllib  # type: ignore[import-not-found]  # tomli only needed for Python 3.10
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 def load_toml(path: Path) -> dict[str, Any]:
@@ -129,8 +130,6 @@ def _format_toml_key(key: str) -> str:
 
 def _format_toml_list(key: str, value: list, indent_str: str) -> list[str]:
     """Format a list value as TOML."""
-    import json  # pylint: disable=import-outside-toplevel
-
     formatted_key = _format_toml_key(key)
     if len(value) == 0:
         return [f"{indent_str}{formatted_key} = []"]
@@ -155,7 +154,11 @@ def _format_toml_value(key: str, value: Any, indent_str: str) -> list[str]:
     if isinstance(value, str):
         return [f'{indent_str}{formatted_key} = "{value}"']
     if isinstance(value, bool):
-        return [f'{indent_str}{formatted_key} = {"true" if value else "false"}']
+        if value:
+            bool_str = "true"
+        else:
+            bool_str = "false"
+        return [f"{indent_str}{formatted_key} = {bool_str}"]
     if isinstance(value, (int, float)):
         return [f"{indent_str}{formatted_key} = {value}"]
     if isinstance(value, list):
@@ -180,7 +183,11 @@ def _print_toml_value(key: str, value: Any) -> None:
     if isinstance(value, str):
         print(f'{formatted_key} = "{value}"')
     elif isinstance(value, bool):
-        print(f'{formatted_key} = {"true" if value else "false"}')
+        if value:
+            bool_str = "true"
+        else:
+            bool_str = "false"
+        print(f"{formatted_key} = {bool_str}")
     elif isinstance(value, list):
         _print_toml_list(key, value)
     else:
@@ -219,9 +226,10 @@ def _print_tool_section(tool_name: str, tool_config: dict[str, Any]) -> None:
 
 def print_tool_config_diff(
     shared_data: dict[str, Any],
-    repo_data: dict[str, Any],  # pylint: disable=unused-argument
+    repo_data: dict[str, Any],
 ) -> None:
     """Print the tool configuration that should be in pyproject.toml."""
+    _ = repo_data  # Reserved for future diff display
     print("\n" + "=" * 70)
     print("Expected tool configuration (copy to pyproject.toml):")
     print("=" * 70 + "\n")
@@ -288,7 +296,9 @@ def _generate_tool_config_text(shared_data: dict[str, Any]) -> str:
         lines.extend(_render_tool_section_lines(f"tool.{tool_name}", tool_config))
 
     rendered = "\n".join(lines).strip()
-    return f"{rendered}\n" if rendered else ""
+    if rendered:
+        return f"{rendered}\n"
+    return ""
 
 
 def sync_configs(shared_config_path: Path, repo_pyproject_path: Path) -> bool:
@@ -298,12 +308,8 @@ def sync_configs(shared_config_path: Path, repo_pyproject_path: Path) -> bool:
     Returns:
         True if the file was updated successfully, False otherwise.
     """
-    try:
-        shared_data = load_toml(shared_config_path)
-        pyproject_text = repo_pyproject_path.read_text(encoding="utf-8")
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error loading config files: {e}", file=sys.stderr)
-        return False
+    shared_data = load_toml(shared_config_path)
+    pyproject_text = repo_pyproject_path.read_text(encoding="utf-8")
 
     new_tool_config = _generate_tool_config_text(shared_data)
     if not new_tool_config:
@@ -313,17 +319,16 @@ def sync_configs(shared_config_path: Path, repo_pyproject_path: Path) -> bool:
         )
         return False
 
-    managed_tools = set(shared_data.get("tool", {}).keys())
+    tool_section = shared_data.get("tool")
+    if not tool_section:
+        raise ValueError("Shared configuration must contain [tool] section")
+    managed_tools = set(tool_section.keys())
     preserved_sections = _remove_tool_sections(pyproject_text, managed_tools)
     if preserved_sections:
         preserved_sections = preserved_sections.rstrip() + "\n\n"
 
     updated_text = f"{preserved_sections}{new_tool_config}"
-    try:
-        repo_pyproject_path.write_text(updated_text, encoding="utf-8")
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error writing updated pyproject.toml: {e}", file=sys.stderr)
-        return False
+    repo_pyproject_path.write_text(updated_text, encoding="utf-8")
 
     print(f"✓ Updated [tool.*] sections in {repo_pyproject_path}")
     print(f"  Source of truth: {shared_config_path}")
@@ -368,7 +373,10 @@ def _handle_config_mismatch(
     shared_config_path: Path,
 ) -> int:
     """Handle case where configs don't match."""
-    status_icon = "✓" if sync_mode else "✗"
+    if sync_mode:
+        status_icon = "✓"
+    else:
+        status_icon = "✗"
     print(
         f"{status_icon} Tool configurations in {repo_pyproject.name} "
         f"differ from shared config:"
@@ -377,7 +385,9 @@ def _handle_config_mismatch(
         print(f"  - {diff}")
 
     if sync_mode:
-        return 0 if sync_configs(shared_config_path, repo_pyproject) else 2
+        if sync_configs(shared_config_path, repo_pyproject):
+            return 0
+        return 2
 
     print("\nRun with --sync to rewrite [tool.*] sections automatically")
     return 1
@@ -414,12 +424,8 @@ def main() -> int:
     if error_code is not None:
         return error_code
 
-    try:
-        shared_data = load_toml(shared_config_path)
-        repo_data = load_toml(repo_pyproject)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error loading TOML files: {e}", file=sys.stderr)
-        return 2
+    shared_data = load_toml(shared_config_path)
+    repo_data = load_toml(repo_pyproject)
 
     matches, differences = compare_configs(shared_data, repo_data)
 

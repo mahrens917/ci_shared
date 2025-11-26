@@ -15,9 +15,11 @@ import argparse
 import ast
 import sys
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
 from radon.complexity import cc_visit
+
+from ci_tools.scripts.guard_common import is_excluded
 
 
 class ComplexityViolation(NamedTuple):
@@ -31,121 +33,139 @@ class ComplexityViolation(NamedTuple):
     violation_type: str
 
 
-def calculate_cognitive_complexity(node: ast.FunctionDef) -> int:
+def _increment_nesting_complexity(
+    visitor: "CognitiveComplexityVisitor", node: ast.AST
+) -> None:
+    """Increment complexity based on nesting level and recurse."""
+    visitor.complexity += 1 + visitor.nesting_level
+    visitor.nesting_level += 1
+    visitor.generic_visit(node)
+    visitor.nesting_level -= 1
+
+
+class CognitiveComplexityVisitor(ast.NodeVisitor):
+    """AST visitor that calculates cognitive complexity of a function."""
+
+    def __init__(self) -> None:
+        self.complexity = 0
+        self.nesting_level = 0
+
+    def visit_If(self, node: ast.If) -> None:
+        """Handle If node - increments nesting complexity."""
+        _increment_nesting_complexity(self, node)
+
+    def visit_While(self, node: ast.While) -> None:
+        """Handle While node - increments nesting complexity."""
+        _increment_nesting_complexity(self, node)
+
+    def visit_For(self, node: ast.For) -> None:
+        """Handle For node - increments nesting complexity."""
+        _increment_nesting_complexity(self, node)
+
+    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+        """Handle ExceptHandler node - increments nesting complexity."""
+        _increment_nesting_complexity(self, node)
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        """Add complexity for each boolean condition."""
+        if isinstance(node.op, (ast.And, ast.Or)):
+            self.complexity += len(node.values) - 1
+        self.generic_visit(node)
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        """Skip lambda nodes - they don't add cognitive complexity."""
+
+
+def calculate_cognitive_complexity(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> int:
     """
     Calculate cognitive complexity for a function.
 
     Cognitive complexity measures how difficult code is to understand,
     accounting for nested control structures and logical operators.
     """
-
-    class CognitiveComplexityVisitor(ast.NodeVisitor):
-        """AST visitor that calculates cognitive complexity of a function."""
-
-        def __init__(self):
-            self.complexity = 0
-            self.nesting_level = 0
-
-        def visit_If(self, node):  # pylint: disable=invalid-name
-            """Visit If node and increment complexity based on nesting level."""
-            self.complexity += 1 + self.nesting_level
-            self.nesting_level += 1
-            self.generic_visit(node)
-            self.nesting_level -= 1
-
-        def visit_While(self, node):  # pylint: disable=invalid-name
-            """Visit While node and increment complexity based on nesting level."""
-            self.complexity += 1 + self.nesting_level
-            self.nesting_level += 1
-            self.generic_visit(node)
-            self.nesting_level -= 1
-
-        def visit_For(self, node):  # pylint: disable=invalid-name
-            """Visit For node and increment complexity based on nesting level."""
-            self.complexity += 1 + self.nesting_level
-            self.nesting_level += 1
-            self.generic_visit(node)
-            self.nesting_level -= 1
-
-        def visit_ExceptHandler(self, node):  # pylint: disable=invalid-name
-            """Visit ExceptHandler node and increment complexity based on nesting level."""
-            self.complexity += 1 + self.nesting_level
-            self.nesting_level += 1
-            self.generic_visit(node)
-            self.nesting_level -= 1
-
-        def visit_BoolOp(self, node):  # pylint: disable=invalid-name
-            """Visit BoolOp node and add complexity for each boolean condition."""
-            # Each additional condition in a boolean expression adds complexity
-            if isinstance(node.op, (ast.And, ast.Or)):
-                self.complexity += len(node.values) - 1
-            self.generic_visit(node)
-
-        def visit_Lambda(self, node):  # pylint: disable=invalid-name
-            """Visit Lambda node without counting nested lambdas as they're separate units."""
-            # Don't count nested lambdas - they're separate cognitive units
-
     visitor = CognitiveComplexityVisitor()
     visitor.visit(node)
     return visitor.complexity
 
 
-def check_file_complexity(  # pylint: disable=too-many-locals
+def _build_function_node_map(
+    tree: ast.AST,
+) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
+    """Build map of function names to AST nodes."""
+    function_nodes: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            function_nodes[node.name] = node
+    return function_nodes
+
+
+class _RadonResult(Protocol):
+    """Type stub protocol for radon complexity result objects."""
+
+    complexity: int
+    name: str
+    lineno: int
+
+
+def _check_function_complexity(
+    result: _RadonResult,
+    function_nodes: dict[str, ast.FunctionDef | ast.AsyncFunctionDef],
+    file_path: Path,
+    max_cyclomatic: int,
+    max_cognitive: int,
+) -> ComplexityViolation | None:
+    """Check a single function for complexity violations."""
+    cyclomatic = result.complexity
+    function_name = result.name
+    line_number = result.lineno
+
+    cognitive = 0
+    if function_name in function_nodes:
+        cognitive = calculate_cognitive_complexity(function_nodes[function_name])
+
+    violation_types = []
+    if cyclomatic > max_cyclomatic:
+        violation_types.append(f"cyclomatic {cyclomatic}")
+    if cognitive > max_cognitive:
+        violation_types.append(f"cognitive {cognitive}")
+
+    if violation_types:
+        return ComplexityViolation(
+            file_path=str(file_path),
+            function_name=function_name,
+            line_number=line_number,
+            cyclomatic=cyclomatic,
+            cognitive=cognitive,
+            violation_type=" & ".join(violation_types),
+        )
+    return None
+
+
+def check_file_complexity(
     file_path: Path, max_cyclomatic: int, max_cognitive: int
 ) -> list[ComplexityViolation]:
     """Check complexity for all functions in a file."""
-    violations = []
+    violations: list[ComplexityViolation] = []
 
     try:
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Get cyclomatic complexity using radon
         cyclomatic_results = cc_visit(content)
-
-        # Parse AST for cognitive complexity
         tree = ast.parse(content)
+        function_nodes = _build_function_node_map(tree)
 
-        # Build map of function names to AST nodes
-        function_nodes = {}
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                function_nodes[node.name] = node
-
-        # Check each function
         for result in cyclomatic_results:
-            cyclomatic = result.complexity
-            function_name = result.name
-            line_number = result.lineno
-
-            # Calculate cognitive complexity
-            cognitive = 0
-            if function_name in function_nodes:
-                cognitive = calculate_cognitive_complexity(
-                    function_nodes[function_name]
-                )
-
-            # Determine violations
-            violation_types = []
-            if cyclomatic > max_cyclomatic:
-                violation_types.append(f"cyclomatic {cyclomatic}")
-            if cognitive > max_cognitive:
-                violation_types.append(f"cognitive {cognitive}")
-
-            if violation_types:
-                violations.append(
-                    ComplexityViolation(
-                        file_path=str(file_path),
-                        function_name=function_name,
-                        line_number=line_number,
-                        cyclomatic=cyclomatic,
-                        cognitive=cognitive,
-                        violation_type=" & ".join(violation_types),
-                    )
-                )
+            violation = _check_function_complexity(
+                result, function_nodes, file_path, max_cyclomatic, max_cognitive
+            )
+            if violation is not None:
+                violations.append(violation)
 
     except (SyntaxError, UnicodeDecodeError, FileNotFoundError) as e:
-        print(f"Warning: Could not parse {file_path}: {e}", file=sys.stderr)
+        raise RuntimeError(f"Could not parse {file_path}: {e}") from e
 
     return violations
 
@@ -196,17 +216,6 @@ def resolve_excludes(root_path: Path, excludes: list[str]) -> list[Path]:
     return [(root_path / Path(exclude_path)).resolve() for exclude_path in excludes]
 
 
-def is_excluded(path: Path, exclude_paths: list[Path]) -> bool:
-    """Return True when the given path is within one of the excluded paths."""
-    for exclude_path in exclude_paths:
-        try:
-            path.resolve().relative_to(exclude_path)
-        except ValueError:
-            continue
-        return True
-    return False
-
-
 def gather_python_files(root_path: Path, exclude_paths: list[Path]) -> list[Path]:
     """Return all python files under root that are not excluded."""
     python_files = [
@@ -237,7 +246,9 @@ def report_violations(
 
     by_file: dict[str, list[ComplexityViolation]] = {}
     for violation in violations:
-        by_file.setdefault(violation.file_path, []).append(violation)
+        if violation.file_path not in by_file:
+            by_file[violation.file_path] = []
+        by_file[violation.file_path].append(violation)
 
     for file_path in sorted(by_file.keys()):
         file_violations = by_file[file_path]

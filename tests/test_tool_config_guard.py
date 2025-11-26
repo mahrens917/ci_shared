@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 
 from ci_tools.scripts.tool_config_guard import (
@@ -287,14 +290,14 @@ def test_sync_configs(tmp_path):
     assert 'exclude = ["tests"]' in updated
 
 
-def test_sync_configs_error(tmp_path):
-    """Test sync_configs handles errors."""
+def test_sync_configs_missing_shared_config_raises(tmp_path):
+    """Test sync_configs raises when shared config is missing."""
     shared_config = tmp_path / "missing.toml"
     repo_pyproject = tmp_path / "pyproject.toml"
     repo_pyproject.write_text('[project]\nname = "test"')
 
-    result = sync_configs(shared_config, repo_pyproject)
-    assert result is False
+    with pytest.raises(FileNotFoundError):
+        sync_configs(shared_config, repo_pyproject)
 
 
 def test_find_shared_config_explicit():
@@ -430,8 +433,8 @@ def test_main_toml_load_error(tmp_path):
     with patch("ci_tools.scripts.tool_config_guard._find_shared_config") as mock:
         mock.return_value = shared_config
         with patch("sys.argv", ["tool_config_guard.py", "--repo-root", str(tmp_path)]):
-            result = main()
-            assert result == 2
+            with pytest.raises(tomllib.TOMLDecodeError):
+                main()
 
 
 def test_main_sync_mode(tmp_path):

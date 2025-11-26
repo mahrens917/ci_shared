@@ -11,19 +11,23 @@ from typing import Optional
 
 from .config import RISKY_PATTERNS
 from .models import CodexCliError, PatchPrompt
-from .process import _stream_pipe, log_codex_interaction
+from .process import log_codex_interaction, stream_pipe
 
 
 def _detect_cli_type(model: str) -> str:
     """Detect which CLI to use based on environment or model name."""
-    cli_type = os.environ.get("CI_CLI_TYPE", "").lower()
-    if cli_type in ("claude", "codex"):
-        return cli_type
+    cli_type_env = os.environ.get("CI_CLI_TYPE")
+    if cli_type_env:
+        cli_type = cli_type_env.lower()
+        if cli_type in ("claude", "codex"):
+            return cli_type
     if model.startswith("claude"):
         return "claude"
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "claude"
-    return "codex"
+    raise ValueError(
+        "CI_CLI_TYPE must be set to 'claude' or 'codex', or ANTHROPIC_API_KEY must be set"
+    )
 
 
 def build_codex_command(model: str, reasoning_effort: Optional[str]) -> list[str]:
@@ -45,19 +49,26 @@ def build_codex_command(model: str, reasoning_effort: Optional[str]) -> list[str
 
 
 def _feed_prompt(process: subprocess.Popen[str], prompt: str) -> None:
-    """Send the prompt to the Codex subprocess and close stdin."""
+    """Send the prompt to the Codex subprocess and close stdin.
+
+    BrokenPipeError is re-raised after closing stdin to signal the subprocess
+    terminated before consuming the input.
+    """
+    if not process.stdin:
+        return
     try:
-        if process.stdin:
-            process.stdin.write(prompt)
-            process.stdin.close()
+        process.stdin.write(prompt)
     except BrokenPipeError:  # pragma: no cover - defensive
-        pass
+        process.stdin.close()
+        raise
+    finally:
+        process.stdin.close()
 
 
 def _stream_output(process: subprocess.Popen[str]) -> tuple[list[str], list[str]]:
     """Read stdout and stderr from the Codex subprocess concurrently.
 
-    Delegates to the canonical _stream_pipe implementation in process.py.
+    Delegates to the canonical stream_pipe implementation in process.py.
     """
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
@@ -66,14 +77,14 @@ def _stream_output(process: subprocess.Popen[str]) -> tuple[list[str], list[str]
     if process.stdout:
         threads.append(
             threading.Thread(
-                target=_stream_pipe, args=(process.stdout, stdout_lines), daemon=True
+                target=stream_pipe, args=(process.stdout, stdout_lines), daemon=True
             )
         )
         threads[-1].start()
     if process.stderr:
         threads.append(
             threading.Thread(
-                target=_stream_pipe, args=(process.stderr, stderr_lines), daemon=True
+                target=stream_pipe, args=(process.stderr, stderr_lines), daemon=True
             )
         )
         threads[-1].start()
@@ -152,6 +163,27 @@ def has_unified_diff_header(diff_text: str) -> bool:
     return bool(re.search(r"^(diff --git|--- |\+\+\+ )", diff_text, re.MULTILINE))
 
 
+def _format_git_status(status: str) -> str:
+    """Format git status for display."""
+    if status:
+        return status
+    return "(clean)"
+
+
+def _format_summary(summary: str) -> str:
+    """Format failure summary for display."""
+    if summary:
+        return summary
+    return "(not detected)"
+
+
+def _format_diff(diff: str, placeholder: str) -> str:
+    """Format diff for display."""
+    if diff:
+        return diff
+    return placeholder
+
+
 def request_codex_patch(
     *,
     model: str,
@@ -159,6 +191,13 @@ def request_codex_patch(
     prompt: PatchPrompt,
 ) -> str:
     """Ask Codex for a patch diff based on the supplied failure context."""
+    git_status_display = _format_git_status(prompt.git_status)
+    summary_display = _format_summary(prompt.failure_context.summary)
+    focused_diff_display = _format_diff(
+        prompt.failure_context.focused_diff, "/* no focused diff */"
+    )
+    git_diff_display = _format_diff(prompt.git_diff, "/* no diff */")
+
     prompt_text = textwrap.dedent(
         f"""\
         You are currently iterating on automated CI repairs.
@@ -168,19 +207,19 @@ def request_codex_patch(
         - Iteration: {prompt.iteration}
         - Patch attempt: {prompt.attempt}
         - Git status:
-        {prompt.git_status or '(clean)'}
+        {git_status_display}
 
         Failure summary:
-        {prompt.failure_context.summary or '(not detected)'}
+        {summary_display}
 
         Focused diff for implicated files:
         ```diff
-        {prompt.failure_context.focused_diff or '/* no focused diff */'}
+        {focused_diff_display}
         ```
 
         Current diff (unstaged working tree):
         ```diff
-        {prompt.git_diff or '/* no diff */'}
+        {git_diff_display}
         ```
 
         Latest CI failure log (tail):

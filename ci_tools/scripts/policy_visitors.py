@@ -24,6 +24,14 @@ MIN_GETATTR_ARGS_WITH_DEFAULT = 3
 MIN_SETDEFAULT_ARGS = 2
 
 
+def _safe_get_qualname(func: ast.AST) -> str:
+    """Get call qualname, returning empty string if None."""
+    result = get_call_qualname(func)
+    if result:
+        return result
+    return ""
+
+
 def _resolve_default_argument(
     call: ast.Call,
     *,
@@ -45,12 +53,17 @@ def _handler_is_suppressed(
     suppression_token: str,
 ) -> bool:
     """Check if an exception handler contains a suppression comment."""
-    return handler_contains_suppression(handler, ctx.lines or [], suppression_token)
+    if ctx.lines:
+        lines = ctx.lines
+    else:
+        lines = []
+    return handler_contains_suppression(handler, lines, suppression_token)
 
 
 def _handler_catches_broad(handler: ast.ExceptHandler) -> bool:
     """Check if an exception handler catches broad exception types."""
-    if handler.type is None:
+    if not handler.type:
+        # Bare except clause catches all exceptions
         return True
     if isinstance(handler.type, ast.Name):
         return handler.type.id in BROAD_EXCEPTION_NAMES
@@ -62,15 +75,15 @@ def _handler_catches_broad(handler: ast.ExceptHandler) -> bool:
     return False
 
 
-class BroadExceptVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class BroadExceptVisitor(ast.NodeVisitor):
     """AST visitor to detect broad exception handlers."""
 
     def __init__(self, ctx: ModuleContext, records: List[Tuple[str, int]]) -> None:
         self.ctx = ctx
         self.records = records
 
-    def visit_Try(self, node: ast.Try) -> None:  # pylint: disable=invalid-name
-        """Visit Try nodes to check exception handlers."""
+    def visit_Try(self, node: ast.Try) -> None:
+        """Check Try nodes for broad exception handlers."""
         for handler in node.handlers:
             if not _handler_catches_broad(handler):
                 continue
@@ -80,15 +93,15 @@ class BroadExceptVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
         self.generic_visit(node)
 
 
-class SilentHandlerVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class SilentHandlerVisitor(ast.NodeVisitor):
     """AST visitor to detect silent exception handlers."""
 
     def __init__(self, ctx: ModuleContext, records: List[Tuple[str, int, str]]) -> None:
         self.ctx = ctx
         self.records = records
 
-    def visit_Try(self, node: ast.Try) -> None:  # pylint: disable=invalid-name
-        """Visit Try nodes to check exception handlers."""
+    def visit_Try(self, node: ast.Try) -> None:
+        """Check Try nodes for silent exception handlers."""
         for handler in node.handlers:
             reason = classify_handler(handler)
             if reason is None:
@@ -99,15 +112,15 @@ class SilentHandlerVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
         self.generic_visit(node)
 
 
-class GenericRaiseVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class GenericRaiseVisitor(ast.NodeVisitor):
     """AST visitor to detect generic exception raises."""
 
     def __init__(self, rel_path: str, records: List[Tuple[str, int]]) -> None:
         self.rel_path = rel_path
         self.records = records
 
-    def visit_Raise(self, node: ast.Raise) -> None:  # pylint: disable=invalid-name
-        """Visit Raise nodes to check for generic exception types."""
+    def visit_Raise(self, node: ast.Raise) -> None:
+        """Check Raise nodes for generic exception types."""
         exc = node.exc
         if exc is None:
             return
@@ -122,15 +135,15 @@ class GenericRaiseVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
         self.generic_visit(node)
 
 
-class LiteralFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class LiteralFallbackVisitor(ast.NodeVisitor):
     """AST visitor to detect literal fallback values in function calls."""
 
     def __init__(self, rel_path: str, records: List[Tuple[str, int, str]]) -> None:
         self.rel_path = rel_path
         self.records = records
 
-    def visit_Call(self, node: ast.Call) -> None:  # pylint: disable=invalid-name
-        """Visit Call nodes to check for literal fallbacks."""
+    def visit_Call(self, node: ast.Call) -> None:
+        """Check Call nodes for literal fallbacks."""
         self._check_get_method(node)
         self._check_getattr(node)
         self._check_os_getenv(node)
@@ -139,7 +152,7 @@ class LiteralFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
 
     def _check_get_method(self, node: ast.Call) -> None:
         """Check for literal fallback in .get() method calls."""
-        qualname = get_call_qualname(node.func) or ""
+        qualname = _safe_get_qualname(node.func)
         if not qualname.endswith(".get"):
             return
         default_arg = _resolve_default_argument(
@@ -148,12 +161,12 @@ class LiteralFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
         self._maybe_record(node, default_arg, f"{qualname} literal fallback")
 
     def _check_getattr(self, node: ast.Call) -> None:
-        qualname = get_call_qualname(node.func) or ""
+        qualname = _safe_get_qualname(node.func)
         if qualname == "getattr" and len(node.args) >= MIN_GETATTR_ARGS_WITH_DEFAULT:
             self._maybe_record(node, node.args[2], "getattr literal fallback")
 
     def _check_os_getenv(self, node: ast.Call) -> None:
-        qualname = get_call_qualname(node.func) or ""
+        qualname = _safe_get_qualname(node.func)
         if qualname not in {"os.getenv", "os.environ.get"}:
             return
         default_arg = _resolve_default_argument(
@@ -162,7 +175,7 @@ class LiteralFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
         self._maybe_record(node, default_arg, f"{qualname} literal fallback")
 
     def _check_setdefault(self, node: ast.Call) -> None:
-        qualname = get_call_qualname(node.func) or ""
+        qualname = _safe_get_qualname(node.func)
         if qualname.endswith(".setdefault") and len(node.args) >= MIN_SETDEFAULT_ARGS:
             self._maybe_record(node, node.args[1], f"{qualname} literal fallback")
 
@@ -174,36 +187,36 @@ class LiteralFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
             self.records.append((self.rel_path, node.lineno, message))
 
 
-class BoolFallbackVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class BoolFallbackVisitor(ast.NodeVisitor):
     """AST visitor to detect boolean fallback patterns."""
 
     def __init__(self, rel_path: str, records: List[Tuple[str, int]]) -> None:
         self.rel_path = rel_path
         self.records = records
 
-    def visit_BoolOp(self, node: ast.BoolOp) -> None:  # pylint: disable=invalid-name
-        """Visit BoolOp nodes to check for literal fallbacks in 'or' expressions."""
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        """Check BoolOp nodes for literal fallbacks in 'or' expressions."""
         if isinstance(node.op, ast.Or):
             if any(is_non_none_literal(value) for value in node.values[1:]):
                 self.records.append((self.rel_path, node.lineno))
         self.generic_visit(node)
 
-    def visit_IfExp(self, node: ast.IfExp) -> None:  # pylint: disable=invalid-name
-        """Visit IfExp nodes to check for literal values in ternary expressions."""
+    def visit_IfExp(self, node: ast.IfExp) -> None:
+        """Check IfExp nodes for literal values in ternary expressions."""
         if is_non_none_literal(node.body) or is_non_none_literal(node.orelse):
             self.records.append((self.rel_path, node.lineno))
         self.generic_visit(node)
 
 
-class ConditionalLiteralVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class ConditionalLiteralVisitor(ast.NodeVisitor):
     """AST visitor to detect literal returns inside None guards."""
 
     def __init__(self, rel_path: str, records: List[Tuple[str, int]]) -> None:
         self.rel_path = rel_path
         self.records = records
 
-    def visit_If(self, node: ast.If) -> None:  # pylint: disable=invalid-name
-        """Visit If nodes to check for literal returns in None guards."""
+    def visit_If(self, node: ast.If) -> None:
+        """Check If nodes for literal returns in None guards."""
         if is_literal_none_guard(node.test):
             for stmt in node.body:
                 if isinstance(stmt, ast.Return) and is_non_none_literal(stmt.value):
@@ -211,18 +224,22 @@ class ConditionalLiteralVisitor(ast.NodeVisitor):  # pylint: disable=invalid-nam
         self.generic_visit(node)
 
 
-class LegacyVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class LegacyVisitor(ast.NodeVisitor):
     """AST visitor to detect legacy/backward compatibility code patterns."""
 
     def __init__(self, ctx: ModuleContext, records: List[Tuple[str, int, str]]) -> None:
         self.ctx = ctx
         self.records = records
 
-    def visit_If(self, node: ast.If) -> None:  # pylint: disable=invalid-name
-        """Visit If nodes to check for legacy conditional guards."""
+    def visit_If(self, node: ast.If) -> None:
+        """Check If nodes for legacy conditional guards."""
         if self.ctx.source is None:
             return
-        segment = ast.get_source_segment(self.ctx.source, node) or ""
+        source_segment = ast.get_source_segment(self.ctx.source, node)
+        if source_segment:
+            segment = source_segment
+        else:
+            segment = ""
         lowered = segment.lower()
         if any(token in lowered for token in LEGACY_GUARD_TOKENS):
             self.records.append(
@@ -230,10 +247,8 @@ class LegacyVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
             )
         self.generic_visit(node)
 
-    def visit_Attribute(  # pylint: disable=invalid-name
-        self, node: ast.Attribute
-    ) -> None:
-        """Visit Attribute nodes to check for legacy suffixes."""
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        """Check Attribute nodes for legacy suffixes."""
         attr_name = node.attr.lower()
         if attr_name.endswith(LEGACY_SUFFIXES):
             self.records.append(
@@ -241,28 +256,28 @@ class LegacyVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
             )
         self.generic_visit(node)
 
-    def visit_Name(self, node: ast.Name) -> None:  # pylint: disable=invalid-name
-        """Visit Name nodes to check for legacy symbols."""
+    def visit_Name(self, node: ast.Name) -> None:
+        """Check Name nodes for legacy symbols."""
         name_id = node.id.lower()
         if name_id.endswith(LEGACY_SUFFIXES):
             self.records.append(
                 (
                     self.ctx.rel_path,
-                    getattr(node, "lineno", 0),
+                    node.lineno,
                     "legacy symbol reference",
                 )
             )
 
 
-class SyncCallVisitor(ast.NodeVisitor):  # pylint: disable=invalid-name
+class SyncCallVisitor(ast.NodeVisitor):
     """AST visitor to detect forbidden synchronous calls."""
 
     def __init__(self, rel_path: str, records: List[Tuple[str, int, str]]) -> None:
         self.rel_path = rel_path
         self.records = records
 
-    def visit_Call(self, node: ast.Call) -> None:  # pylint: disable=invalid-name
-        """Visit Call nodes to check for forbidden synchronous calls."""
+    def visit_Call(self, node: ast.Call) -> None:
+        """Check Call nodes for forbidden synchronous calls."""
         qualname = get_call_qualname(node.func)
         if not qualname:
             self.generic_visit(node)

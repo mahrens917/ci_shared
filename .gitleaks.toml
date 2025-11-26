@@ -46,6 +46,10 @@ regexes = [
     '''EXAMPLE_API_KEY''',
     '''YOUR_API_KEY_HERE''',
     '''INSERT_YOUR_''',
+    # Python class declarations (CamelCase class names trigger false positives)
+    '''class\s+[A-Z][A-Za-z0-9]+''',
+    # Test class names that follow Test* pattern
+    '''Test[A-Za-z0-9]+''',
 ]
 
 # Allowlist specific commits (if needed)

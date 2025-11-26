@@ -289,11 +289,11 @@ def test_process_repositories(tmp_path):
         ConsumingRepo("aws", tmp_path / "aws"),
     ]
     with patch("ci_tools.scripts.propagate_ci_shared.update_submodule_in_repo") as mock_update:
-        mock_update.side_effect = [True, False, Exception("error")]
+        mock_update.side_effect = [True, False, True]
         updated, skipped, failed = _process_repositories(repos, "Test commit", tmp_path)
-        assert updated == ["zeus"]
+        assert updated == ["zeus", "aws"]
         assert skipped == ["kalshi"]
-        assert failed == ["aws"]
+        assert not failed
 
 
 def test_print_summary_all_types(capsys):
@@ -342,7 +342,7 @@ def test_main_success_with_updates(tmp_path, monkeypatch):
     monkeypatch.chdir(repo_dir)
 
     with patch("ci_tools.scripts.propagate_ci_shared.get_commit_message") as mock1:
-        with patch("ci_tools.utils.consumers.load_consuming_repos") as mock_load:
+        with patch("ci_tools.scripts.propagate_ci_shared.load_consuming_repos") as mock_load:
             with patch("ci_tools.scripts.propagate_ci_shared._process_repositories") as mock2:
                 mock1.return_value = "Test commit"
                 mock_load.return_value = [ConsumingRepo("api", tmp_path / "api")]
@@ -360,7 +360,7 @@ def test_main_with_failures(tmp_path, monkeypatch):
     monkeypatch.chdir(repo_dir)
 
     with patch("ci_tools.scripts.propagate_ci_shared.get_commit_message") as mock1:
-        with patch("ci_tools.utils.consumers.load_consuming_repos") as mock_load:
+        with patch("ci_tools.scripts.propagate_ci_shared.load_consuming_repos") as mock_load:
             with patch("ci_tools.scripts.propagate_ci_shared._process_repositories") as mock2:
                 mock1.return_value = "Test commit"
                 mock_load.return_value = [ConsumingRepo("api", tmp_path / "api")]

@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from ci_tools.ci_runtime.models import ModelSelectionAbort, ReasoningEffortAbort
 from ci_tools.scripts.config_loader import load_json_config
 from ci_tools.scripts.guard_common import detect_repo_root
 
@@ -26,15 +27,19 @@ REQUIRED_MODEL = "gpt-5-codex"
 REASONING_EFFORT_CHOICES: tuple[str, ...] = ("low", "medium", "high")
 DEFAULT_REASONING_EFFORT = "high"
 
+_EMPTY_CONFIG: dict[str, Any] = {}
+
 
 def load_repo_config(repo_root: Path) -> dict[str, Any]:
     """Load shared CI configuration when available.
 
     Delegates to the shared load_json_config implementation in config_loader.
+    Returns empty dict if no config file exists; raises on parse errors.
     """
-    return load_json_config(
-        repo_root, CONFIG_CANDIDATES, warn_on_error=True, missing_value={}
-    )
+    try:
+        return load_json_config(repo_root, CONFIG_CANDIDATES)
+    except FileNotFoundError:
+        return _EMPTY_CONFIG
 
 
 def _coerce_repo_context(config: dict[str, Any], initial: str) -> str:
@@ -78,11 +83,15 @@ def resolve_model_choice(
 
     Raises:
         ValueError: If validate=True and model doesn't match REQUIRED_MODEL
+        ModelSelectionAbort: If no model is provided via argument or environment
     """
-    # pylint: disable=import-outside-toplevel
-    from ci_tools.ci_runtime.models import ModelSelectionAbort
-
-    candidate = model_arg or os.environ.get("OPENAI_MODEL") or REQUIRED_MODEL
+    candidate = model_arg
+    if not candidate:
+        candidate = os.environ.get("OPENAI_MODEL")
+    if not candidate:
+        raise ModelSelectionAbort.unsupported_model(
+            received="(none)", required=REQUIRED_MODEL
+        )
     if validate and candidate != REQUIRED_MODEL:
         raise ModelSelectionAbort.unsupported_model(
             received=candidate, required=REQUIRED_MODEL
@@ -105,16 +114,17 @@ def resolve_reasoning_choice(
 
     Raises:
         ValueError: If validate=True and choice is not in REASONING_EFFORT_CHOICES
+        ReasoningEffortAbort: If no reasoning effort is provided via argument or environment
     """
-    # pylint: disable=import-outside-toplevel
-    from ci_tools.ci_runtime.models import ReasoningEffortAbort
-
-    env_reasoning = os.environ.get("OPENAI_REASONING_EFFORT")
-    candidate = (
-        reasoning_arg
-        or (env_reasoning.lower() if env_reasoning else None)
-        or DEFAULT_REASONING_EFFORT
-    )
+    candidate = reasoning_arg
+    if not candidate:
+        env_reasoning = os.environ.get("OPENAI_REASONING_EFFORT")
+        if env_reasoning:
+            candidate = env_reasoning.lower()
+    if not candidate:
+        raise ReasoningEffortAbort.unsupported_choice(
+            received="(none)", allowed=REASONING_EFFORT_CHOICES
+        )
     if validate and candidate not in REASONING_EFFORT_CHOICES:
         raise ReasoningEffortAbort.unsupported_choice(
             received=candidate, allowed=REASONING_EFFORT_CHOICES

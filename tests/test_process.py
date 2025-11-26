@@ -10,7 +10,7 @@ import pytest
 from ci_tools.ci_runtime.process import (
     _run_command_buffered,
     _run_command_streaming,
-    _stream_pipe,
+    stream_pipe,
     run_command,
     tail_text,
     gather_git_diff,
@@ -97,7 +97,7 @@ class TestRunCommandBuffered:
 
 
 class TestStreamPipe:
-    """Tests for _stream_pipe helper function."""
+    """Tests for stream_pipe helper function."""
 
     def test_collects_and_forwards_lines(self):
         """Test that lines are collected and forwarded to target."""
@@ -106,7 +106,7 @@ class TestStreamPipe:
         collector: list[str] = []
         target = MagicMock()
 
-        _stream_pipe(mock_pipe, collector, target)
+        stream_pipe(mock_pipe, collector, target)
 
         assert collector == ["line1\n", "line2\n"]
         assert target.write.call_count == 2
@@ -121,7 +121,7 @@ class TestStreamPipe:
         collector: list[str] = []
         target = MagicMock()
 
-        _stream_pipe(mock_pipe, collector, target)
+        stream_pipe(mock_pipe, collector, target)
 
         mock_pipe.close.assert_called_once()
 

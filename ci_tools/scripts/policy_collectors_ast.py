@@ -82,7 +82,7 @@ def collect_literal_fallbacks() -> List[Tuple[str, int, str]]:
     """Collect function calls that use literal fallback values."""
     records: List[Tuple[str, int, str]] = []
     for ctx in iter_module_contexts():
-        if ctx.rel_path.startswith(("scripts/", "ci_runtime/", "vendor/")):
+        if ctx.rel_path.startswith(("vendor/",)):
             continue
         LiteralFallbackVisitor(ctx.rel_path, records).visit(ctx.tree)
     return records
@@ -92,7 +92,7 @@ def collect_bool_fallbacks() -> List[Tuple[str, int]]:
     """Collect boolean 'or' expressions that use literal fallback values."""
     records: List[Tuple[str, int]] = []
     for ctx in iter_module_contexts():
-        if ctx.rel_path.startswith(("scripts/", "ci_runtime/", "vendor/")):
+        if ctx.rel_path.startswith(("vendor/",)):
             continue
         BoolFallbackVisitor(ctx.rel_path, records).visit(ctx.tree)
     return records
@@ -102,17 +102,21 @@ def collect_conditional_literal_returns() -> List[Tuple[str, int]]:
     """Collect return statements with literals inside None guards."""
     records: List[Tuple[str, int]] = []
     for ctx in iter_module_contexts():
-        if ctx.rel_path.startswith(("scripts/", "ci_runtime/", "vendor/")):
+        if ctx.rel_path.startswith(("vendor/",)):
             continue
         ConditionalLiteralVisitor(ctx.rel_path, records).visit(ctx.tree)
     return records
 
 
 def collect_backward_compat_blocks() -> List[Tuple[str, int, str]]:
-    """Collect backward compatibility code blocks."""
+    """Collect backward compatibility code blocks.
+
+    Note: scripts/ is excluded because policy enforcement code necessarily
+    contains the banned keywords in its implementation.
+    """
     records: List[Tuple[str, int, str]] = []
     for ctx in iter_module_contexts(include_source=True):
-        if ctx.rel_path.startswith(("scripts/", "ci_runtime/", "vendor/")):
+        if ctx.rel_path.startswith(("scripts/", "vendor/")):
             continue
         LegacyVisitor(ctx, records).visit(ctx.tree)
     return records
@@ -126,6 +130,20 @@ def collect_forbidden_sync_calls() -> List[Tuple[str, int, str]]:
     return records
 
 
+# Method names that are commonly interface implementations and should be excluded
+# from duplicate detection. These methods are expected to have similar structure
+# across different classes implementing the same interface.
+INTERFACE_METHOD_NAMES = frozenset(
+    {
+        "__init__",
+        "__post_init__",
+        "setup_parser",
+        "get_violations_header",
+        "get_violations_footer",
+    }
+)
+
+
 def _function_entries_from_context(
     ctx: ModuleContext,
     *,
@@ -136,6 +154,9 @@ def _function_entries_from_context(
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         if not (node.end_lineno and node.lineno):
+            continue
+        # Skip common interface method implementations
+        if node.name in INTERFACE_METHOD_NAMES:
             continue
         length = node.end_lineno - node.lineno + 1
         if length < min_length:
@@ -154,7 +175,7 @@ def collect_duplicate_functions(min_length: int = 6) -> List[List[FunctionEntry]
     """Collect groups of duplicate function implementations."""
     mapping: Dict[str, List[FunctionEntry]] = defaultdict(list)
     for ctx in iter_non_init_modules():
-        if ctx.rel_path.startswith(("scripts/", "ci_runtime/", "vendor/")):
+        if ctx.rel_path.startswith(("vendor/",)):
             continue
         for key, entry in _function_entries_from_context(ctx, min_length=min_length):
             mapping[key].append(entry)

@@ -6,12 +6,21 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import List, Sequence
 
 from ci_tools.ci_runtime.config import CONFIG_CANDIDATES
-from ci_tools.scripts.config_loader import load_json_config
+from ci_tools.scripts.config_loader import ConfigLoadError, load_json_config
 
-DEFAULT_CONSUMERS: tuple[str, ...] = ("api", "zeus", "kalshi", "aws")
+
+class MissingConsumersConfigError(ConfigLoadError):
+    """Raised when no consuming repositories configuration is found."""
+
+    def __init__(self, repo_root: Path) -> None:
+        super().__init__(
+            f"No consuming repositories configured. "
+            f"Set CI_SHARED_PROJECTS env var or add 'consuming_repositories' "
+            f"to config file in {repo_root}"
+        )
 
 
 @dataclass(frozen=True)
@@ -26,11 +35,14 @@ def _load_config(repo_root: Path) -> dict | None:
     """Load configuration from repo root.
 
     Delegates to canonical load_json_config implementation in config_loader.
+    Returns None if no config file exists; raises on parse errors.
     """
-    result = load_json_config(
-        repo_root, CONFIG_CANDIDATES, warn_on_error=False, missing_value=None
-    )
-    return result if result else None
+    try:
+        return load_json_config(repo_root, CONFIG_CANDIDATES)
+    except FileNotFoundError:
+        return None
+    except ConfigLoadError:
+        raise
 
 
 def _coerce_repo_entry(
@@ -84,8 +96,12 @@ def _load_from_env(repo_root: Path, env_value: str) -> List[ConsumingRepo]:
 
 
 def load_consuming_repos(repo_root: Path | None = None) -> List[ConsumingRepo]:
-    """Resolve consuming repositories from config/env/defaults."""
+    """Resolve consuming repositories from config or environment.
 
+    Raises:
+        MissingConsumersConfigError: When no configuration source provides
+            consuming repositories.
+    """
     repo_root = repo_root.resolve() if repo_root else Path.cwd().resolve()
     env_value = os.environ.get("CI_SHARED_PROJECTS")
     if isinstance(env_value, str):
@@ -103,10 +119,12 @@ def load_consuming_repos(repo_root: Path | None = None) -> List[ConsumingRepo]:
         if config_repos:
             return config_repos
 
-    return [
-        _coerce_repo_entry(repo_root, name=name, raw_path=None)
-        for name in DEFAULT_CONSUMERS
-    ]
+    raise MissingConsumersConfigError(repo_root)
 
 
-__all__ = ["ConsumingRepo", "load_consuming_repos", "CONFIG_CANDIDATES"]
+__all__ = [
+    "ConsumingRepo",
+    "MissingConsumersConfigError",
+    "load_consuming_repos",
+    "CONFIG_CANDIDATES",
+]

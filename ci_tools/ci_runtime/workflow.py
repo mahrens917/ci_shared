@@ -21,21 +21,24 @@ from .failures import build_failure_context
 from .messaging import commit_and_push, request_commit_message
 from .models import (
     CiAbort,
+    CommandConfig,
+    ModelConfig,
     PatchLifecycleAbort,
     RuntimeOptions,
+    WorkflowConfig,
 )
 from .patch_cycle import request_and_apply_patches
 from .process import gather_git_diff_limited, run_command
-
-# Use the limited diff for prompts while preserving the expected name for tests.
-gather_git_diff = gather_git_diff_limited
 
 
 def _derive_runtime_flags(
     args: argparse.Namespace, command_tokens: list[str]
 ) -> tuple[bool, dict[str, str], bool, bool, bool]:
     """Derive automation flags based on CLI args and the requested command."""
-    command_basename = Path(command_tokens[0]).name if command_tokens else ""
+    if command_tokens:
+        command_basename = Path(command_tokens[0]).name
+    else:
+        command_basename = ""
     automation_mode = command_basename == "ci.sh"
     command_env = {"CI_AUTOMATION": "1"} if automation_mode else {}
     auto_stage_enabled = args.auto_stage or automation_mode
@@ -65,15 +68,15 @@ def configure_runtime(args: argparse.Namespace) -> RuntimeOptions:
     ) = _derive_runtime_flags(args, command_tokens)
 
     return RuntimeOptions(
-        command_tokens=command_tokens,
-        command_env=command_env,
-        patch_approval_mode=args.patch_approval_mode,
-        automation_mode=automation_mode,
-        auto_stage_enabled=auto_stage_enabled,
-        commit_message_enabled=commit_message_enabled,
-        auto_push_enabled=auto_push_enabled,
-        model_name=model_name,
-        reasoning_effort=reasoning_effort,
+        command=CommandConfig(tokens=command_tokens, env=command_env),
+        workflow=WorkflowConfig(
+            patch_approval_mode=args.patch_approval_mode,
+            automation_mode=automation_mode,
+            auto_stage_enabled=auto_stage_enabled,
+            commit_message_enabled=commit_message_enabled,
+            auto_push_enabled=auto_push_enabled,
+        ),
+        model=ModelConfig(name=model_name, reasoning_effort=reasoning_effort),
     )
 
 
@@ -88,7 +91,7 @@ def perform_dry_run(args: argparse.Namespace, options: RuntimeOptions) -> Option
 
 def _collect_worktree_diffs() -> tuple[str, str]:
     """Return both unstaged and staged git diffs."""
-    return gather_git_diff(staged=False), gather_git_diff(staged=True)
+    return gather_git_diff_limited(staged=False), gather_git_diff_limited(staged=True)
 
 
 def _worktree_is_clean(unstaged_diff: str, staged_diff: str) -> bool:
@@ -102,7 +105,7 @@ def _stage_if_needed(options: RuntimeOptions, staged_diff: str) -> str:
         return staged_diff
     print("[info] Staging all changes (`git add -A`).")
     run_command(["git", "add", "-A"], check=True)
-    return gather_git_diff(staged=True)
+    return gather_git_diff_limited(staged=True)
 
 
 def _warn_missing_staged_changes() -> None:
@@ -134,7 +137,10 @@ def _maybe_request_commit_message(
         preview_lines.extend(body_lines)
     print("[info] Suggested commit message:")
     for line in preview_lines:
-        print(f"    {line}" if line else "")
+        if line:
+            print(f"    {line}")
+        else:
+            print("")
     return summary, body_lines
 
 
@@ -145,9 +151,9 @@ def _maybe_push_or_notify(
 ) -> None:
     """Push automatically or prompt the user to commit manually."""
     if options.auto_push_enabled:
-        commit_summary = summary or "Automated commit"
-        commit_body = body_lines if summary is not None else []
-        commit_and_push(commit_summary, commit_body, push=True)
+        if not summary:
+            raise ValueError("Commit summary is required for auto-push")
+        commit_and_push(summary, body_lines, push=True)
         return
     if summary is not None:
         print("[info] Commit message ready; run `git commit` manually if desired.")

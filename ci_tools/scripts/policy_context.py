@@ -82,10 +82,9 @@ class ModuleContext:
     lines: Optional[List[str]] = None
 
 
-class FunctionNormalizer(ast.NodeTransformer):  # pylint: disable=invalid-name
+class FunctionNormalizer(ast.NodeTransformer):
     """Normalizes function ASTs for structural comparison by replacing names and constants."""
 
-    # pylint: disable=invalid-name
     def visit_Name(self, node: ast.Name) -> ast.AST:  # pragma: no cover - trivial
         """Normalize variable names to 'var'."""
         ctx = node.ctx.__class__()
@@ -106,9 +105,17 @@ class FunctionNormalizer(ast.NodeTransformer):  # pylint: disable=invalid-name
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> ast.AST:
         """Normalize exception variable names to 'exc'."""
+        if node.type:
+            normalized_type = self.visit(node.type)
+        else:
+            normalized_type = None
+        if node.name:
+            normalized_name = "exc"
+        else:
+            normalized_name = None
         new_node = ast.ExceptHandler(
-            type=self.visit(node.type) if node.type else None,
-            name="exc" if node.name else None,
+            type=normalized_type,
+            name=normalized_name,
             body=[self.visit(stmt) for stmt in node.body],
         )
         return ast.copy_location(new_node, node)

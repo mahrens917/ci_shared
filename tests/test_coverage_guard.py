@@ -14,6 +14,15 @@ from ci_tools.scripts import coverage_guard
 from ci_tools.scripts.guard_common import detect_repo_root
 
 
+def create_coverage_mock() -> Mock:
+    """Create a properly configured Coverage mock with config attribute."""
+    mock_cov = Mock(spec=Coverage)
+    mock_config = Mock()
+    mock_config.report_omit = None
+    mock_cov.config = mock_config
+    return mock_cov
+
+
 class TestFindRepoRoot:
     """Test repository root finding."""
 
@@ -85,42 +94,51 @@ class TestCoverageResult:
 class TestParseArgs:
     """Test argument parsing."""
 
-    def test_parse_args_defaults(self) -> None:
-        """Test default argument values."""
-        args = coverage_guard.parse_args([])
+    def test_parse_args_required_args(self) -> None:
+        """Test parsing with required arguments."""
+        args = coverage_guard.parse_args([
+            "--threshold", "80",
+            "--data-file", ".coverage"
+        ])
         assert args.threshold == 80.0
-        assert args.data_file is None
+        assert args.data_file == ".coverage"
         assert args.include == []
 
     def test_parse_args_custom_threshold(self) -> None:
         """Test custom threshold argument."""
-        args = coverage_guard.parse_args(["--threshold", "90"])
+        args = coverage_guard.parse_args([
+            "--threshold", "90",
+            "--data-file", ".coverage"
+        ])
         assert args.threshold == 90.0
 
     def test_parse_args_custom_data_file(self) -> None:
         """Test custom data file argument."""
-        args = coverage_guard.parse_args(["--data-file", "/path/to/.coverage"])
+        args = coverage_guard.parse_args([
+            "--threshold", "80",
+            "--data-file", "/path/to/.coverage"
+        ])
         assert args.data_file == "/path/to/.coverage"
 
     def test_parse_args_single_include(self) -> None:
         """Test single include path."""
-        args = coverage_guard.parse_args(["--include", "src"])
+        args = coverage_guard.parse_args([
+            "--threshold", "80",
+            "--data-file", ".coverage",
+            "--include", "src"
+        ])
         assert "src" in args.include
 
     def test_parse_args_multiple_includes(self) -> None:
         """Test multiple include paths."""
-        args = coverage_guard.parse_args(
-            ["--include", "src", "--include", "lib", "--include", "tests"]
-        )
+        args = coverage_guard.parse_args([
+            "--threshold", "80",
+            "--data-file", ".coverage",
+            "--include", "src", "--include", "lib", "--include", "tests"
+        ])
         assert "src" in args.include
         assert "lib" in args.include
         assert "tests" in args.include
-
-    def test_parse_args_threshold_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test reading threshold from environment variable."""
-        monkeypatch.setenv("ZEUS_COVERAGE_THRESHOLD", "75")
-        args = coverage_guard.parse_args([])
-        assert args.threshold == 75.0
 
     def test_parse_args_combined_options(self) -> None:
         """Test combining multiple options."""
@@ -158,20 +176,19 @@ class TestResolveDataFile:
             result = coverage_guard.resolve_data_file(".coverage.test")
             assert result == (tmp_path / ".coverage.test").resolve()
 
-    def test_resolve_data_file_none_defaults(self, tmp_path: Path) -> None:
-        """Test with None defaults to .coverage."""
+    def test_resolve_data_file_relative(self, tmp_path: Path) -> None:
+        """Test resolving relative path."""
         with patch.object(coverage_guard, "ROOT", tmp_path):
-            result = coverage_guard.resolve_data_file(None)
+            result = coverage_guard.resolve_data_file(".coverage")
             assert result == (tmp_path / ".coverage").resolve()
 
-    def test_resolve_data_file_from_env(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    def test_resolve_data_file_with_custom_name(
+        self, tmp_path: Path
     ) -> None:
-        """Test reading from COVERAGE_FILE environment variable."""
-        monkeypatch.setenv("COVERAGE_FILE", ".coverage.env")
+        """Test resolving with custom filename."""
         with patch.object(coverage_guard, "ROOT", tmp_path):
-            result = coverage_guard.resolve_data_file(None)
-            assert result == (tmp_path / ".coverage.env").resolve()
+            result = coverage_guard.resolve_data_file(".coverage.custom")
+            assert result == (tmp_path / ".coverage.custom").resolve()
 
     def test_resolve_data_file_candidate_overrides_env(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -273,7 +290,7 @@ class TestCollectResults:
 
     def test_collect_results_no_data(self) -> None:
         """Test when no coverage data exists."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_cov.load.side_effect = NoDataError("No data")
 
         with pytest.raises(SystemExit) as exc_info:
@@ -283,7 +300,7 @@ class TestCollectResults:
 
     def test_collect_results_empty_data(self) -> None:
         """Test with empty coverage data."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
         mock_data.measured_files.return_value = []
 
@@ -295,7 +312,7 @@ class TestCollectResults:
 
     def test_collect_results_single_file(self, tmp_path: Path) -> None:
         """Test collecting results for single file."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file_path = tmp_path / "src" / "module.py"
@@ -323,7 +340,7 @@ class TestCollectResults:
 
     def test_collect_results_multiple_files(self, tmp_path: Path) -> None:
         """Test collecting results for multiple files."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "src" / "module1.py"
@@ -347,7 +364,7 @@ class TestCollectResults:
 
     def test_collect_results_with_prefixes(self, tmp_path: Path) -> None:
         """Test collecting results filtered by prefixes."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "src" / "module.py"
@@ -369,7 +386,7 @@ class TestCollectResults:
 
     def test_collect_results_skip_no_source(self, tmp_path: Path) -> None:
         """Test that files with no source are skipped."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "exists.py"
@@ -393,7 +410,7 @@ class TestCollectResults:
 
     def test_collect_results_sorted_output(self, tmp_path: Path) -> None:
         """Test that results are sorted by filename."""
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         files = [str(tmp_path / "zebra.py"), str(tmp_path / "alpha.py"), str(tmp_path / "beta.py")]
@@ -418,7 +435,10 @@ class TestMainFunction:
     ) -> None:
         """Test main when coverage data file doesn't exist."""
         with patch.object(coverage_guard, "ROOT", tmp_path):
-            result = coverage_guard.main(["--data-file", str(tmp_path / ".coverage.missing")])
+            result = coverage_guard.main([
+                "--threshold", "80",
+                "--data-file", str(tmp_path / ".coverage.missing")
+            ])
 
         assert result == 1
         captured = capsys.readouterr()
@@ -429,7 +449,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")  # Create empty file
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "module.py"
@@ -451,7 +471,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "low_coverage.py"
@@ -480,12 +500,15 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_cov.load.side_effect = CoverageException("Error loading data")
 
         with patch.object(coverage_guard, "ROOT", tmp_path):
             with patch("ci_tools.scripts.coverage_guard.Coverage", return_value=mock_cov):
-                result = coverage_guard.main(["--data-file", str(data_file)])
+                result = coverage_guard.main([
+                    "--threshold", "80",
+                    "--data-file", str(data_file)
+                ])
 
         assert result == 1
         captured = capsys.readouterr()
@@ -496,7 +519,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "module.py"
@@ -519,7 +542,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "empty.py"
@@ -542,7 +565,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "src" / "module.py"
@@ -574,7 +597,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
         mock_data.measured_files.return_value = []
         mock_cov.load.return_value = None
@@ -584,7 +607,10 @@ class TestMainFunction:
         # Instead, test that main() can be called successfully
         with patch.object(coverage_guard, "ROOT", tmp_path):
             with patch("ci_tools.scripts.coverage_guard.Coverage", return_value=mock_cov):
-                result = coverage_guard.main(["--data-file", str(data_file)])
+                result = coverage_guard.main([
+                    "--threshold", "80",
+                    "--data-file", str(data_file)
+                ])
                 assert result == 0
 
     def test_main_float_precision_edge_case(self, tmp_path: Path) -> None:
@@ -592,7 +618,7 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "module.py"
@@ -624,13 +650,17 @@ class TestMainFunction:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
         mock_data.measured_files.return_value = []
         mock_cov.load.return_value = None
         mock_cov.get_data.return_value = mock_data
 
-        monkeypatch.setattr(sys, "argv", ["coverage_guard.py", "--data-file", str(data_file)])
+        monkeypatch.setattr(sys, "argv", [
+            "coverage_guard.py",
+            "--threshold", "80",
+            "--data-file", str(data_file)
+        ])
 
         with patch.object(coverage_guard, "ROOT", tmp_path):
             with patch("ci_tools.scripts.coverage_guard.Coverage", return_value=mock_cov):
@@ -661,7 +691,7 @@ class TestEdgeCases:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "module1.py"
@@ -691,7 +721,7 @@ class TestEdgeCases:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "src" / "deeply" / "nested" / "module.py"
@@ -715,7 +745,7 @@ class TestEdgeCases:
         data_file = tmp_path / ".coverage"
         data_file.write_text("")
 
-        mock_cov = Mock(spec=Coverage)
+        mock_cov = create_coverage_mock()
         mock_data = Mock()
 
         file1 = tmp_path / "module.py"

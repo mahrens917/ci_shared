@@ -20,9 +20,7 @@ that the Python package and helper scripts resolve correctly:
 python -m pip install -e ../ci_shared
 ```
 
-This exposes:
-- The `ci_tools` Python package on `PYTHONPATH`
-- The `xci.sh` wrapper on your shell `PATH`
+This exposes the `ci_tools` Python package on `PYTHONPATH`.
 
 ## Configure Repository Context (Optional)
 Place a `ci_shared.config.json` at the repository root when you need custom
@@ -76,15 +74,6 @@ python -m ci_tools.ci --model gpt-5-codex --reasoning-effort high
 - Applies Codex patches while enforcing protected path rules
 - Generates a commit message when checks pass
 
-### Bash Wrapper (legacy)
-```bash
-xci.sh               # Uses the same automation loop
-xci.sh pytest -q     # Override the command executed inside the loop
-```
-
-The wrapper mirrors the Python interface but preserves the legacy CLI workflow
-used by existing automation scripts.
-
 ## Integrate Shared Makefile Targets
 
 Include `ci_shared.mk` inside your repository’s `Makefile` to adopt the shared
@@ -103,8 +92,7 @@ and pytest with coverage. Customize high-level knobs such as `FORMAT_TARGETS` or
 
 ## Verify the Installation
 1. `python -m ci_tools.ci --dry-run --command "echo ok"` – ensures CLI wiring
-2. `xci.sh --help` – confirms the shim is on your `PATH`
-3. `make shared-checks` – validates the guard scripts can be imported and run
+2. `make shared-checks` – validates the guard scripts can be imported and run
 
 If any command fails, see the [Development Guide](development.md) for debugging
 tips and dependency notes.

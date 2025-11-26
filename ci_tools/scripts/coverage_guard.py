@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import os
 import sys
 from dataclasses import dataclass
@@ -43,11 +44,13 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--threshold",
         type=float,
-        help="Required per-file coverage percentage (initial: 80).",
+        required=True,
+        help="Required per-file coverage percentage.",
     )
     parser.add_argument(
         "--data-file",
-        help="Coverage data file (initial: COVERAGE_FILE or .coverage).",
+        required=True,
+        help="Coverage data file path.",
     )
     parser.add_argument(
         "--include",
@@ -55,20 +58,28 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Relative path prefixes to check (repeatable). Initial: repo root.",
     )
     parser.set_defaults(
-        threshold=float(os.environ.get("ZEUS_COVERAGE_THRESHOLD") or "80"),
-        data_file=None,
         include=[],
     )
     return parser.parse_args(argv)
 
 
-def resolve_data_file(candidate: str | None) -> Path:
+def resolve_data_file(candidate: str) -> Path:
     """Resolve the coverage data file path."""
-    raw = candidate or os.environ.get("COVERAGE_FILE") or ".coverage"
-    path = Path(raw)
+    path = Path(candidate)
     if not path.is_absolute():
         path = ROOT / path
     return path.resolve()
+
+
+def find_config_file() -> str | None:
+    """Find the coverage configuration file (pyproject.toml or .coveragerc)."""
+    pyproject = ROOT / "pyproject.toml"
+    if pyproject.exists():
+        return str(pyproject)
+    coveragerc = ROOT / ".coveragerc"
+    if coveragerc.exists():
+        return str(coveragerc)
+    return None
 
 
 def normalize_prefixes(prefixes: Iterable[str]) -> List[Path]:
@@ -94,6 +105,16 @@ def should_include(path: Path, prefixes: Sequence[Path]) -> bool:
     )
 
 
+def is_omitted(path: Path, cov: Coverage) -> bool:
+    """Check if a file should be omitted based on coverage config omit patterns."""
+    omit_patterns = cov.config.report_omit or []
+    path_str = str(path)
+    for pattern in omit_patterns:
+        if fnmatch.fnmatch(path_str, pattern):
+            return True
+    return False
+
+
 def collect_results(cov: Coverage, prefixes: Sequence[Path]) -> List[CoverageResult]:
     """Collect coverage results for files matching the given prefixes."""
     try:
@@ -106,6 +127,8 @@ def collect_results(cov: Coverage, prefixes: Sequence[Path]) -> List[CoverageRes
     for filename in sorted(data.measured_files()):
         file_path = Path(filename).resolve()
         if not should_include(file_path, prefixes):
+            continue
+        if is_omitted(file_path, cov):
             continue
         try:
             _, statements, _, missing, _ = cov.analysis2(str(file_path))
@@ -123,6 +146,17 @@ def collect_results(cov: Coverage, prefixes: Sequence[Path]) -> List[CoverageRes
     return results
 
 
+def _create_coverage_instance(data_file: Path, config_file: str | None) -> Coverage:
+    """Create a Coverage instance with appropriate config handling.
+
+    The Coverage class expects config_file to be FilePath or bool (True means
+    auto-detect). We use True when no explicit config is found.
+    """
+    if config_file is not None:
+        return Coverage(data_file=str(data_file), config_file=config_file)
+    return Coverage(data_file=str(data_file), config_file=True)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Main entry point for coverage guard."""
     args = parse_args(argv or sys.argv[1:])
@@ -133,7 +167,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    cov = Coverage(data_file=str(data_file))
+    config_file = find_config_file()
+    cov = _create_coverage_instance(data_file, config_file)
     prefixes = normalize_prefixes(args.include)
     try:
         results = collect_results(cov, prefixes)

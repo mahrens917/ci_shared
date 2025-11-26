@@ -25,10 +25,14 @@ def load_env_file(path: str) -> dict[str, str]:
 
 
 def load_env_settings(env_path: str) -> None:
-    """Populate os.environ with defaults from a dotenv-style file."""
+    """Populate os.environ with values from a dotenv-style file.
+
+    Only sets values that are not already present in the environment.
+    """
     env_values = load_env_file(env_path)
     for key, value in env_values.items():
-        os.environ.setdefault(key, value)
+        if key not in os.environ:
+            os.environ[key] = value
 
 
 __all__ = ["load_env_file", "load_env_settings"]

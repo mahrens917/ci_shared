@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import subprocess
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -29,7 +28,7 @@ def iter_python_files(root: Union[Path, Sequence[Path]]) -> Iterable[Path]:
     Raises:
         OSError: If a root path does not exist
     """
-    # Handle both single Path and Sequence[Path] for maximum compatibility
+    # Handle both single Path and Sequence[Path] inputs
     if isinstance(root, (list, tuple)):
         for base in root:
             if not base.exists():
@@ -72,11 +71,20 @@ def parse_python_ast(path: Path, *, raise_on_error: bool = True) -> ast.AST | No
         return None
 
 
+def _find_repo_root_via_walk() -> Path | None:
+    """Walk up directory tree looking for .git directory."""
+    current = Path.cwd().resolve()
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    return None
+
+
 def detect_repo_root() -> Path:
     """Detect the repository root directory.
 
-    Attempts to use git command first for reliability, falls back to
-    directory walking if git is unavailable.
+    Walks the directory tree looking for a .git directory.
 
     Returns:
         Path to repository root (directory containing .git), or current
@@ -86,27 +94,10 @@ def detect_repo_root() -> Path:
         >>> root = detect_repo_root()
         >>> assert (root / ".git").exists() or root == Path.cwd()
     """
-    # Try git command first (most reliable)
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        candidate = Path(result.stdout.strip())
-        if candidate.exists():
-            return candidate
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    walk_root = _find_repo_root_via_walk()
+    if walk_root is not None:
+        return walk_root
 
-    # Fall back to directory walking
-    current = Path.cwd().resolve()
-    while current != current.parent:
-        if (current / ".git").exists():
-            return current
-        current = current.parent
     return Path.cwd().resolve()
 
 
@@ -219,7 +210,12 @@ class GuardRunner(ABC):
     Subclasses implement setup_parser(), scan_file(), get_violations_header().
     """
 
-    def __init__(self, name: str, description: str, default_root: Path = Path("src")):
+    def __init__(
+        self,
+        name: str = "",
+        description: str = "",
+        default_root: Path = Path("src"),
+    ):
         self.name, self.description, self.default_root = name, description, default_root
         self.repo_root = Path.cwd()
 
@@ -235,10 +231,9 @@ class GuardRunner(ABC):
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Return header message for violations report."""
 
-    # pylint: disable=unused-argument
     def get_violations_footer(self, args: argparse.Namespace) -> Optional[str]:
         """Return optional footer message for violations report."""
-        return None
+        _ = args  # Unused in base implementation
 
     def parse_args(self, argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         """Parse command-line arguments for this guard script."""
@@ -289,5 +284,5 @@ class GuardRunner(ABC):
             Subclasses must override __init__() to take no arguments and call
             super().__init__() with hardcoded name/description values.
         """
-        guard = cls()  # type: ignore[call-arg]  # pylint: disable=no-value-for-parameter  # Subclasses override __init__ to take no args
+        guard: GuardRunner = cls()  # Subclasses override __init__ to take no args
         return guard.run(argv)

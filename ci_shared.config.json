@@ -11,5 +11,11 @@
     {"name": "zeus", "path": "../zeus"},
     {"name": "kalshi", "path": "../kalshi"},
     {"name": "aws", "path": "../aws"}
-  ]
+  ],
+  "commit_message": {
+    "model": "claude-sonnet-4-20250514",
+    "reasoning": "medium",
+    "chunk_line_limit": 6000,
+    "max_chunks": 4
+  }
 }

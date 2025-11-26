@@ -75,7 +75,9 @@ def load_allowlist() -> Dict[str, set[str]]:
         ) from exc
 
     def _coerce_group(key: str) -> set[str]:
-        values = payload.get(key, [])
+        values = payload.get(key)
+        if values is None:
+            return set()
         return {str(item) for item in values}
 
     return {
@@ -90,8 +92,9 @@ ALLOWLIST = load_allowlist()
 
 def allowlisted(name: str, category: str) -> bool:
     """Check if a name is allowlisted in a given category."""
-    group = ALLOWLIST.get(category, set())
-    return name in group
+    if category not in ALLOWLIST:
+        return False
+    return name in ALLOWLIST[category]
 
 
 class DataGuardViolation(Exception):
@@ -137,7 +140,9 @@ def literal_value_repr(node: ast.AST | None) -> str:
     """Get string representation of a literal value."""
     if isinstance(node, ast.Constant):
         return repr(node.value)
-    return ast.dump(node) if node is not None else "None"
+    if node is not None:
+        return ast.dump(node)
+    return "None"
 
 
 def should_flag_assignment(target_names: Iterable[str], value: ast.AST | None) -> bool:

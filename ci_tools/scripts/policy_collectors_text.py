@@ -65,11 +65,16 @@ def scan_keywords() -> Dict[str, Dict[str, List[int]]]:
     for ctx in iter_module_contexts(include_source=True):
         if _should_skip_path(ctx.rel_path):
             continue
-        source = ctx.source or ""
+        if ctx.source:
+            source = ctx.source
+        else:
+            source = ""
         keyword_hits = _keyword_token_lines(source, keyword_lookup)
         for keyword, lines in keyword_hits.items():
             if lines:
-                found.setdefault(keyword, {})[ctx.rel_path] = sorted(lines)
+                if keyword not in found:
+                    found[keyword] = {}
+                found[keyword][ctx.rel_path] = sorted(lines)
     return found
 
 

@@ -47,16 +47,11 @@ class MethodCountGuard(GuardRunner):
             help="Maximum allowed total methods (public + private) per class (default: 25).",
         )
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def _build_violation(
-        self,
-        path: Path,
-        node: ast.ClassDef,
-        pub: int,
-        tot: int,
-        args: argparse.Namespace,
+    def _check_class_methods(
+        self, path: Path, node: ast.ClassDef, args: argparse.Namespace
     ) -> Optional[str]:
-        """Build violation message if limits exceeded."""
+        """Check class method counts and build violation message if exceeded."""
+        pub, tot = count_class_methods(node)
         if pub <= args.max_public_methods and tot <= args.max_total_methods:
             return None
         rel_path = relative_path(path, self.repo_root)
@@ -74,12 +69,9 @@ class MethodCountGuard(GuardRunner):
         violations: List[str] = []
         for node in iter_ast_nodes(tree, ast.ClassDef):
             assert isinstance(node, ast.ClassDef)  # Type narrowing for pyright
-            pub, tot = count_class_methods(node)
-            if violation := self._build_violation(path, node, pub, tot, args):
+            if violation := self._check_class_methods(path, node, args):
                 violations.append(violation)
         return violations
-
-    # pylint: enable=duplicate-code
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""

@@ -43,7 +43,7 @@ def _run_command_buffered(
     )
 
 
-def _stream_pipe(pipe, collector: list[str], target=None) -> None:
+def stream_pipe(pipe, collector: list[str], target=None) -> None:
     """Collect text from a pipe, optionally forwarding to a stream.
 
     This consolidates duplicate stream processing logic used across
@@ -88,7 +88,7 @@ def _run_command_streaming(
         if process.stdout:
             threads.append(
                 threading.Thread(
-                    target=_stream_pipe,
+                    target=stream_pipe,
                     args=(process.stdout, stdout_lines, sys.stdout),
                     daemon=True,
                 )
@@ -96,7 +96,7 @@ def _run_command_streaming(
         if process.stderr:
             threads.append(
                 threading.Thread(
-                    target=_stream_pipe,
+                    target=stream_pipe,
                     args=(process.stderr, stderr_lines, sys.stderr),
                     daemon=True,
                 )

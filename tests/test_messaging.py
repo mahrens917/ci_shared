@@ -96,13 +96,13 @@ class TestRequestCommitMessage:
         assert "high" in prompt
 
     @patch("ci_tools.ci_runtime.messaging.invoke_codex")
-    def test_commit_message_with_none_reasoning_effort(self, mock_invoke):
-        """Test commit message with None reasoning effort."""
+    def test_commit_message_with_medium_reasoning_effort(self, mock_invoke):
+        """Test commit message with medium reasoning effort."""
         mock_invoke.return_value = "Fixed bug"
 
         request_commit_message(
             model="gpt-5-codex",
-            reasoning_effort=None,
+            reasoning_effort="medium",
             staged_diff="diff",
             extra_context="",
             detailed=False,
@@ -110,7 +110,7 @@ class TestRequestCommitMessage:
 
         call_args = mock_invoke.call_args
         prompt = call_args[0][0]
-        assert "default" in prompt
+        assert "medium" in prompt
 
     @patch("ci_tools.ci_runtime.messaging.invoke_codex")
     def test_empty_response_raises_error(self, mock_invoke):
@@ -309,6 +309,7 @@ class TestCommitAndPush:
         assert m_count == 1
 
     @patch("ci_tools.ci_runtime.messaging.run_command")
+    @patch.dict("os.environ", {"GIT_REMOTE": "origin"})
     def test_commit_and_push_to_origin(self, mock_run):
         """Test committing and pushing to origin."""
         mock_run.return_value = Mock(returncode=0, stdout="main\n", stderr="")
@@ -353,6 +354,7 @@ class TestCommitAndPush:
         assert "commit" in str(exc_info.value).lower()
 
     @patch("ci_tools.ci_runtime.messaging.run_command")
+    @patch.dict("os.environ", {"GIT_REMOTE": "origin"})
     def test_push_failure_raises_abort(self, mock_run):
         """Test that push failure raises GitCommandAbort."""
         # First call (commit) succeeds, second (rev-parse) succeeds, third (push) fails
@@ -368,6 +370,7 @@ class TestCommitAndPush:
         assert "push" in str(exc_info.value).lower()
 
     @patch("ci_tools.ci_runtime.messaging.run_command")
+    @patch.dict("os.environ", {"GIT_REMOTE": "origin"})
     def test_prints_info_messages(self, mock_run, capsys):
         """Test that informational messages are printed."""
         mock_run.return_value = Mock(returncode=0, stdout="main\n", stderr="")
@@ -401,6 +404,7 @@ class TestCommitAndPush:
         assert kwargs.get("live") is True
 
     @patch("ci_tools.ci_runtime.messaging.run_command")
+    @patch.dict("os.environ", {"GIT_REMOTE": "origin"})
     def test_push_uses_live_output(self, mock_run):
         """Test that push command uses live=True for output."""
         mock_run.return_value = Mock(returncode=0, stdout="main\n", stderr="")
@@ -412,6 +416,7 @@ class TestCommitAndPush:
         assert kwargs.get("live") is True
 
     @patch("ci_tools.ci_runtime.messaging.run_command")
+    @patch.dict("os.environ", {"GIT_REMOTE": "origin"})
     def test_branch_detection_strips_whitespace(self, mock_run):
         """Test that branch name is stripped of whitespace."""
         mock_run.side_effect = [

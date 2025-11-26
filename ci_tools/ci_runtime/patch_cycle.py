@@ -20,9 +20,6 @@ from .models import (
 from .patching import apply_patch, patch_looks_risky
 from .process import gather_git_diff_limited, gather_git_status
 
-# Backward-compatible alias for tests and call sites that expect gather_git_diff
-gather_git_diff = gather_git_diff_limited
-
 
 def _obtain_patch_diff(*, options: RuntimeOptions, prompt: PatchPrompt) -> str:
     """Request a patch from Codex and return its diff text."""
@@ -31,7 +28,9 @@ def _obtain_patch_diff(*, options: RuntimeOptions, prompt: PatchPrompt) -> str:
         reasoning_effort=options.reasoning_effort,
         prompt=prompt,
     )
-    diff_text = extract_unified_diff(response or "")
+    if not response:
+        raise PatchLifecycleAbort.missing_patch()
+    diff_text = extract_unified_diff(response)
     if not diff_text:
         raise PatchLifecycleAbort.missing_patch()
     return diff_text
@@ -51,7 +50,9 @@ def _validate_patch_candidate(
         return "Patch missing unified diff headers (diff --git/---/+++ lines)."
     is_risky, reason = patch_looks_risky(diff_text, max_lines=max_patch_lines)
     if is_risky:
-        return reason or "Patch failed safety checks."
+        if not reason:
+            return "Patch failed safety checks."
+        return reason
     return None
 
 
@@ -66,7 +67,7 @@ def _apply_patch_candidate(
     except PatchApplyError as exc:
         state.record_failure(str(exc), retryable=exc.retryable)
         return False
-    except RuntimeError as exc:  # pragma: no cover - defensive fallback
+    except RuntimeError as exc:  # pragma: no cover - defensive
         state.record_failure(str(exc), retryable=False)
         return False
     state.last_error = None
@@ -108,7 +109,7 @@ def request_and_apply_patches(
         prompt = PatchPrompt(
             command=args.command,
             failure_context=failure_ctx,
-            git_diff=gather_git_diff(staged=False),
+            git_diff=gather_git_diff_limited(staged=False),
             git_status=gather_git_status(),
             iteration=iteration,
             patch_error=state.last_error,

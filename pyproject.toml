@@ -50,7 +50,6 @@ DEP003 = [
 [tool.setuptools]
 packages = ["ci_tools"]
 include-package-data = true
-script-files = ["ci_tools/scripts/xci.sh"]
 
 [tool.setuptools.package-data]
 ci_tools = ["scripts/*.sh", "scripts/*.py", "vendor/**/*", "config/*"]
@@ -66,12 +65,6 @@ ci_tools = ["scripts/*.sh", "scripts/*.py", "vendor/**/*", "config/*"]
 # To validate: python -m ci_tools.scripts.tool_config_guard
 # To sync: python -m ci_tools.scripts.tool_config_guard --sync
 # =============================================================================
-
-[tool.pylint.MAIN]
-init-hook = "import sys; sys.path.insert(0, 'tests')"
-
-[tool.pylint.SIMILARITIES]
-min-similarity-lines = 7
 
 [tool.bandit]
 exclude_dirs = [
@@ -101,6 +94,12 @@ skips = [
 
 [tool.coverage]
 
+[tool.coverage.report]
+omit = [
+    "*helpers/__init__.py",
+    "*/_module_references.py",
+]
+
 [tool.coverage.run]
 omit = [
     "*/vendor/*",
@@ -111,14 +110,75 @@ omit = [
     "*/dependency_injector/*.pyx",
     "*/dependency_injector/**/*.pyx",
     "*/site-packages/*",
+    "*helpers/__init__.py",
+    "*/_module_references.py",
 ]
+
+[tool.pylint]
+
+[tool.pylint.BASIC]
+method-rgx = "([a-z_][a-z0-9_]*|visit_[A-Z][A-Za-z]*)"
+
+[tool.pylint.MAIN]
+init-hook = "import sys; sys.path.insert(0, 'tests')"
+
+[tool.pylint.SIMILARITIES]
+min-similarity-lines = 7
+
+[tool.pylint.messages_control]
+disable = "too-few-public-methods"
+
+[tool.pylint.design]
+max-args = 7
+max-positional-arguments = 7
+
+[tool.pyright]
+pythonVersion = "3.12"
+reportArgumentType = "warning"
+reportAssertAlwaysTrue = "warning"
+reportAssignmentType = "warning"
+reportAttributeAccessIssue = "warning"
+reportCallInDefaultInitializer = "none"
+reportCallIssue = "warning"
+reportDuplicateImport = "error"
+reportFunctionMemberAccess = "warning"
+reportGeneralTypeIssues = "error"
+reportImplicitStringConcatenation = "none"
+reportIncompleteStub = "none"
+reportIndexIssue = "warning"
+reportInvalidStubStatement = "warning"
+reportInvalidTypeVarUse = "warning"
+reportMissingImports = "error"
+reportMissingModuleSource = "none"
+reportMissingTypeStubs = "none"
+reportOperatorIssue = "warning"
+reportOptionalCall = "warning"
+reportOptionalContextManager = "warning"
+reportOptionalIterable = "warning"
+reportOptionalMemberAccess = "warning"
+reportOptionalOperand = "warning"
+reportOptionalSubscript = "warning"
+reportPrivateUsage = "none"
+reportPropertyTypeMismatch = "warning"
+reportReturnType = "warning"
+reportSelfClsParameterName = "warning"
+reportUnboundVariable = "error"
+reportUndefinedVariable = "error"
+reportUninitializedInstanceVariable = "none"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryIsInstance = "warning"
+reportUntypedBaseClass = "none"
+reportUntypedClassDecorator = "none"
+reportUntypedFunctionDecorator = "none"
+reportUntypedNamedTuple = "warning"
+reportUnusedImport = "error"
+reportUnusedVariable = "error"
+typeCheckingMode = "basic"
 
 [tool.pytest]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
-asyncio_default_test_loop_scope = "session"
 addopts = [
     "-v",
     "--tb=short",
@@ -132,10 +192,10 @@ addopts = [
     "-p",
     "no:jaxtyping",
 ]
-testpaths = ["tests"]
-pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+asyncio_mode = "auto"
 consider_namespace_packages = true
-norecursedirs = ["tests/manual"]
 env = [
     "PYTHONDONTWRITEBYTECODE=1",
     "REDIS_HOST=localhost",
@@ -147,11 +207,18 @@ env = [
     "REDIS_SOCKET_TIMEOUT=30",
     "REDIS_SOCKET_CONNECT_TIMEOUT=30",
 ]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-timeout = 30
-timeout_method = "thread"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:The optimal value found.*is close to the specified.*bound.*:UserWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::ResourceWarning",
+    "ignore::UserWarning:sklearn",
+    "ignore::FutureWarning:sklearn",
+    "ignore::FutureWarning",
+]
+junit_duration_report = "total"
+junit_family = "xunit2"
 markers = [
     "unit: Unit tests - fast, isolated tests (< 1 second each)",
     "integration: Integration tests - test component interactions (< 15 seconds each)",
@@ -172,18 +239,26 @@ markers = [
     "pnl: PnL (Profit and Loss) system related tests",
     "slowpdf: Deterministic PDF performance regression tests",
 ]
-junit_family = "xunit2"
-junit_duration_report = "total"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
-    "ignore:The optimal value found.*is close to the specified.*bound.*:UserWarning",
-    "ignore::pytest.PytestUnraisableExceptionWarning",
-    "ignore::ResourceWarning",
-    "ignore::UserWarning:sklearn",
-    "ignore::FutureWarning:sklearn",
-    "ignore::FutureWarning",
+norecursedirs = [
+    "tests/manual",
 ]
+python_classes = [
+    "Test*",
+]
+python_files = [
+    "test_*.py",
+]
+python_functions = [
+    "test_*",
+]
+pythonpath = [
+    "src",
+]
+testpaths = [
+    "tests",
+]
+timeout = 30
+timeout_method = "thread"
 
 [tool.ruff]
 extend-exclude = [

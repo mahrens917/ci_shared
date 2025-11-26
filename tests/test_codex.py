@@ -28,11 +28,13 @@ from ci_tools.ci_runtime.models import (
 class TestBuildCodexCommand:
     """Tests for build_codex_command function."""
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     def test_basic_command_without_reasoning_effort(self):
         """Test command building without reasoning effort."""
         result = build_codex_command("gpt-5-codex", None)
         assert result == ["codex", "exec", "--model", "gpt-5-codex", "-"]
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     def test_command_with_reasoning_effort(self):
         """Test command building with reasoning effort."""
         result = build_codex_command("gpt-5-codex", "high")
@@ -46,6 +48,7 @@ class TestBuildCodexCommand:
             "-",
         ]
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     def test_command_with_low_reasoning_effort(self):
         """Test command building with low reasoning effort."""
         result = build_codex_command("gpt-5-codex", "low")
@@ -59,6 +62,7 @@ class TestBuildCodexCommand:
             "-",
         ]
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     def test_command_with_medium_reasoning_effort(self):
         """Test command building with medium reasoning effort."""
         result = build_codex_command("gpt-5-codex", "medium")
@@ -87,13 +91,17 @@ class TestFeedPrompt:
         mock_process.stdin.close.assert_called_once()
 
     def test_handles_broken_pipe_error(self):
-        """Test that BrokenPipeError is handled gracefully."""
+        """Test that BrokenPipeError is re-raised after closing stdin."""
         mock_process = Mock()
         mock_process.stdin = Mock()
         mock_process.stdin.write.side_effect = BrokenPipeError()
 
-        # Should not raise
-        _feed_prompt(mock_process, "test prompt")
+        # Should re-raise BrokenPipeError after closing stdin
+        with pytest.raises(BrokenPipeError):
+            _feed_prompt(mock_process, "test prompt")
+
+        # stdin should still be closed even when error occurs
+        mock_process.stdin.close.assert_called()
 
     def test_handles_none_stdin(self):
         """Test handling when stdin is None."""
@@ -167,6 +175,7 @@ class TestStreamOutput:
 class TestInvokeCodex:
     """Tests for invoke_codex function."""
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
     @patch("subprocess.Popen")
     def test_successful_invocation(self, mock_popen, mock_log):
@@ -192,6 +201,7 @@ class TestInvokeCodex:
         assert result == "response text"
         mock_log.assert_called_once()
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
     @patch("subprocess.Popen")
     def test_invocation_without_assistant_prefix(self, mock_popen, _mock_log):
@@ -216,6 +226,7 @@ class TestInvokeCodex:
 
         assert result == "direct response"
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
     @patch("subprocess.Popen")
     def test_invocation_with_error(self, mock_popen, _mock_log):
@@ -241,6 +252,7 @@ class TestInvokeCodex:
 
         assert "exit status 1" in str(exc_info.value)
 
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
     @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
     @patch("subprocess.Popen")
     def test_invocation_returns_stderr_when_no_stdout(self, mock_popen, _mock_log):

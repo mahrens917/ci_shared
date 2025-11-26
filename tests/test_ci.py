@@ -1,9 +1,9 @@
-"""Unit tests for ci_tools.ci module (compatibility layer)."""
+"""Unit tests for ci_tools.ci_runtime module."""
 
 from __future__ import annotations
 
-# Import all exports from ci.py to verify they're accessible
-from ci_tools.ci import (
+# Import all exports from ci_runtime to verify they're accessible
+from ci_tools.ci_runtime import (
     PatchPrompt,
     apply_patch,
     build_codex_command,
@@ -42,14 +42,14 @@ from ci_tools.ci_runtime.workflow import (
     main as workflow_main,
 )
 from ci_tools.ci_runtime import workflow, process, patching, messaging
-import ci_tools.ci as ci_module
+import ci_tools.ci_runtime as ci_module
 
 
-class TestCiCompatibilityLayer:
-    """Tests verifying the ci.py compatibility layer exports."""
+class TestCiRuntimeExports:
+    """Tests verifying the ci_runtime package exports."""
 
     def test_all_exports_accessible(self):
-        """Test that all exported functions are accessible from ci.py."""
+        """Test that all exported functions are accessible from ci_runtime."""
         # Verify main entry point is callable
         assert callable(main)
 
@@ -120,10 +120,10 @@ class TestCiCompatibilityLayer:
 
 
 class TestCiModuleStructure:
-    """Tests for ci.py module structure and organization."""
+    """Tests for ci_runtime module structure and organization."""
 
     def test_module_has_all_attribute(self):
-        """Test that ci.py defines __all__ for explicit exports."""
+        """Test that ci_runtime defines __all__ for explicit exports."""
         assert hasattr(ci_module, "__all__")
         assert isinstance(ci_module.__all__, list)
         assert len(ci_module.__all__) > 0
@@ -190,17 +190,17 @@ class TestCiModuleStructure:
 
 
 class TestCiIntegration:
-    """Integration tests for the ci.py compatibility layer."""
+    """Integration tests for the ci_runtime package."""
 
     def test_can_import_from_ci_module_directly(self):
-        """Test that functions can be imported directly from ci_tools.ci."""
+        """Test that functions can be imported directly from ci_tools.ci_runtime."""
         # Verify imports already at module level work
         assert main is not None
         assert configure_runtime is not None
         assert run_command is not None
 
     def test_ci_module_provides_same_interface_as_runtime(self):
-        """Test that ci.py provides the same interface as ci_runtime modules."""
+        """Test that ci_runtime provides consistent interface with submodules."""
         # Verify workflow functions
         assert ci_module.main is workflow.main
         assert ci_module.configure_runtime is workflow.configure_runtime
@@ -217,6 +217,6 @@ class TestCiIntegration:
         assert ci_module.request_commit_message is messaging.request_commit_message
 
     def test_ci_module_docstring_exists(self):
-        """Test that ci.py has a module docstring."""
+        """Test that ci_runtime has a module docstring."""
         assert ci_module.__doc__ is not None
         assert len(ci_module.__doc__.strip()) > 0

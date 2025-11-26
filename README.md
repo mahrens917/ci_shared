@@ -29,7 +29,7 @@ python -m pip install -e ../ci_shared
 python -m ci_tools.scripts.tool_config_guard --sync
 ```
 
-This makes `ci_tools` scripts available and adds `xci.sh` to your PATH.
+This makes `ci_tools` scripts available on your `PYTHONPATH`.
 
 ### Requirements
 
@@ -85,19 +85,7 @@ The `ci.sh` script:
 4. **Commits and pushes** if all checks pass
 5. **Auto-propagates** ci_shared updates to consuming repos
 
-### Option 3: Legacy Wrapper (xci.sh)
-
-Use the legacy bash wrapper with archived prompts/responses:
-
-```bash
-xci.sh              # Auto-detect CI command
-xci.sh make check   # Custom CI command
-xci.sh --help       # Show all options
-```
-
-Archives are saved to `.xci/archive/` with timestamps.
-
-### Option 4: Manual Makefile Targets
+### Option 3: Manual Makefile Targets
 
 For local development:
 
@@ -160,9 +148,6 @@ When you push changes to `ci_shared`:
   config sync + propagation into API, Zeus, Kalshi, AWS, etc.
 - Environment variables such as `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, and
   `GIT_REMOTE` customize Codex behavior and push targets.
-- `xci.config.json` fine-tunes the legacy shell wrapper (attempt counts, log
-  tails, archive paths). See `xci.config.json.example` for all available options.
-  Run `xci.sh --help` for usage documentation.
 
 ## Guard Suite
 Key guard scripts live under `ci_tools/scripts/` and `scripts/`:

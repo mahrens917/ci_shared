@@ -55,45 +55,44 @@ _MODULE_EXPORTS = [
 ]
 
 # Static __all__ definition required for pyright analysis
-# pylint: disable=duplicate-code  # Intentional duplication of module exports
 __all__ = [
-    # models
+    # ---- models ----
     "PatchPrompt",
-    # codex
+    # ---- codex module exports ----
     "build_codex_command",
-    "invoke_codex",
-    "request_codex_patch",
-    "truncate_error",
     "extract_unified_diff",
     "has_unified_diff_header",
-    "truncate_diff_summary",
+    "invoke_codex",
+    "request_codex_patch",
     "risky_pattern_in_diff",
-    # coverage
+    "truncate_diff_summary",
+    "truncate_error",
+    # ---- coverage ----
     "extract_coverage_deficits",
-    # failures
+    # ---- failures ----
     "build_failure_context",
-    # messaging
-    "request_commit_message",
+    # ---- messaging ----
     "commit_and_push",
-    # patch_cycle
+    "request_commit_message",
+    # ---- patch_cycle ----
     "request_and_apply_patches",
-    # patching
-    "patch_looks_risky",
+    # ---- patching ----
     "apply_patch",
-    # process
-    "run_command",
-    "tail_text",
+    "patch_looks_risky",
+    # ---- process ----
+    "gather_file_diff",
     "gather_git_diff",
     "gather_git_diff_limited",
     "gather_git_status",
-    "gather_file_diff",
     "log_codex_interaction",
-    # workflow
-    "main",
+    "run_command",
+    "tail_text",
+    # ---- workflow ----
     "configure_runtime",
+    "finalize_worktree",
+    "main",
     "perform_dry_run",
     "run_repair_iterations",
-    "finalize_worktree",
 ]
 
 for module, exports in _MODULE_EXPORTS:

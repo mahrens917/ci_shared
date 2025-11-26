@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from ci_tools.scripts import bandit_wrapper
+from ci_tools.ci_runtime import bandit_wrapper
 
 
 def test_collect_warning_lines_filters_bandit_logs() -> None:
@@ -34,7 +34,7 @@ def test_run_bandit_returns_underlying_exit_code_when_non_zero(
         stdout="Run started...\n",
         stderr="[error] something bad\n",
     )
-    with mock.patch("ci_tools.scripts.bandit_wrapper.subprocess.run", return_value=completed):
+    with mock.patch("ci_tools.ci_runtime.bandit_wrapper.subprocess.run", return_value=completed):
         exit_code = bandit_wrapper.run_bandit(["-c", "pyproject.toml"])
     captured = capsys.readouterr()
     assert "Run started..." in captured.out
@@ -52,7 +52,7 @@ def test_run_bandit_fails_when_warning_detected(
         stdout="[manager] WARNING invalid escape sequence '\\;'\n",
         stderr="",
     )
-    with mock.patch("ci_tools.scripts.bandit_wrapper.subprocess.run", return_value=completed):
+    with mock.patch("ci_tools.ci_runtime.bandit_wrapper.subprocess.run", return_value=completed):
         exit_code = bandit_wrapper.run_bandit(["-c", "pyproject.toml"])
     captured = capsys.readouterr()
     assert "Bandit emitted warnings" in captured.err
@@ -69,7 +69,7 @@ def test_run_bandit_allows_warnings_when_flag_set(
         stdout="[tester] WARNING nosec encountered (B324)\n",
         stderr="",
     )
-    with mock.patch("ci_tools.scripts.bandit_wrapper.subprocess.run", return_value=completed):
+    with mock.patch("ci_tools.ci_runtime.bandit_wrapper.subprocess.run", return_value=completed):
         exit_code = bandit_wrapper.run_bandit(
             ["-c", "pyproject.toml"],
             allow_warnings=True,

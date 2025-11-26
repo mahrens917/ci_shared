@@ -106,7 +106,6 @@ class DependencyGuard(GuardRunner):
                 )
         return None
 
-    # pylint: disable=duplicate-code
     def scan_file(self, path: Path, args: argparse.Namespace) -> List[str]:
         """Scan a file for dependency instantiation violations."""
         tree = parse_python_ast(path)

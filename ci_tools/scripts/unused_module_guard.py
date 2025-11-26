@@ -59,7 +59,9 @@ def find_unused_modules(
     Returns:
         List of (file_path, reason) tuples for unused modules
     """
-    exclude_patterns = list(exclude_patterns or [])
+    if exclude_patterns is None:
+        exclude_patterns = []
+    exclude_patterns = list(exclude_patterns)
     all_imports = collect_all_imports_with_parent(root)
     unused: List[Tuple[Path, str]] = []
 
@@ -201,7 +203,9 @@ def main() -> int:
     duplicates = apply_whitelist_filtering(duplicates, args.whitelist, args.root)
     issues_found = report_results(unused, duplicates, args.root, args.strict)
 
-    return 1 if issues_found else 0
+    if issues_found:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

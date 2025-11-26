@@ -9,6 +9,39 @@ from typing import Iterable, Optional
 from .._messages import format_default_message
 
 
+def _normalize_output(*sources: Optional[str]) -> str:
+    """Combine and strip multiple output sources into a single string.
+
+    Returns the first non-empty stripped string from the provided sources,
+    or an empty string if all sources are None or empty.
+    """
+    for source in sources:
+        if source is not None:
+            stripped = source.strip()
+            if stripped:
+                return stripped
+    return ""
+
+
+def _normalize_output_with_placeholder(*sources: Optional[str]) -> str:
+    """Combine output sources and return a placeholder if all are empty."""
+    result = _normalize_output(*sources)
+    if not result:
+        return "(no output)"
+    return result
+
+
+def display_value(value: Optional[str], placeholder: str) -> str:
+    """Return the value if non-empty, otherwise the placeholder.
+
+    This is the canonical way to display optional values without using
+    the banned `value or placeholder` pattern.
+    """
+    if value:
+        return value
+    return placeholder
+
+
 class CiError(RuntimeError):
     """Base class for CI automation runtime failures."""
 
@@ -29,7 +62,7 @@ class CodexCliError(CiError):
     @classmethod
     def exit_status(cls, *, returncode: int, output: Optional[str]) -> "CodexCliError":
         """Build an error containing the CLI exit status and captured output."""
-        normalized = (output or "").strip() or "(no output)"
+        normalized = _normalize_output_with_placeholder(output)
         detail = f"exit status {returncode} ({normalized})"
         return cls(detail=detail)
 
@@ -67,7 +100,7 @@ class GitCommandAbort(CiAbort):
     @classmethod
     def commit_failed(cls, exc: subprocess.CalledProcessError) -> "GitCommandAbort":
         """Return an error capturing a failed git commit invocation."""
-        output = (exc.stderr or exc.output or "").strip()
+        output = _normalize_output(exc.stderr, exc.output)
         detail = f"'git commit' exited with status {exc.returncode}"
         if output:
             detail = f"{detail}; {output}"
@@ -76,11 +109,16 @@ class GitCommandAbort(CiAbort):
     @classmethod
     def push_failed(cls, exc: subprocess.CalledProcessError) -> "GitCommandAbort":
         """Return an error capturing a failed git push invocation."""
-        output = (exc.stderr or exc.output or "").strip()
+        output = _normalize_output(exc.stderr, exc.output)
         detail = f"'git push' exited with status {exc.returncode}"
         if output:
             detail = f"{detail}; {output}"
         return cls(detail=detail)
+
+    @classmethod
+    def missing_remote(cls) -> "GitCommandAbort":
+        """Return an error when GIT_REMOTE environment variable is not set."""
+        return cls(detail="GIT_REMOTE environment variable is required")
 
 
 class RepositoryStateAbort(CiAbort):
@@ -171,18 +209,84 @@ class CommandResult:
 
 
 @dataclass
-class RuntimeOptions:  # pylint: disable=too-many-instance-attributes
-    """Configuration flags governing how the CI workflow runs."""
+class CommandConfig:
+    """Command execution configuration."""
 
-    command_tokens: list[str]
-    command_env: dict[str, str]
+    tokens: list[str]
+    env: dict[str, str]
+
+
+@dataclass
+class WorkflowConfig:
+    """Workflow behavior configuration."""
+
     patch_approval_mode: str
     automation_mode: bool
     auto_stage_enabled: bool
     commit_message_enabled: bool
     auto_push_enabled: bool
-    model_name: str
+
+
+@dataclass
+class ModelConfig:
+    """Model configuration."""
+
+    name: str
     reasoning_effort: str
+
+
+@dataclass
+class RuntimeOptions:
+    """Configuration flags governing how the CI workflow runs."""
+
+    command: CommandConfig
+    workflow: WorkflowConfig
+    model: ModelConfig
+
+    @property
+    def command_tokens(self) -> list[str]:
+        """Command tokens for execution."""
+        return self.command.tokens
+
+    @property
+    def command_env(self) -> dict[str, str]:
+        """Command environment variables."""
+        return self.command.env
+
+    @property
+    def patch_approval_mode(self) -> str:
+        """Patch approval mode."""
+        return self.workflow.patch_approval_mode
+
+    @property
+    def automation_mode(self) -> bool:
+        """Whether automation mode is enabled."""
+        return self.workflow.automation_mode
+
+    @property
+    def auto_stage_enabled(self) -> bool:
+        """Whether auto staging is enabled."""
+        return self.workflow.auto_stage_enabled
+
+    @property
+    def commit_message_enabled(self) -> bool:
+        """Whether commit message generation is enabled."""
+        return self.workflow.commit_message_enabled
+
+    @property
+    def auto_push_enabled(self) -> bool:
+        """Whether auto push is enabled."""
+        return self.workflow.auto_push_enabled
+
+    @property
+    def model_name(self) -> str:
+        """Model name."""
+        return self.model.name
+
+    @property
+    def reasoning_effort(self) -> str:
+        """Reasoning effort level."""
+        return self.model.reasoning_effort
 
 
 @dataclass
@@ -234,7 +338,7 @@ class PatchApplyError(CiError):
     @classmethod
     def git_apply_failed(cls, *, output: str) -> "PatchApplyError":
         """Factory when `git apply` fails to dry-run or apply the diff."""
-        normalized = (output or "").strip() or "(no output)"
+        normalized = _normalize_output_with_placeholder(output)
         detail = f"`git apply` failed: {normalized}"
         return cls(detail=detail, retryable=True)
 
@@ -243,17 +347,19 @@ class PatchApplyError(CiError):
         cls, *, check_output: str, dry_output: str
     ) -> "PatchApplyError":
         """Factory when both git and patch dry-runs are unable to apply."""
+        check_display = display_value(_normalize_output(check_output), "(none)")
+        dry_display = display_value(_normalize_output(dry_output), "(none)")
         detail = (
             "Patch dry-run failed.\n"
-            f"git apply --check output:\n{(check_output or '').strip() or '(none)'}\n\n"
-            f"patch --dry-run output:\n{(dry_output or '').strip() or '(none)'}"
+            f"git apply --check output:\n{check_display}\n\n"
+            f"patch --dry-run output:\n{dry_display}"
         )
         return cls(detail=detail, retryable=True)
 
     @classmethod
     def patch_exit(cls, *, returncode: int, output: str) -> "PatchApplyError":
         """Factory when the POSIX `patch` utility exits with a non-zero code."""
-        normalized = (output or "").strip() or "(no output)"
+        normalized = _normalize_output_with_placeholder(output)
         detail = f"`patch` exited with status {returncode}: {normalized}"
         return cls(detail=detail, retryable=True)
 
@@ -289,6 +395,7 @@ class PatchPrompt:
 
 
 __all__ = [
+    "display_value",
     "CiError",
     "CodexCliError",
     "CommitMessageError",
@@ -300,6 +407,9 @@ __all__ = [
     "PatchLifecycleAbort",
     "PatchApplyError",
     "CommandResult",
+    "CommandConfig",
+    "WorkflowConfig",
+    "ModelConfig",
     "RuntimeOptions",
     "FailureContext",
     "PatchAttemptState",

@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from ci_tools.scripts.generate_commit_message import (
     _build_chunk_summary_diff,
     _chunk_by_lines,
     _chunk_by_sections,
     _chunk_diff,
-    _env_int,
+    _get_config_int,
     _prepare_payload,
     _read_staged_diff,
     _request_with_chunking,
@@ -114,6 +116,7 @@ def test_write_payload_file_error(tmp_path):
     assert result == 1
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -123,9 +126,16 @@ def test_main_success(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
     capsys,
 ):
     """Test main with successful commit message generation."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "medium"
@@ -137,14 +147,22 @@ def test_main_success(
     assert "Fix bug" in captured.out
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
-def test_main_no_staged_diff(mock_gather_diff):
+def test_main_no_staged_diff(mock_gather_diff, mock_get_config):
     """Test main exits with error when no staged diff."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = ""
     result = main([])
     assert result == 1
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -154,8 +172,15 @@ def test_main_empty_summary(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
 ):
     """Test main exits with error when commit message is empty."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "medium"
@@ -165,6 +190,7 @@ def test_main_empty_summary(
     assert result == 1
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -174,17 +200,25 @@ def test_main_codex_exception(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
 ):
-    """Test main handles Codex exceptions."""
+    """Test main propagates Codex exceptions."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.side_effect = Exception("Codex failed")
 
-    result = main([])
-    assert result == 1
+    with pytest.raises(Exception, match="Codex failed"):
+        main([])
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -194,9 +228,16 @@ def test_main_with_detailed_flag(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
     capsys,
 ):
     """Test main with detailed flag includes body."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "medium"
@@ -209,6 +250,7 @@ def test_main_with_detailed_flag(
     assert "Detailed explanation" in captured.out
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -218,9 +260,16 @@ def test_main_with_output_file(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
     tmp_path,
 ):
     """Test main writes to output file when specified."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     output_file = tmp_path / "commit.txt"
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
@@ -233,7 +282,14 @@ def test_main_with_output_file(
     assert "Fix bug" in output_file.read_text()
 
 
-@patch.dict("os.environ", {"CI_COMMIT_MODEL": "gpt-5-codex"})
+@patch.dict(
+    "os.environ",
+    {
+        "CI_COMMIT_MODEL": "gpt-5-codex",
+        "CI_COMMIT_REASONING": "medium",
+    },
+)
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -243,8 +299,15 @@ def test_main_uses_env_var_for_model(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
 ):
     """Test main uses CI_COMMIT_MODEL env var."""
+    mock_get_config.return_value = {
+        "model": "config-model",
+        "reasoning": "low",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "medium"
@@ -252,10 +315,18 @@ def test_main_uses_env_var_for_model(
 
     result = main([])
     assert result == 0
+    # Env var takes precedence over config
     mock_resolve_model.assert_called_once_with("gpt-5-codex", validate=False)
 
 
-@patch.dict("os.environ", {"CI_COMMIT_REASONING": "high"})
+@patch.dict(
+    "os.environ",
+    {
+        "CI_COMMIT_MODEL": "gpt-5-codex",
+        "CI_COMMIT_REASONING": "high",
+    },
+)
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -265,8 +336,15 @@ def test_main_uses_env_var_for_reasoning(
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
+    mock_get_config,
 ):
     """Test main uses CI_COMMIT_REASONING env var."""
+    mock_get_config.return_value = {
+        "model": "config-model",
+        "reasoning": "low",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
     mock_resolve_model.return_value = "gpt-5-codex"
     mock_resolve_reasoning.return_value = "high"
@@ -274,25 +352,64 @@ def test_main_uses_env_var_for_reasoning(
 
     result = main([])
     assert result == 0
+    # Env var takes precedence over config
     mock_resolve_reasoning.assert_called_once_with("high", validate=False)
 
 
+@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
+@patch("ci_tools.scripts.generate_commit_message.request_commit_message")
+@patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
+@patch("ci_tools.scripts.generate_commit_message.resolve_reasoning_choice")
+def test_main_uses_config_file_values(
+    mock_resolve_reasoning,
+    mock_resolve_model,
+    mock_request_commit,
+    mock_gather_diff,
+    mock_get_config,
+):
+    """Test main uses config file values when no env vars or CLI args."""
+    mock_get_config.return_value = {
+        "model": "claude-sonnet-4-20250514",
+        "reasoning": "medium",
+        "chunk_line_limit": 6000,
+        "max_chunks": 4,
+    }
+    mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
+    mock_resolve_model.return_value = "claude-sonnet-4-20250514"
+    mock_resolve_reasoning.return_value = "medium"
+    mock_request_commit.return_value = ("Fix bug", [])
+
+    result = main([])
+    assert result == 0
+    mock_resolve_model.assert_called_once_with("claude-sonnet-4-20250514", validate=False)
+    mock_resolve_reasoning.assert_called_once_with("medium", validate=False)
+
+
 @patch.dict("os.environ", {}, clear=True)
-def test_env_int_default():
-    """Return defaults when env var missing."""
-    assert _env_int("NON_EXISTENT_VALUE", 7) == 7
+def test_get_config_int_raises_when_missing():
+    """Raises ValueError when env var and config key missing."""
+    with pytest.raises(ValueError, match="NON_EXISTENT env var or 'missing_key' in config file"):
+        _get_config_int({}, "missing_key", "NON_EXISTENT")
 
 
 @patch.dict("os.environ", {"TEST_VALUE": "123"}, clear=True)
-def test_env_int_parses_int():
-    """Parse integer value from env."""
-    assert _env_int("TEST_VALUE", 0) == 123
+def test_get_config_int_prefers_env_var():
+    """Env var takes precedence over config value."""
+    assert _get_config_int({"chunk_line_limit": 999}, "chunk_line_limit", "TEST_VALUE") == 123
+
+
+@patch.dict("os.environ", {}, clear=True)
+def test_get_config_int_uses_config():
+    """Falls back to config value when env var missing."""
+    assert _get_config_int({"chunk_line_limit": 6000}, "chunk_line_limit", "MISSING_ENV") == 6000
 
 
 @patch.dict("os.environ", {"TEST_VALUE": "not-a-number"}, clear=True)
-def test_env_int_handles_invalid():
-    """Fall back to default on invalid numbers."""
-    assert _env_int("TEST_VALUE", 42) == 42
+def test_get_config_int_raises_on_invalid():
+    """Raises ValueError on invalid numbers."""
+    with pytest.raises(ValueError):
+        _get_config_int({}, "key", "TEST_VALUE")
 
 
 def test_split_diff_sections_breaks_on_headers():

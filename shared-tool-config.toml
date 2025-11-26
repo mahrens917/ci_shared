@@ -116,6 +116,16 @@ omit = [
     "*/dependency_injector/*.pyx",    # Exclude Cython files that can't be parsed
     "*/dependency_injector/**/*.pyx", # Exclude all nested Cython files
     "*/site-packages/*", # Exclude all third-party packages
+    "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
+    "*/_module_references.py", # Exclude module reference files (prevent circular imports)
+]
+
+[tool.coverage.report]
+# Also exclude these from report output (run.omit excludes from collection,
+# report.omit excludes from display - both needed for complete exclusion)
+omit = [
+    "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
+    "*/_module_references.py", # Exclude module reference files (prevent circular imports)
 ]
 
 [tool.bandit]
@@ -154,3 +164,65 @@ max-statements = 50
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["TRY002", "TRY203", "PLR2004"]
+
+[tool.pylint.MAIN]
+init-hook = "import sys; sys.path.insert(0, 'tests')"
+
+[tool.pylint.BASIC]
+# Allow ast.NodeVisitor method naming pattern (visit_Name, visit_If, etc.)
+method-rgx = "([a-z_][a-z0-9_]*|visit_[A-Z][A-Za-z]*)"
+
+[tool.pylint."messages_control"]
+# Protocol classes are type stubs that don't need public methods
+disable = "too-few-public-methods"
+
+[tool.pylint.SIMILARITIES]
+min-similarity-lines = 7
+
+[tool.pylint.design]
+max-args = 7
+max-positional-arguments = 7
+
+[tool.pyright]
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+reportMissingImports = "error"
+reportMissingTypeStubs = "none"
+reportUnusedImport = "error"
+reportUnusedVariable = "error"
+reportDuplicateImport = "error"
+reportPrivateUsage = "none"
+reportUnnecessaryIsInstance = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportAssertAlwaysTrue = "warning"
+reportSelfClsParameterName = "warning"
+reportImplicitStringConcatenation = "none"
+reportInvalidStubStatement = "warning"
+reportIncompleteStub = "none"
+reportUndefinedVariable = "error"
+reportUnboundVariable = "error"
+reportOptionalSubscript = "warning"
+reportOptionalMemberAccess = "warning"
+reportOptionalCall = "warning"
+reportOptionalIterable = "warning"
+reportOptionalContextManager = "warning"
+reportOptionalOperand = "warning"
+reportUntypedFunctionDecorator = "none"
+reportUntypedClassDecorator = "none"
+reportUntypedBaseClass = "none"
+reportUntypedNamedTuple = "warning"
+reportCallInDefaultInitializer = "none"
+reportUninitializedInstanceVariable = "none"
+reportInvalidTypeVarUse = "warning"
+reportPropertyTypeMismatch = "warning"
+reportFunctionMemberAccess = "warning"
+reportGeneralTypeIssues = "error"
+reportMissingModuleSource = "none"
+reportAttributeAccessIssue = "warning"
+reportArgumentType = "warning"
+reportCallIssue = "warning"
+reportReturnType = "warning"
+reportAssignmentType = "warning"
+reportIndexIssue = "warning"
+reportOperatorIssue = "warning"

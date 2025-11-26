@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is `codex-ci-tools`, a shared continuous-integration toolkit used by the Zeus and Kalshi repositories. The package bundles the Codex automation workflow (`ci_tools`) along with the `xci.sh` convenience script for automated CI repair loops.
+This is `codex-ci-tools`, a shared continuous-integration toolkit used by the Zeus and Kalshi repositories. The package bundles the Codex automation workflow (`ci_tools`) for automated CI repair loops.
 
 ## Installation & Setup
 
@@ -14,29 +14,24 @@ Install the package in editable mode from the consuming repository root:
 python -m pip install -e ../ci_shared
 ```
 
-This places the shared scripts on `PYTHONPATH` and the `xci.sh` wrapper on your shell `PATH`.
+This places the shared scripts on `PYTHONPATH`.
 
 ## Key Commands
 
 ### Running CI Automation
 
-**Python interface (modern):**
+**Python interface:**
 ```bash
 python -m ci_tools.ci --model gpt-5-codex --reasoning-effort high
 ```
 
-**Bash wrapper (legacy CLI surface):**
-```bash
-xci.sh [optional-ci-command]
-```
+This interface:
+- Runs the CI command (defaults to `scripts/ci.sh` or `./ci.sh`)
+- On failure, sends logs to Codex for a patch suggestion
+- Applies patches and loops until CI passes or max iterations reached
+- Generates commit messages when CI succeeds
 
-Both interfaces:
-- Run the CI command (defaults to `scripts/ci.sh` or `./ci.sh`)
-- On failure, send logs to Codex for a patch suggestion
-- Apply patches and loop until CI passes or max iterations reached
-- Generate commit messages when CI succeeds
-
-**Common options for `ci_tools.ci`:**
+**Common options:**
 - `--command <cmd>`: Custom CI command (default: `./scripts/ci.sh`)
 - `--max-iterations <n>`: Max fix attempts (default: 5)
 - `--patch-approval-mode {prompt,auto}`: Control patch approval (default: prompt)
@@ -139,13 +134,6 @@ Key workflow stages:
 2. **Iteration loop**: Run CI → capture failure → request patch → apply → retry
 3. **Coverage handling**: Special logic for coverage deficits below threshold
 4. **Commit phase**: Auto-stage changes and generate commit messages
-
-**`ci_tools/scripts/xci.sh`**
-- Bash wrapper providing legacy CLI compatibility
-- Loops on CI failures, archives Codex exchanges under `.xci/archive/`
-- Enforces strict rules in prompts (no baseline files, no exemptions, fix code not tests)
-- Validates patches don't modify protected CI infrastructure
-- Generates detailed success/failure reports with statistics
 
 **`ci_tools/scripts/ci.sh`** (shared CI script)
 - Primary CI entry point used by consuming repositories (Zeus, Kalshi) and ci_shared itself
@@ -283,7 +271,7 @@ The package includes a lightweight `packaging` shim under `ci_tools/vendor/` to 
 
 ## Key Design Principles
 
-1. **Protected Infrastructure**: Patches cannot modify CI tooling itself (`ci_tools/`, `scripts/ci.sh`, `Makefile`, `xci.sh`, `ci.py`)
+1. **Protected Infrastructure**: Patches cannot modify CI tooling itself (`ci_tools/`, `scripts/ci.sh`, `Makefile`, `ci.py`)
 2. **No Workarounds**: The automation refuses to add baseline files, exemption comments (`# noqa`, `policy_guard: allow-*`), or `--exclude` arguments
 3. **Fix Code, Not Tests**: The workflow is designed to fix underlying code issues, not bypass quality checks
 4. **Safety Guards**: Multiple heuristics prevent dangerous patches (risky patterns, protected paths, line count limits)
@@ -353,8 +341,6 @@ When CI passes but coverage falls below threshold:
 ## Logs & Archiving
 
 - **`logs/codex_ci.log`**: Appended log of all Codex interactions (prompt + response)
-- **`.xci/archive/`**: Timestamped archives of prompts, responses, and patches from `xci.sh`
-- **`.xci/tmp/`**: Temporary files during execution (cleaned on each run)
 
 ## Development Workflow
 

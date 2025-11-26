@@ -4,14 +4,52 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import sys
 from pathlib import Path
-from typing import Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
-from ci_tools.ci import gather_git_diff, request_commit_message
+from ci_tools.ci_runtime import gather_git_diff, request_commit_message
 from ci_tools.ci_runtime.config import resolve_model_choice, resolve_reasoning_choice
+from ci_tools.scripts.guard_common import detect_repo_root
+
+
+def _load_config() -> dict[str, Any]:
+    """Load ci_shared.config.json from the repository root."""
+    repo_root = detect_repo_root()
+    config_path = repo_root / "ci_shared.config.json"
+    if not config_path.exists():
+        return {}
+    with open(config_path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _get_commit_config() -> dict[str, Any]:
+    """Get the commit_message section from config."""
+    config = _load_config()
+    return config.get("commit_message", {})
+
+
+def _resolve_model_arg(cli_arg: str | None, config: dict[str, Any]) -> str | None:
+    """Resolve model from CLI arg, env var, or config file."""
+    if cli_arg:
+        return cli_arg
+    env_model = os.environ.get("CI_COMMIT_MODEL")
+    if env_model:
+        return env_model
+    return config.get("model")
+
+
+def _resolve_reasoning_arg(cli_arg: str | None, config: dict[str, Any]) -> str | None:
+    """Resolve reasoning from CLI arg, env var, or config file."""
+    if cli_arg:
+        return cli_arg
+    env_reasoning = os.environ.get("CI_COMMIT_REASONING")
+    if env_reasoning:
+        return env_reasoning
+    return config.get("reasoning")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -48,10 +86,15 @@ def _prepare_payload(summary: str, body_lines: list[str]) -> str:
     return "\n".join(payload_lines)
 
 
+def _print_payload_to_stdout(payload: str) -> int:
+    """Print payload to stdout and return success code."""
+    print(payload)
+    return 0
+
+
 def _write_payload(payload: str, output_path: Path | None) -> int | None:
-    if output_path is None:
-        print(payload)
-        return 0
+    if not output_path:
+        return _print_payload_to_stdout(payload)
     try:
         output_path.write_text(payload + "\n")
     except OSError as exc:
@@ -62,14 +105,14 @@ def _write_payload(payload: str, output_path: Path | None) -> int | None:
     return 0
 
 
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
+def _get_config_int(config: dict[str, Any], key: str, env_name: str) -> int:
+    """Get an integer value from env var or config file."""
+    raw = os.environ.get(env_name)
+    if raw is not None:
         return int(raw)
-    except ValueError:
-        return default
+    if key in config:
+        return int(config[key])
+    raise ValueError(f"{env_name} env var or '{key}' in config file is required")
 
 
 def _split_diff_sections(diff_text: str) -> list[str]:
@@ -139,7 +182,7 @@ def _chunk_by_sections(
 
 
 def _chunk_by_lines(diff_text: str, chunk_count: int) -> list[str]:
-    """Fallback chunking by raw line count when section grouping is insufficient."""
+    """Chunk by raw line count when section-based grouping produces too few chunks."""
     lines = diff_text.splitlines()
     if not lines:
         return []
@@ -150,7 +193,9 @@ def _chunk_by_lines(diff_text: str, chunk_count: int) -> list[str]:
         chunk_lines = lines[start : start + chunk_size]
         if chunk_lines:
             chunks.append("\n".join(chunk_lines).strip("\n"))
-    return chunks or [diff_text]
+    if not chunks:
+        return [diff_text]
+    return chunks
 
 
 def _chunk_diff(
@@ -180,7 +225,9 @@ def _chunk_diff(
             max(2, math.ceil(total_lines / sanitized_max_lines)),
         )
         chunks = _chunk_by_lines(diff_text, chunk_target)
-    return chunks or [diff_text]
+    if not chunks:
+        return [diff_text]
+    return chunks
 
 
 def _build_chunk_summary_diff(
@@ -201,14 +248,16 @@ def _build_chunk_summary_diff(
                 lines.append(f"+ {entry_text}")
         lines.append("")
     synthesized = "\n".join(lines).strip()
-    return synthesized or "+ chunk summary unavailable"
+    if synthesized:
+        return synthesized
+    return "+ chunk summary unavailable"
 
 
 def _request_with_chunking(
     *,
     chunks: Sequence[str],
     model: str,
-    reasoning_effort: str | None,
+    reasoning_effort: str,
     detailed: bool,
 ) -> tuple[str, list[str]]:
     """Run multiple Codex requests across diff chunks and synthesize the final message."""
@@ -266,9 +315,25 @@ def _request_with_chunking(
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for commit message generation."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    commit_config = _get_commit_config()
 
-    model_arg = args.model or os.environ.get("CI_COMMIT_MODEL")
-    reasoning_arg = args.reasoning or os.environ.get("CI_COMMIT_REASONING")
+    model_arg = _resolve_model_arg(args.model, commit_config)
+    if not model_arg:
+        print(
+            "Model must be specified via --model, CI_COMMIT_MODEL env var, "
+            "or commit_message.model in ci_shared.config.json",
+            file=sys.stderr,
+        )
+        return 1
+
+    reasoning_arg = _resolve_reasoning_arg(args.reasoning, commit_config)
+    if not reasoning_arg:
+        print(
+            "Reasoning must be specified via --reasoning, CI_COMMIT_REASONING env var, "
+            "or commit_message.reasoning in ci_shared.config.json",
+            file=sys.stderr,
+        )
+        return 1
 
     model = resolve_model_choice(model_arg, validate=False)
     reasoning = resolve_reasoning_choice(reasoning_arg, validate=False)
@@ -280,30 +345,21 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    max_chunk_lines = _env_int("CI_CODEX_COMMIT_CHUNK_LINE_LIMIT", 6000)
-    max_chunks = _env_int("CI_CODEX_COMMIT_MAX_CHUNKS", 4)
+    max_chunk_lines = _get_config_int(
+        commit_config, "chunk_line_limit", "CI_CODEX_COMMIT_CHUNK_LINE_LIMIT"
+    )
+    max_chunks = _get_config_int(
+        commit_config, "max_chunks", "CI_CODEX_COMMIT_MAX_CHUNKS"
+    )
     chunks = _chunk_diff(staged_diff, max_chunk_lines, max_chunks)
 
-    try:
-        if len(chunks) == 1:
-            summary, body_lines = request_commit_message(
-                model=model,
-                reasoning_effort=reasoning,
-                staged_diff=staged_diff,
-                extra_context="",
-                detailed=args.detailed,
-            )
-        else:
-            summary, body_lines = _request_with_chunking(
-                chunks=chunks,
-                model=model,
-                reasoning_effort=reasoning,
-                detailed=args.detailed,
-            )
-    # pylint: disable=broad-exception-caught
-    except Exception as exc:  # pragma: no cover - defensive guardrail
-        print(f"Codex commit message request failed: {exc}", file=sys.stderr)
-        return 1
+    summary, body_lines = _generate_commit_message(
+        chunks=chunks,
+        staged_diff=staged_diff,
+        model=model,
+        reasoning=reasoning,
+        detailed=args.detailed,
+    )
 
     summary = summary.strip()
     if not summary:
@@ -312,7 +368,34 @@ def main(argv: list[str] | None = None) -> int:
 
     payload = _prepare_payload(summary, body_lines)
     result = _write_payload(payload, args.output)
-    return result if result is not None else 0
+    if result is not None:
+        return result
+    return 0
+
+
+def _generate_commit_message(
+    *,
+    chunks: list[str],
+    staged_diff: str,
+    model: str,
+    reasoning: str,
+    detailed: bool,
+) -> tuple[str, list[str]]:
+    """Generate commit message, using chunking if needed."""
+    if len(chunks) == 1:
+        return request_commit_message(
+            model=model,
+            reasoning_effort=reasoning,
+            staged_diff=staged_diff,
+            extra_context="",
+            detailed=detailed,
+        )
+    return _request_with_chunking(
+        chunks=chunks,
+        model=model,
+        reasoning_effort=reasoning,
+        detailed=detailed,
+    )
 
 
 if __name__ == "__main__":

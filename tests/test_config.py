@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
+import pytest
 
 from ci_tools.ci_runtime.config import (
     CONFIG_CANDIDATES,
@@ -26,6 +27,7 @@ from ci_tools.ci_runtime.config import (
     detect_repo_root,
     load_repo_config,
 )
+from ci_tools.scripts.config_loader import ConfigLoadError
 from ci_tools.test_constants import get_constant
 
 COVERAGE_VALUES = get_constant("config", "coverage_thresholds")
@@ -84,43 +86,36 @@ class TestConstants:
 class TestDetectRepoRoot:
     """Tests for detect_repo_root function."""
 
-    def test_detect_repo_root_git_success(self):
-        """Test detect_repo_root uses git when available."""
-        with patch("subprocess.run") as mock_run:
-            mock_result = Mock()
-            mock_result.stdout = "/path/to/repo\n"
-            mock_run.return_value = mock_result
+    def test_detect_repo_root_finds_git_dir(self, tmp_path):
+        """Test detect_repo_root finds .git directory."""
+        repo = tmp_path / "project"
+        repo.mkdir()
+        (repo / ".git").mkdir()
 
-            with patch("pathlib.Path.exists", return_value=True):
-                result = detect_repo_root()
-                assert result == Path("/path/to/repo")
-
-            mock_run.assert_called_once()
-            args = mock_run.call_args[0][0]
-            assert args == ["git", "rev-parse", "--show-toplevel"]
-
-    def test_detect_repo_root_git_failure_returns_cwd(self):
-        """Test detect_repo_root falls back to cwd when git fails."""
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git")):
+        with patch("pathlib.Path.cwd", return_value=repo):
             result = detect_repo_root()
-            assert result == Path.cwd()
+            assert result == repo
 
-    def test_detect_repo_root_git_not_found_returns_cwd(self):
-        """Test detect_repo_root falls back to cwd when git not found."""
-        with patch("subprocess.run", side_effect=FileNotFoundError):
+    def test_detect_repo_root_walks_up_to_find_git(self, tmp_path):
+        """Test detect_repo_root walks up directory tree."""
+        repo = tmp_path / "project"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        nested = repo / "src" / "module"
+        nested.mkdir(parents=True)
+
+        with patch("pathlib.Path.cwd", return_value=nested):
             result = detect_repo_root()
-            assert result == Path.cwd()
+            assert result == repo
 
-    def test_detect_repo_root_path_does_not_exist(self):
-        """Test detect_repo_root falls back to cwd when path doesn't exist."""
-        with patch("subprocess.run") as mock_run:
-            mock_result = Mock()
-            mock_result.stdout = "/nonexistent/path\n"
-            mock_run.return_value = mock_result
+    def test_detect_repo_root_returns_cwd_when_no_git(self, tmp_path):
+        """Test detect_repo_root returns cwd when no .git found."""
+        no_git_dir = tmp_path / "no_git"
+        no_git_dir.mkdir()
 
-            with patch("pathlib.Path.exists", return_value=False):
-                result = detect_repo_root()
-                assert result == Path.cwd()
+        with patch("pathlib.Path.cwd", return_value=no_git_dir):
+            result = detect_repo_root()
+            assert result == no_git_dir.resolve()
 
 
 class TestLoadRepoConfig:
@@ -160,25 +155,23 @@ class TestLoadRepoConfig:
         result = load_repo_config(tmp_path)
         assert not result
 
-    def test_load_repo_config_invalid_json(self, tmp_path, capsys):
-        """Test loading handles invalid JSON gracefully."""
+    def test_load_repo_config_invalid_json(self, tmp_path):
+        """Test loading raises ConfigLoadError for invalid JSON."""
         config_file = tmp_path / "ci_shared.config.json"
         config_file.write_text("{ invalid json }")
 
-        result = load_repo_config(tmp_path)
-        assert not result
+        with pytest.raises(ConfigLoadError) as exc_info:
+            load_repo_config(tmp_path)
+        assert "Failed to parse" in str(exc_info.value)
 
-        captured = capsys.readouterr()
-        assert "warning" in captured.err.lower()
-        assert "Failed to parse" in captured.err
-
-    def test_load_repo_config_non_dict_returns_empty(self, tmp_path):
-        """Test loading returns empty dict when JSON is not a dict."""
+    def test_load_repo_config_non_dict_raises_error(self, tmp_path):
+        """Test loading raises ConfigLoadError when JSON is not a dict."""
         config_file = tmp_path / "ci_shared.config.json"
         config_file.write_text(json.dumps(["not", "a", "dict"]))
 
-        result = load_repo_config(tmp_path)
-        assert not result
+        with pytest.raises(ConfigLoadError) as exc_info:
+            load_repo_config(tmp_path)
+        assert "Expected dict" in str(exc_info.value)
 
     def test_load_repo_config_empty_json(self, tmp_path):
         """Test loading empty JSON object."""

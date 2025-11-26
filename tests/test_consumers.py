@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ci_tools.utils.consumers import load_consuming_repos
+from ci_tools.utils.consumers import MissingConsumersConfigError, load_consuming_repos
 
 
 def write_config(tmp_path: Path, data: str) -> None:
@@ -63,9 +63,9 @@ def test_load_from_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert repos[0].path == env_path.resolve()
 
 
-def test_load_defaults_when_config_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Test that defaults are used when config file is missing."""
+def test_raises_when_config_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Test that an error is raised when no config source provides repositories."""
     monkeypatch.delenv("CI_SHARED_PROJECTS", raising=False)
-    repos = load_consuming_repos(tmp_path)
-    # Defaults are deterministic and include at least API.
-    assert any(repo.name == "api" for repo in repos)
+    with pytest.raises(MissingConsumersConfigError) as exc_info:
+        load_consuming_repos(tmp_path)
+    assert "No consuming repositories configured" in str(exc_info.value)
