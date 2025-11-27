@@ -1,6 +1,6 @@
 # codex-ci-tools
 
-Shared continuous-integration toolkit used across Zeus, Kalshi, AWS, and API repositories. This package provides:
+Shared continuous-integration toolkit used across Zeus, Kalshi, AWS, API, and TicTacToe repositories. This package provides:
 - **Automated CI repair loops** powered by Codex that fix failing checks
 - **Comprehensive guard suite** enforcing code quality, security, and complexity standards
 - **Shared CI pipeline** with consistent tooling across all consuming repositories
@@ -17,7 +17,7 @@ Shared continuous-integration toolkit used across Zeus, Kalshi, AWS, and API rep
 
 ## Installation
 
-### For Consuming Repositories (Zeus, Kalshi, AWS, API)
+### For Consuming Repositories (Zeus, Kalshi, AWS, API, TicTacToe)
 
 From your repository root:
 
