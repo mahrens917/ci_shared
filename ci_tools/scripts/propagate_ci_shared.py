@@ -4,6 +4,8 @@ Propagate ci_shared updates to consuming repositories.
 
 After ci_shared is successfully pushed, this script copies the canonical CI files
 into all consuming repositories (api, zeus, kalshi, aws) and pushes the changes.
+Repositories that are explicitly blocked (for example, personal chess/tictactoe
+checkouts) are skipped automatically to avoid unintended pushes.
 """
 
 import subprocess
@@ -17,6 +19,24 @@ from ci_tools.ci_runtime.process import (
     run_command,
 )
 from ci_tools.utils.consumers import ConsumingRepo, load_consuming_repos
+
+BLOCKED_CONSUMER_NAMES = frozenset({"chess", "tictactoe"})
+
+
+def _filter_blocked_consumers(
+    consuming_repos: Iterable[ConsumingRepo],
+) -> tuple[list[ConsumingRepo], list[ConsumingRepo]]:
+    """Remove blocked repositories from the consuming repos list."""
+    allowed: list[ConsumingRepo] = []
+    blocked: list[ConsumingRepo] = []
+
+    for repo in consuming_repos:
+        if repo.name.lower() in BLOCKED_CONSUMER_NAMES:
+            blocked.append(repo)
+            continue
+        allowed.append(repo)
+
+    return allowed, blocked
 
 
 def _validate_repo_state(repo_path: Path, repo_name: str) -> bool:
@@ -266,12 +286,27 @@ def main() -> int:
     if not consuming_repos:
         print("⚠️  No consuming repositories configured; skipping propagation")
         return 0
+
+    filtered_repos, blocked_repos = _filter_blocked_consumers(consuming_repos)
+    if blocked_repos:
+        print(
+            "\nSkipping blocked repositories: "
+            + ", ".join(f"{repo.name} ({repo.path})" for repo in blocked_repos)
+        )
+
+    if not filtered_repos:
+        print(
+            "⚠️  No consuming repositories available after filtering; "
+            "skipping propagation"
+        )
+        return 0
+
     print(
         "\nConsuming repos: "
-        + ", ".join(f"{repo.name} ({repo.path})" for repo in consuming_repos)
+        + ", ".join(f"{repo.name} ({repo.path})" for repo in filtered_repos)
     )
 
-    updated, skipped, failed = _process_repositories(consuming_repos, commit_msg, cwd)
+    updated, skipped, failed = _process_repositories(filtered_repos, commit_msg, cwd)
 
     _print_summary(updated, skipped, failed)
 

@@ -12,6 +12,7 @@ from ci_tools.ci_runtime.models import CommandResult
 from ci_tools.ci_runtime.process import get_commit_message, run_command
 from ci_tools.scripts.propagate_ci_shared import (
     _commit_and_push_update,
+    _filter_blocked_consumers,
     _print_summary,
     _process_repositories,
     _sync_repo_configs,
@@ -296,6 +297,18 @@ def test_process_repositories(tmp_path):
         assert not failed
 
 
+def test_filter_blocked_consumers(tmp_path):
+    """Test that blocked consumer names are filtered out."""
+    repos = [
+        ConsumingRepo("api", tmp_path / "api"),
+        ConsumingRepo("chess", tmp_path / "chess"),
+        ConsumingRepo("tictactoe", tmp_path / "tictactoe"),
+    ]
+    allowed, blocked = _filter_blocked_consumers(repos)
+    assert [repo.name for repo in allowed] == ["api"]
+    assert [repo.name for repo in blocked] == ["chess", "tictactoe"]
+
+
 def test_print_summary_all_types(capsys):
     """Test _print_summary prints all status types."""
     _print_summary(["zeus"], ["kalshi"], ["aws"])
@@ -366,4 +379,69 @@ def test_main_with_failures(tmp_path, monkeypatch):
                 mock_load.return_value = [ConsumingRepo("api", tmp_path / "api")]
                 mock2.return_value = ([], [], ["aws"])
                 result = main()
-                assert result == 1
+    assert result == 1
+
+
+def test_main_skips_blocked_consumers(tmp_path, monkeypatch, capsys):
+    """Test main filters out blocked consuming repositories."""
+    repo_dir = tmp_path / "ci_shared"
+    repo_dir.mkdir()
+    (repo_dir / "ci_tools").mkdir()
+    (repo_dir / "ci_shared.mk").touch()
+    monkeypatch.chdir(repo_dir)
+
+    with patch(
+        "ci_tools.scripts.propagate_ci_shared.get_commit_message"
+    ) as mock_commit:
+        with patch(
+            "ci_tools.scripts.propagate_ci_shared.load_consuming_repos"
+        ) as mock_load:
+            with patch(
+                "ci_tools.scripts.propagate_ci_shared._process_repositories"
+            ) as mock_process:
+                mock_commit.return_value = "Test commit"
+                mock_load.return_value = [
+                    ConsumingRepo("api", tmp_path / "api"),
+                    ConsumingRepo("chess", tmp_path / "chess"),
+                ]
+                mock_process.return_value = ([], [], [])
+                result = main()
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert "Skipping blocked repositories" in captured.out
+    assert "chess" in captured.out
+    mock_process.assert_called_once()
+    passed_repos = mock_process.call_args.args[0]
+    assert [repo.name for repo in passed_repos] == ["api"]
+
+
+def test_main_only_blocked_consumers(tmp_path, monkeypatch, capsys):
+    """Test main exits early when every consuming repo is blocked."""
+    repo_dir = tmp_path / "ci_shared"
+    repo_dir.mkdir()
+    (repo_dir / "ci_tools").mkdir()
+    (repo_dir / "ci_shared.mk").touch()
+    monkeypatch.chdir(repo_dir)
+
+    with patch(
+        "ci_tools.scripts.propagate_ci_shared.get_commit_message"
+    ) as mock_commit:
+        with patch(
+            "ci_tools.scripts.propagate_ci_shared.load_consuming_repos"
+        ) as mock_load:
+            with patch(
+                "ci_tools.scripts.propagate_ci_shared._process_repositories"
+            ) as mock_process:
+                mock_commit.return_value = "Test commit"
+                mock_load.return_value = [
+                    ConsumingRepo("chess", tmp_path / "chess"),
+                    ConsumingRepo("tictactoe", tmp_path / "tictactoe"),
+                ]
+                result = main()
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert "Skipping blocked repositories" in captured.out
+    assert "No consuming repositories available after filtering" in captured.out
+    mock_process.assert_not_called()
