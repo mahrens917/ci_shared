@@ -110,6 +110,7 @@ filterwarnings = [
 omit = [
     "*/vendor/*",
     "*/__main__.py",
+    "**/__init__.py",    # Skip package initializers
     "tests/*",           # Exclude test directory
     "*/tests/*",         # Exclude tests in any subdirectory
     "*_test_*.py",       # Exclude test utility files (e.g., api_test_utils.py)
@@ -124,6 +125,7 @@ omit = [
 # Also exclude these from report output (run.omit excludes from collection,
 # report.omit excludes from display - both needed for complete exclusion)
 omit = [
+    "**/__init__.py",    # Skip package initializers
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
 ]

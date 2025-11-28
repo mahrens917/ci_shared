@@ -102,7 +102,14 @@ if [ -z "${COMMIT_MESSAGE}" ]; then
   fi
 
   if [ -n "${CLI_NAME}" ]; then
-    echo "Requesting commit message from ${CLI_NAME}..."
+    if [ "${CI_CLI_TYPE}" = "claude" ]; then
+      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-claude-haiku-4-5-20251001}"
+    else
+      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-gpt-5.1-codex-mini}"
+    fi
+    export CI_COMMIT_REASONING="${CI_COMMIT_REASONING:-medium}"
+
+    echo "Requesting commit message from ${CLI_NAME} (model: ${CI_COMMIT_MODEL})..."
     COMMIT_OUTPUT_FILE="$(mktemp)"
     if python -m ci_tools.scripts.generate_commit_message --output "${COMMIT_OUTPUT_FILE}"; then
       COMMIT_MESSAGE="$(head -n 1 "${COMMIT_OUTPUT_FILE}")"

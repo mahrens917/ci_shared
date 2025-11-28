@@ -96,6 +96,7 @@ skips = [
 
 [tool.coverage.report]
 omit = [
+    "**/__init__.py",
     "*helpers/__init__.py",
     "*/_module_references.py",
 ]
@@ -104,6 +105,7 @@ omit = [
 omit = [
     "*/vendor/*",
     "*/__main__.py",
+    "**/__init__.py",
     "tests/*",
     "*/tests/*",
     "*_test_*.py",
@@ -125,12 +127,12 @@ init-hook = "import sys; sys.path.insert(0, 'tests')"
 [tool.pylint.SIMILARITIES]
 min-similarity-lines = 7
 
-[tool.pylint.messages_control]
-disable = "too-few-public-methods"
-
 [tool.pylint.design]
 max-args = 7
 max-positional-arguments = 7
+
+[tool.pylint.messages_control]
+disable = "too-few-public-methods"
 
 [tool.pyright]
 pythonVersion = "3.12"
