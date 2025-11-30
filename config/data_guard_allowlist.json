@@ -1,5 +1,7 @@
 {
   "assignments": [],
   "comparisons": ["count"],
-  "dataframe": []
+  "dataframe": [
+    "tests/**"
+  ]
 }
