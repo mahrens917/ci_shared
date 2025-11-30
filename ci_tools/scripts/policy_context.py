@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
 from ci_tools.scripts.guard_common import (
+    detect_repo_root,
     iter_python_files,
     parse_python_ast,
     relative_path,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = detect_repo_root()
 SCAN_DIRECTORIES: Sequence[Path] = (ROOT / "src", ROOT / "tests")
 BANNED_KEYWORDS = (
     "legacy",

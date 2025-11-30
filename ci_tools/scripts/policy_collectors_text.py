@@ -20,7 +20,7 @@ from .policy_context import (
 )
 
 # Paths to skip during policy collection
-_SKIP_PATH_PREFIXES = ("scripts/", "ci_runtime/", "vendor/")
+_SKIP_PATH_PREFIXES = ("scripts/", "ci_runtime/", "vendor/", "tests/test_policy")
 
 # Pre-computed legacy patterns (forbidden suffixes, directory parts, and prefixes)
 _FORBIDDEN_SUFFIXES = tuple(f"{suffix}.py" for suffix in LEGACY_SUFFIXES)
@@ -36,7 +36,12 @@ _LEGACY_PATTERNS = (_FORBIDDEN_SUFFIXES, _FORBIDDEN_PARTS, _FORBIDDEN_PREFIXES)
 
 def _should_skip_path(rel_path: str) -> bool:
     """Check if a path should be skipped during policy collection."""
-    return rel_path.startswith(_SKIP_PATH_PREFIXES)
+    if rel_path.startswith(_SKIP_PATH_PREFIXES):
+        return True
+    # Skip all test files (they can legitimately use patterns disallowed in production)
+    if rel_path.startswith("tests/"):
+        return True
+    return False
 
 
 def _keyword_token_lines(
