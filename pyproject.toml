@@ -134,6 +134,13 @@ max-positional-arguments = 7
 [tool.pylint.messages_control]
 disable = "too-few-public-methods"
 
+[tool.pylint.TYPECHECK]
+extension-pkg-allow-list = [
+    "dependency_injector",
+    "dependency_injector.providers",
+    "dependency_injector.containers",
+]
+
 [tool.pyright]
 pythonVersion = "3.12"
 reportArgumentType = "warning"
