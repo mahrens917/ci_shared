@@ -212,6 +212,46 @@ class TestRequestCommitMessage:
         assert "diff --git" in prompt  # Warning about not using this command
 
     @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    def test_retries_when_summary_is_meta(self, mock_invoke):
+        """Test that meta responses trigger a guarded retry."""
+        mock_invoke.side_effect = [
+            "Here is your commit message: Updated auth flow",
+            "Updated auth flow for MFA",
+        ]
+
+        summary, _ = request_commit_message(
+            model="gpt-5-codex",
+            reasoning_effort="high",
+            staged_diff="diff",
+            extra_context="",
+            detailed=False,
+        )
+
+        assert summary == "Updated auth flow for MFA"
+        assert mock_invoke.call_count == 2
+        retry_prompt = mock_invoke.call_args_list[1][0][0]
+        assert "rejected" in retry_prompt.lower()
+
+    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    def test_invalid_retry_raises_error(self, mock_invoke):
+        """Test that a second invalid summary raises an error."""
+        mock_invoke.side_effect = [
+            "Here is your commit message: Updated auth flow",
+            "Now I understand the change.",
+        ]
+
+        with pytest.raises(CommitMessageError):
+            request_commit_message(
+                model="gpt-5-codex",
+                reasoning_effort="high",
+                staged_diff="diff",
+                extra_context="",
+                detailed=False,
+            )
+
+        assert mock_invoke.call_count == 2
+
+    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
     def test_passes_staged_diff_to_prompt(self, mock_invoke):
         """Test that staged diff is included in prompt."""
         mock_invoke.return_value = "Summary"

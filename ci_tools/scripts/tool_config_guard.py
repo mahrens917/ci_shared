@@ -30,7 +30,10 @@ from typing import Any
 if sys.version_info >= (3, 11):
     import tomllib
 else:
-    import tomli as tomllib
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError as exc:  # pragma: no cover - defensive
+        raise ModuleNotFoundError("tomli is required for Python <3.11.") from exc
 
 
 def load_toml(path: Path) -> dict[str, Any]:

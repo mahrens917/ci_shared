@@ -81,7 +81,7 @@ class TestCommitMessageError:
         """Test empty_response factory method."""
         error = CommitMessageError.empty_response()
         assert "Commit message response was empty" in str(error)
-        assert error.detail is None
+        assert error.detail == "Commit message response was empty"
 
 
 class TestCiAbort:

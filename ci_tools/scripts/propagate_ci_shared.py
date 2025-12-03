@@ -143,16 +143,55 @@ def _reinstall_ci_shared(repo_path: Path, repo_name: str, source_root: Path) -> 
     return True
 
 
+def _request_claude_commit_message(
+    repo_path: Path, ci_shared_commit_msg: str
+) -> tuple[str, list[str]] | None:
+    """Generate a Claude-reviewed commit message for the staged diff."""
+    print("Requesting Claude-reviewed commit message...")
+    result = run_command(
+        [
+            sys.executable,
+            "-m",
+            "ci_tools.scripts.generate_commit_message",
+            "--detailed",
+        ],
+        cwd=repo_path,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("⚠️  Commit message generation failed")
+        return None
+
+    lines = [line.rstrip("\n") for line in result.stdout.splitlines()]
+    if not lines:
+        print("⚠️  Commit message generator returned no content")
+        return None
+
+    summary = lines[0].strip()
+    if not summary:
+        print("⚠️  Commit summary was empty")
+        return None
+
+    body_lines = [line.rstrip() for line in lines[1:]]
+    body_lines.append(f"- Latest ci_shared change: {ci_shared_commit_msg}")
+    return summary, body_lines
+
+
 def _commit_and_push_update(
     repo_path: Path, repo_name: str, ci_shared_commit_msg: str
 ) -> bool:
     """Stage, commit, and push the synced ci_shared files."""
-    commit_msg = (
-        f"Update shared CI files\n\nLatest ci_shared change: {ci_shared_commit_msg}"
-    )
+    commit_message = _request_claude_commit_message(repo_path, ci_shared_commit_msg)
+    if commit_message is None:
+        return False
+    summary, body_lines = commit_message
+    commit_args = ["git", "commit", "-m", summary]
+    body_text = "\n".join(body_lines).strip()
+    if body_text:
+        commit_args.extend(["-m", body_text])
 
     result = run_command(
-        ["git", "commit", "-m", commit_msg],
+        commit_args,
         cwd=repo_path,
         check=False,
     )

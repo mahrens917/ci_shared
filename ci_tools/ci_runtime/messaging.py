@@ -11,6 +11,8 @@ from .codex import invoke_codex
 from .models import CommitMessageError, GitCommandAbort
 from .process import run_command
 
+COMMIT_SUMMARY_MAX_LENGTH = 90
+
 
 def _format_staged_diff(staged_diff: str) -> str:
     """Format staged diff for display."""
@@ -19,21 +21,77 @@ def _format_staged_diff(staged_diff: str) -> str:
     return "/* no staged diff */"
 
 
-def request_commit_message(
+def _commit_summary_issue(summary: str) -> str | None:
+    """Return a description of any formatting issue detected in the commit summary."""
+    trimmed = summary.strip()
+    checks: list[tuple[bool, str]] = [
+        (not trimmed, "Commit summary was blank."),
+        (
+            len(trimmed) > COMMIT_SUMMARY_MAX_LENGTH,
+            f"Commit summary exceeded {COMMIT_SUMMARY_MAX_LENGTH} characters ({len(trimmed)}).",
+        ),
+        (
+            ". " in trimmed,
+            "Commit summary contained multiple sentences; use one concise line.",
+        ),
+        (
+            trimmed.endswith((".", "!", "?")),
+            "Commit summary must not end with punctuation.",
+        ),
+    ]
+
+    if trimmed:
+        lowered = trimmed.lower()
+        disallowed_prefixes = (
+            "now i ",
+            "i ",
+            "here is",
+            "here's",
+            "the diff",
+            "this diff",
+        )
+        checks.append(
+            (
+                any(lowered.startswith(prefix) for prefix in disallowed_prefixes),
+                "Commit summary used meta commentary instead of describing the change.",
+            )
+        )
+
+        disallowed_phrases = (
+            "commit message",
+            "your commit",
+            "the diff shows",
+        )
+        checks.append(
+            (
+                any(phrase in lowered for phrase in disallowed_phrases),
+                "Commit summary referenced the prompt instead of the change.",
+            )
+        )
+
+    for condition, message in checks:
+        if condition:
+            return message
+    return None
+
+
+def _build_commit_prompt(
     *,
     model: str,
     reasoning_effort: str,
     staged_diff: str,
     extra_context: str,
-    detailed: bool = False,
-) -> tuple[str, List[str]]:
-    """Ask Codex to produce a commit message for the staged diff."""
+    detailed: bool,
+    invalid_reason: str | None = None,
+) -> str:
+    """Construct the Codex prompt for commit message generation."""
     effort_display = reasoning_effort
     if detailed:
         instructions = textwrap.dedent(
             """\
             Produce a git commit message consisting of:
-            - A concise subject line (≤72 characters) that summarizes what changed using past tense.
+            - A concise subject line (≤72 characters)
+              that summarizes what changed using past tense.
             - After a blank line, include ≤5 bullet points (each starting with "- ").
             - Each bullet should summarise the key changes using past tense verbs.
             Avoid trailing periods on the subject line.
@@ -46,9 +104,27 @@ def request_commit_message(
             """\
             Provide a single-line commit message in past tense (no trailing punctuation).
             Use the diff shown above instead of running shell commands such as `diff --git`.
+            Avoid prefatory phrases like "Here is your commit message"
+            or commentary about the diff.
             """
         ).strip()
-    extra_block = extra_context.strip()
+
+    retry_block = ""
+    if invalid_reason:
+        detail_hint = " and bullet list" if detailed else ""
+        retry_block = textwrap.dedent(
+            f"""\
+            The previous response was rejected because it violated the commit message
+            rules ({invalid_reason}).
+            Retry with a concise commit message that follows the instructions above.
+            Do not include apologies or meta commentary.
+            Respond with only the commit subject{detail_hint}.
+            """
+        ).strip()
+
+    extra_parts = [part for part in (extra_context.strip(), retry_block) if part]
+    extra_block = "\n\n".join(extra_parts)
+
     diff_display = _format_staged_diff(staged_diff)
     prompt = textwrap.dedent(
         f"""\
@@ -64,9 +140,21 @@ def request_commit_message(
         ```
 
         {instructions}
-        {extra_block}
         """
     ).strip()
+
+    if extra_block:
+        prompt = f"{prompt}\n\n{extra_block}"
+    return prompt
+
+
+def _invoke_commit_prompt(
+    prompt: str,
+    *,
+    model: str,
+    reasoning_effort: str,
+) -> tuple[str, List[str]]:
+    """Call Codex with the provided prompt and parse the response."""
     response = invoke_codex(
         prompt,
         model=model,
@@ -80,6 +168,46 @@ def request_commit_message(
     body_lines = lines[1:]
     while body_lines and not body_lines[0].strip():
         body_lines.pop(0)
+    return summary, body_lines
+
+
+def request_commit_message(
+    *,
+    model: str,
+    reasoning_effort: str,
+    staged_diff: str,
+    extra_context: str,
+    detailed: bool = False,
+) -> tuple[str, List[str]]:
+    """Ask Codex to produce a commit message for the staged diff."""
+    prompt = _build_commit_prompt(
+        model=model,
+        reasoning_effort=reasoning_effort,
+        staged_diff=staged_diff,
+        extra_context=extra_context,
+        detailed=detailed,
+    )
+    summary, body_lines = _invoke_commit_prompt(
+        prompt, model=model, reasoning_effort=reasoning_effort
+    )
+    validation_issue = _commit_summary_issue(summary)
+    if not validation_issue:
+        return summary, body_lines
+
+    retry_prompt = _build_commit_prompt(
+        model=model,
+        reasoning_effort=reasoning_effort,
+        staged_diff=staged_diff,
+        extra_context=extra_context,
+        detailed=detailed,
+        invalid_reason=validation_issue,
+    )
+    summary, body_lines = _invoke_commit_prompt(
+        retry_prompt, model=model, reasoning_effort=reasoning_effort
+    )
+    retry_issue = _commit_summary_issue(summary)
+    if retry_issue:
+        raise CommitMessageError.invalid_response(reason=retry_issue)
     return summary, body_lines
 
 

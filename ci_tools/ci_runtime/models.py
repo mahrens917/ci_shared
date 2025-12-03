@@ -68,14 +68,19 @@ class CodexCliError(CiError):
 
 
 class CommitMessageError(CiError):
-    """Raised when commit message generation produces no content."""
+    """Raised when commit message generation fails."""
 
-    default_message = "Commit message response was empty"
+    default_message = "Commit message generation failed"
 
     @classmethod
     def empty_response(cls) -> "CommitMessageError":
         """Return an error signalling the Codex response was blank."""
-        return cls()
+        return cls(detail="Commit message response was empty")
+
+    @classmethod
+    def invalid_response(cls, *, reason: str) -> "CommitMessageError":
+        """Return an error signalling the Codex response violated format expectations."""
+        return cls(detail=reason)
 
 
 class CiAbort(SystemExit):

@@ -40,6 +40,9 @@ root = ["ci_tools", "scripts"]
 exclude = ["tests"]
 known_first_party = ["ci_tools"]
 
+[tool.deptry.package_module_name_map]
+tomli = "tomli"
+
 [tool.deptry.per_rule_ignores]
 DEP002 = ["jinja2"]
 DEP003 = [
@@ -133,13 +136,6 @@ max-positional-arguments = 7
 
 [tool.pylint.messages_control]
 disable = "too-few-public-methods"
-
-[tool.pylint.TYPECHECK]
-extension-pkg-allow-list = [
-    "dependency_injector",
-    "dependency_injector.providers",
-    "dependency_injector.containers",
-]
 
 [tool.pyright]
 pythonVersion = "3.12"

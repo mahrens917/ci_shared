@@ -193,6 +193,7 @@ def test_commit_and_push_update_commit_failure(tmp_path):
 
     with patch("ci_tools.scripts.propagate_ci_shared.run_command") as mock_run:
         mock_run.side_effect = [
+            CommandResult(returncode=0, stdout="Subject\n- body", stderr=""),
             CommandResult(returncode=1, stdout="", stderr="error")
         ]
         result = _commit_and_push_update(repo_path, "repo", "Test commit")
@@ -205,9 +206,10 @@ def test_commit_and_push_update_branch_detection_failure(tmp_path):
 
     with patch("ci_tools.scripts.propagate_ci_shared.run_command") as mock_run:
         with patch("ci_tools.scripts.propagate_ci_shared.get_current_branch") as mock_branch:
-            mock_run.return_value = CommandResult(
-                returncode=0, stdout="", stderr=""
-            )
+            mock_run.side_effect = [
+                CommandResult(returncode=0, stdout="Subject\n- body", stderr=""),
+                CommandResult(returncode=0, stdout="", stderr=""),
+            ]
             mock_branch.side_effect = subprocess.CalledProcessError(1, "git")
             result = _commit_and_push_update(repo_path, "repo", "Test commit")
             assert result is False
@@ -221,6 +223,7 @@ def test_commit_and_push_update_push_failure(tmp_path):
         with patch("ci_tools.scripts.propagate_ci_shared.get_current_branch") as mock_branch:
             mock_branch.return_value = "main"
             mock_run.side_effect = [
+                CommandResult(returncode=0, stdout="Subject\n- body", stderr=""),
                 CommandResult(returncode=0, stdout="", stderr=""),
                 CommandResult(returncode=1, stdout="", stderr="error"),
             ]
@@ -236,11 +239,23 @@ def test_commit_and_push_update_success(tmp_path):
         with patch("ci_tools.scripts.propagate_ci_shared.get_current_branch") as mock_branch:
             mock_branch.return_value = "main"
             mock_run.side_effect = [
+                CommandResult(returncode=0, stdout="Subject\n- body", stderr=""),
                 CommandResult(returncode=0, stdout="", stderr=""),
                 CommandResult(returncode=0, stdout="", stderr=""),
             ]
             result = _commit_and_push_update(repo_path, "repo", "Test commit")
             assert result is True
+
+
+def test_commit_and_push_update_generation_failure(tmp_path):
+    """Test _commit_and_push_update fails fast when commit message generation fails."""
+    repo_path = tmp_path / "repo"
+
+    with patch("ci_tools.scripts.propagate_ci_shared.run_command") as mock_run:
+        mock_run.return_value = CommandResult(returncode=1, stdout="", stderr="error")
+        result = _commit_and_push_update(repo_path, "repo", "Test commit")
+        assert result is False
+        mock_run.assert_called_once()
 
 
 def test_update_submodule_in_repo_invalid_state(tmp_path):
