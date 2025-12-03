@@ -120,12 +120,12 @@ shared-checks:
 		SCAN_TARGETS="$(GITLEAKS_SOURCE_DIRS)"; \
 		if [ -z "$$SCAN_TARGETS" ]; then \
 			SCAN_TARGETS="."; \
-		fi; \
+		 fi; \
 		GITLEAKS_FAILED=0; \
 		for TARGET in $$SCAN_TARGETS; do \
 			if [ -e "$$TARGET" ]; then \
 				echo "  → scanning $$TARGET"; \
-				gitleaks detect $$CONFIG_FLAG --no-git --source "$$TARGET" --verbose || GITLEAKS_FAILED=1; \
+				gitleaks detect $$CONFIG_FLAG --no-git --no-banner --log-level=warn --source "$$TARGET" || GITLEAKS_FAILED=1; \
 			fi; \
 		done; \
 		if [ $$GITLEAKS_FAILED -eq 1 ]; then \

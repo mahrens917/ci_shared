@@ -69,13 +69,19 @@ PY
   fi
 fi
 
+# pyproject.toml adds -v; stack quiet flags here so CI output stays concise unless callers opt in to verbosity.
 PYTEST_EXTRA="${SHARED_PYTEST_EXTRA:-}"
-if [[ "${PYTEST_EXTRA}" == *"-q"* ]]; then
+PYTEST_QUIET="-qq"
+if [[ -z "${PYTEST_EXTRA}" ]]; then
+  MAKE_PYTEST_EXTRA="${PYTEST_QUIET}"
+elif [[ "${PYTEST_EXTRA}" == *"-qq"* ]]; then
   MAKE_PYTEST_EXTRA="${PYTEST_EXTRA}"
-elif [[ -n "${PYTEST_EXTRA}" ]]; then
+elif [[ "${PYTEST_EXTRA}" == *"-q"* || "${PYTEST_EXTRA}" == *"--quiet"* ]]; then
   MAKE_PYTEST_EXTRA="${PYTEST_EXTRA} -q"
+elif [[ "${PYTEST_EXTRA}" == *"-v"* || "${PYTEST_EXTRA}" == *"--verbose"* ]]; then
+  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA}"
 else
-  MAKE_PYTEST_EXTRA="-q"
+  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA} ${PYTEST_QUIET}"
 fi
 
 echo "Running make check..."
