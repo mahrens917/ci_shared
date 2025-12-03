@@ -67,6 +67,7 @@ UNUSED_MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --exclude tests conftes
 # ============================================================================
 SHARED_CODESPELL_IGNORE ?= $(if $(CI_TOOLS_CONFIG_PATH),$(CI_TOOLS_CONFIG_PATH)/codespell_ignore_words.txt)
 SHARED_PYTEST_EXTRA ?=
+SHARED_PYTEST_LOG_OPTIONS ?= --log-level=WARNING --log-cli-level=WARNING
 PYLINT_ARGS ?=
 BANDIT_BASELINE ?=
 BANDIT_EXCLUDE ?= artifacts,trash,models,logs,htmlcov
@@ -202,7 +203,7 @@ shared-checks:
 	done; \
 	\
 	echo "→ Running pytest..."; \
-	pytest $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) --cov-report=term --strict-markers -W error $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	pytest $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) --cov-report=term --strict-markers -W error $(SHARED_PYTEST_LOG_OPTIONS) $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running coverage_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.coverage_guard --threshold $(COVERAGE_GUARD_THRESHOLD) --data-file "$(CURDIR)/.coverage" || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
