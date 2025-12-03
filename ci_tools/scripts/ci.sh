@@ -69,8 +69,17 @@ PY
   fi
 fi
 
+PYTEST_EXTRA="${SHARED_PYTEST_EXTRA:-}"
+if [[ "${PYTEST_EXTRA}" == *"-q"* ]]; then
+  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA}"
+elif [[ -n "${PYTEST_EXTRA}" ]]; then
+  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA} -q"
+else
+  MAKE_PYTEST_EXTRA="-q"
+fi
+
 echo "Running make check..."
-if ! make -k check; then
+if ! make -k check SHARED_PYTEST_EXTRA="${MAKE_PYTEST_EXTRA}"; then
   echo "make check failed; aborting commit and push." >&2
   exit 1
 fi
