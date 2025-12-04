@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Shared CI shell helper used by multiple repositories.
+
+# Re-exec with bash if a different shell invokes this file (e.g., via sh).
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -105,13 +111,13 @@ fi
 
 COMMIT_BODY=""
 if [ -z "${COMMIT_MESSAGE}" ]; then
-  # Prefer Claude CLI if available, fall back to Codex
-  if command -v claude >/dev/null 2>&1; then
-    CLI_NAME="Claude"
-    export CI_CLI_TYPE=claude
-  elif command -v codex >/dev/null 2>&1; then
+  # Prefer Codex CLI if available, fall back to Claude
+  if command -v codex >/dev/null 2>&1; then
     CLI_NAME="Codex"
     export CI_CLI_TYPE=codex
+  elif command -v claude >/dev/null 2>&1; then
+    CLI_NAME="Claude"
+    export CI_CLI_TYPE=claude
   else
     CLI_NAME=""
   fi

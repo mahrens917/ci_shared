@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import textwrap
 from typing import List
@@ -58,13 +59,16 @@ def _commit_summary_issue(summary: str) -> str | None:
         )
 
         disallowed_phrases = (
-            "commit message",
             "your commit",
             "the diff shows",
         )
+        commit_message_prompt = re.search(
+            r"\b(?:the|this|your|our)\s+commit message\b", lowered
+        )
         checks.append(
             (
-                any(phrase in lowered for phrase in disallowed_phrases),
+                commit_message_prompt is not None
+                or any(phrase in lowered for phrase in disallowed_phrases),
                 "Commit summary referenced the prompt instead of the change.",
             )
         )

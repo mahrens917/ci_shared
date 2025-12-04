@@ -8,10 +8,11 @@ Repositories that are explicitly blocked (for example, personal chess/tictactoe
 checkouts) are skipped automatically to avoid unintended pushes.
 """
 
+import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from ci_tools.ci_runtime.process import (
     get_commit_message,
@@ -21,6 +22,10 @@ from ci_tools.ci_runtime.process import (
 from ci_tools.utils.consumers import ConsumingRepo, load_consuming_repos
 
 BLOCKED_CONSUMER_NAMES = frozenset({"chess", "tictactoe"})
+
+CI_SHARED_ROOT = Path(__file__).resolve().parents[2]
+CI_SHARED_CONFIG_PATH = CI_SHARED_ROOT / "ci_shared.config.json"
+DEFAULT_CLAUDE_FALLBACK_MODEL = "claude-sonnet-4-20250514"
 
 
 def _filter_blocked_consumers(
@@ -59,9 +64,9 @@ def _validate_repo_state(repo_path: Path, repo_name: str) -> bool:
         # Create commit message
         commit_msg = """Auto-commit before ci_shared update
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+🤖 Generated with the ci_shared commit message helper
 
-Co-Authored-By: Claude <noreply@anthropic.com>"""
+Co-Authored-By: ci_shared-bot <noreply@ci_shared>"""
 
         # Commit changes
         commit_result = run_command(
@@ -143,11 +148,36 @@ def _reinstall_ci_shared(repo_path: Path, repo_name: str, source_root: Path) -> 
     return True
 
 
-def _request_claude_commit_message(
-    repo_path: Path, ci_shared_commit_msg: str
+def _load_commit_message_config() -> dict[str, Any]:
+    """Load the commit_message section of ci_shared.config.json."""
+    if not CI_SHARED_CONFIG_PATH.exists():
+        return {}
+    try:
+        with CI_SHARED_CONFIG_PATH.open(encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _get_commit_message_fallback_model() -> str:
+    """Return the configured fallback model when Codex isn't available."""
+    config = _load_commit_message_config()
+    commit_section = config.get("commit_message")
+    if isinstance(commit_section, dict):
+        fallback = commit_section.get("fallback_model")
+        if isinstance(fallback, str) and fallback.strip():
+            return fallback.strip()
+    return DEFAULT_CLAUDE_FALLBACK_MODEL
+
+
+def _invoke_commit_message_generator(
+    repo_path: Path,
+    *,
+    env_overrides: dict[str, str] | None,
+    label: str,
 ) -> tuple[str, list[str]] | None:
-    """Generate a Claude-reviewed commit message for the staged diff."""
-    print("Requesting Claude-reviewed commit message...")
+    """Run the commit message generator and parse the response."""
+    print(f"Requesting {label} commit message...")
     result = run_command(
         [
             sys.executable,
@@ -157,22 +187,53 @@ def _request_claude_commit_message(
         ],
         cwd=repo_path,
         check=False,
+        env=env_overrides,
     )
     if result.returncode != 0:
-        print("⚠️  Commit message generation failed")
+        print(f"⚠️  {label} commit message generation failed", file=sys.stderr)
+        if result.stderr:
+            print(f"   Error: {result.stderr.strip()}", file=sys.stderr)
         return None
 
     lines = [line.rstrip("\n") for line in result.stdout.splitlines()]
     if not lines:
-        print("⚠️  Commit message generator returned no content")
+        print("⚠️  Commit message generator returned no content", file=sys.stderr)
         return None
 
     summary = lines[0].strip()
     if not summary:
-        print("⚠️  Commit summary was empty")
+        print("⚠️  Commit summary was empty", file=sys.stderr)
         return None
 
     body_lines = [line.rstrip() for line in lines[1:]]
+    return summary, body_lines
+
+
+def _request_commit_message(
+    repo_path: Path, ci_shared_commit_msg: str
+) -> tuple[str, list[str]] | None:
+    """Generate a commit message, trying Codex first then falling back to Claude."""
+    commit_message = _invoke_commit_message_generator(
+        repo_path, env_overrides=None, label="Codex"
+    )
+    if commit_message is None:
+        fallback_model = _get_commit_message_fallback_model()
+        print(
+            "⚠️  Codex commit message generation failed; falling back to Claude...",
+            file=sys.stderr,
+        )
+        fallback_env = {
+            "CI_COMMIT_MODEL": fallback_model,
+            "CI_CLI_TYPE": "claude",
+        }
+        commit_message = _invoke_commit_message_generator(
+            repo_path, env_overrides=fallback_env, label="Claude"
+        )
+        if commit_message is None:
+            print("⚠️  Commit message generation failed after fallback", file=sys.stderr)
+            return None
+
+    summary, body_lines = commit_message
     body_lines.append(f"- Latest ci_shared change: {ci_shared_commit_msg}")
     return summary, body_lines
 
@@ -181,7 +242,7 @@ def _commit_and_push_update(
     repo_path: Path, repo_name: str, ci_shared_commit_msg: str
 ) -> bool:
     """Stage, commit, and push the synced ci_shared files."""
-    commit_message = _request_claude_commit_message(repo_path, ci_shared_commit_msg)
+    commit_message = _request_commit_message(repo_path, ci_shared_commit_msg)
     if commit_message is None:
         return False
     summary, body_lines = commit_message

@@ -15,6 +15,7 @@ from ci_tools.scripts.propagate_ci_shared import (
     _filter_blocked_consumers,
     _print_summary,
     _process_repositories,
+    _request_commit_message,
     _sync_repo_configs,
     _validate_repo_state,
     main,
@@ -148,6 +149,39 @@ def test_validate_repo_state_clean(tmp_path):
         result = _validate_repo_state(repo_path, "repo")
         assert result is True
 
+@patch("ci_tools.scripts.propagate_ci_shared.run_command")
+def test_request_commit_message_success(mock_run):
+    """Test _request_commit_message succeeds when Codex returns content."""
+    repo_path = Path("/tmp/repo")
+    mock_run.return_value = CommandResult(
+        returncode=0,
+        stdout="Fix bug\n- Updated logic\n",
+        stderr="",
+    )
+
+    summary, body_lines = _request_commit_message(repo_path, "abc123")
+    assert summary == "Fix bug"
+    assert body_lines[-1] == "- Latest ci_shared change: abc123"
+    assert mock_run.call_count == 1
+    assert mock_run.call_args.kwargs["env"] is None
+
+
+@patch("ci_tools.scripts.propagate_ci_shared.run_command")
+def test_request_commit_message_fallback_to_claude(mock_run):
+    """Test fallback to Claude when the Codex attempt fails."""
+    repo_path = Path("/tmp/repo")
+    mock_run.side_effect = [
+        CommandResult(returncode=1, stdout="", stderr="codex missing"),
+        CommandResult(returncode=0, stdout="Add docs\n- Document change\n", stderr=""),
+    ]
+
+    summary, body_lines = _request_commit_message(repo_path, "ci456")
+    assert summary == "Add docs"
+    assert body_lines[-1] == "- Latest ci_shared change: ci456"
+    assert mock_run.call_count == 2
+    fallback_env = mock_run.call_args_list[1][1]["env"]
+    assert fallback_env["CI_CLI_TYPE"] == "claude"
+    assert fallback_env["CI_COMMIT_MODEL"] == "claude-sonnet-4-20250514"
 
 def test_sync_repo_configs_no_changes(tmp_path):
     """Test _sync_repo_configs reports no updates when status clean."""
@@ -255,7 +289,10 @@ def test_commit_and_push_update_generation_failure(tmp_path):
         mock_run.return_value = CommandResult(returncode=1, stdout="", stderr="error")
         result = _commit_and_push_update(repo_path, "repo", "Test commit")
         assert result is False
-        mock_run.assert_called_once()
+        assert mock_run.call_count == 2
+        fallback_env = mock_run.call_args_list[1][1]["env"]
+        assert fallback_env["CI_CLI_TYPE"] == "claude"
+        assert fallback_env["CI_COMMIT_MODEL"] == "claude-sonnet-4-20250514"
 
 
 def test_update_submodule_in_repo_invalid_state(tmp_path):
