@@ -9,30 +9,48 @@ import math
 import os
 import sys
 from pathlib import Path
-from typing import Any, Sequence, Tuple
+from typing import Any, Iterator, Sequence, Tuple
 
 from ci_tools.ci_runtime import gather_git_diff, request_commit_message
-from ci_tools.ci_runtime.config import resolve_model_choice, resolve_reasoning_choice
+from ci_tools.ci_runtime.config import (
+    CONFIG_CANDIDATES,
+    resolve_model_choice,
+    resolve_reasoning_choice,
+)
 from ci_tools.scripts.guard_common import detect_repo_root
 
+CI_SHARED_ROOT = Path(__file__).resolve().parents[2]
 
-def _load_config() -> dict[str, Any]:
-    """Load ci_shared.config.json from the repository root."""
+
+def _config_search_roots() -> Iterator[Path]:
+    """Yield the repository and shared ci_shared roots for config lookup."""
     repo_root = detect_repo_root()
-    config_path = repo_root / "ci_shared.config.json"
-    if not config_path.exists():
-        return {}
-    with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+    yield repo_root
+    if CI_SHARED_ROOT != repo_root:
+        yield CI_SHARED_ROOT
 
 
-def _get_commit_config() -> dict[str, Any]:
+def _load_config_from_root(root: Path) -> dict[str, Any] | None:
+    """Load the first available configuration file from a given root."""
+    for candidate_name in CONFIG_CANDIDATES:
+        candidate_path = root / candidate_name
+        if not candidate_path.is_file():
+            continue
+        with candidate_path.open(encoding="utf-8") as handle:
+            return json.load(handle)
+    return None
+
+
+def get_commit_config() -> dict[str, Any]:
     """Get the commit_message section from config."""
-    config = _load_config()
-    section = config.get("commit_message")
-    if section is None:
-        raise KeyError("commit_message section required in ci_shared.config.json")
-    return section
+    for root in _config_search_roots():
+        config = _load_config_from_root(root)
+        if not config:
+            continue
+        section = config.get("commit_message")
+        if isinstance(section, dict):
+            return section
+    raise KeyError("commit_message section required in ci_shared.config.json")
 
 
 def _resolve_model_arg(cli_arg: str | None, config: dict[str, Any]) -> str | None:
@@ -318,7 +336,7 @@ def _request_with_chunking(
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for commit message generation."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
-    commit_config = _get_commit_config()
+    commit_config = get_commit_config()
 
     model_arg = _resolve_model_arg(args.model, commit_config)
     if not model_arg:

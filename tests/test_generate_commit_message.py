@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from ci_tools.scripts import generate_commit_message as commit_message_module
 from ci_tools.scripts.generate_commit_message import (
     _build_chunk_summary_diff,
     _chunk_by_lines,
@@ -54,6 +57,55 @@ def test_parse_args_with_output():
     """Test parse_args with output file specified."""
     args = parse_args(["--output", "/tmp/commit.txt"])
     assert args.output == Path("/tmp/commit.txt")
+
+
+def _write_config(path: Path, data: dict[str, object]) -> None:
+    """Persist JSON data for config files used in tests."""
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def testget_commit_config_prefers_repo(monkeypatch, tmp_path):
+    """Repo root config should win when commit_message is present."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    repo_config = repo_root / "ci_shared.config.json"
+    _write_config(repo_config, {"commit_message": {"model": "repo"}})
+
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+    shared_config = shared_root / "ci_shared.config.json"
+    _write_config(shared_config, {"commit_message": {"model": "shared"}})
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(
+        commit_message_module, "detect_repo_root", lambda: repo_root
+    )
+
+    assert commit_message_module.get_commit_config()["model"] == "repo"
+
+
+def testget_commit_config_falls_back_to_shared(monkeypatch, tmp_path):
+    """Fallback to shared config when repo config lacks commit_message."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _write_config(repo_root / "ci_shared.config.json", {"repo_context": "local"})
+
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+    _write_config(
+        shared_root / "ci_shared.config.json",
+        {"commit_message": {"reasoning": "medium"}},
+    )
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(
+        commit_message_module, "detect_repo_root", lambda: repo_root
+    )
+
+    assert (
+        commit_message_module.get_commit_config()["reasoning"]
+        == "medium"
+    )
 
 
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
@@ -116,7 +168,7 @@ def test_write_payload_file_error(tmp_path):
     assert result == 1
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -147,7 +199,7 @@ def test_main_success(
     assert "Fix bug" in captured.out
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 def test_main_no_staged_diff(mock_gather_diff, mock_get_config):
     """Test main exits with error when no staged diff."""
@@ -162,7 +214,7 @@ def test_main_no_staged_diff(mock_gather_diff, mock_get_config):
     assert result == 1
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -190,7 +242,7 @@ def test_main_empty_summary(
     assert result == 1
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -218,7 +270,7 @@ def test_main_codex_exception(
         main([])
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -250,7 +302,7 @@ def test_main_with_detailed_flag(
     assert "Detailed explanation" in captured.out
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -289,7 +341,7 @@ def test_main_with_output_file(
         "CI_COMMIT_REASONING": "medium",
     },
 )
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -326,7 +378,7 @@ def test_main_uses_env_var_for_model(
         "CI_COMMIT_REASONING": "high",
     },
 )
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
@@ -356,7 +408,7 @@ def test_main_uses_env_var_for_reasoning(
     mock_resolve_reasoning.assert_called_once_with("high", validate=False)
 
 
-@patch("ci_tools.scripts.generate_commit_message._get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
 @patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
