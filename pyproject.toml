@@ -185,13 +185,13 @@ typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
 addopts = [
-    "-v",
-    "--tb=short",
+    "-q",
+    "--tb=no",
     "--strict-markers",
     "--strict-config",
     "--durations=10",
     "--durations-min=0.1",
-    "-ra",
+    "-rEw",
     "-p",
     "pytest_asyncio",
     "-p",

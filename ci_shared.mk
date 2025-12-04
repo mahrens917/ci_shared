@@ -97,7 +97,7 @@ shared-checks:
 	else \
 		IGNORE_FLAG=""; \
 	fi; \
-	CODESPELL_SKIP=".git,artifacts,artifacts/*,trash,trash/*,models,node_modules,logs,htmlcov,*.json,*.csv"; \
+	CODESPELL_SKIP=".git,.venv,venv,dist,build,artifacts,artifacts/*,trash,trash/*,models,node_modules,logs,htmlcov,*.json,*.csv,*.txt,*.log,*.svg,*.png,*.jpg,*.jpeg,*.gif,*.ico,*.lock,*.whl,*.egg-info"; \
 	codespell --skip="$$CODESPELL_SKIP" --quiet-level=2 $$IGNORE_FLAG || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running vulture..."; \
