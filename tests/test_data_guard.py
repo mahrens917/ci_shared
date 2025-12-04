@@ -13,6 +13,20 @@ from conftest import write_module
 from ci_tools.scripts import data_guard
 from ci_tools.scripts.guard_common import parse_python_ast, relative_path
 
+EMPTY_ALLOWLIST = {
+    "assignments": set(),
+    "comparisons": set(),
+    "dataframe": set(),
+    "dataframe_paths": set(),
+}
+
+TESTS_EXCLUDED_ALLOWLIST = {
+    "assignments": set(),
+    "comparisons": set(),
+    "dataframe": set(),
+    "dataframe_paths": {"tests/**"},
+}
+
 
 def write_allowlist(path: Path, content: dict) -> None:
     """Helper to write a JSON allowlist file."""
@@ -27,7 +41,12 @@ class TestAllowlistLoading:
         """Test loading allowlist when file doesn't exist."""
         with patch.object(data_guard, "ALLOWLIST_PATH", tmp_path / "missing.json"):
             result = data_guard.load_allowlist()
-            assert result == {"assignments": set(), "comparisons": set(), "dataframe": set()}
+            assert result == {
+                "assignments": set(),
+                "comparisons": set(),
+                "dataframe": set(),
+                "dataframe_paths": set(),
+            }
 
     def test_load_allowlist_valid_file(self, tmp_path: Path) -> None:
         """Test loading valid allowlist file."""
@@ -215,7 +234,7 @@ class TestAssignmentViolations:
         with patch.object(
             data_guard,
             "ALLOWLIST",
-            {"assignments": set(), "comparisons": set(), "dataframe": set()},
+            EMPTY_ALLOWLIST,
         ):
             violation = data_guard.assignment_violation_from_node(tmp_path / "test.py", stmt)
             assert violation is not None
@@ -232,7 +251,7 @@ class TestAssignmentViolations:
         with patch.object(
             data_guard,
             "ALLOWLIST",
-            {"assignments": set(), "comparisons": set(), "dataframe": set()},
+            EMPTY_ALLOWLIST,
         ):
             violation = data_guard.assignment_violation_from_node(tmp_path / "test.py", stmt)
             assert violation is not None
@@ -258,7 +277,7 @@ class TestAssignmentViolations:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     violations = data_guard.collect_sensitive_assignments()
                     assert len(violations) >= 2  # threshold and timeout
@@ -275,7 +294,7 @@ class TestComparisonViolations:
         with patch.object(
             data_guard,
             "ALLOWLIST",
-            {"assignments": set(), "comparisons": set(), "dataframe": set()},
+            EMPTY_ALLOWLIST,
         ):
             assert data_guard.should_flag_comparison(["threshold"])
             assert not data_guard.should_flag_comparison(["THRESHOLD"])
@@ -357,7 +376,7 @@ class TestComparisonViolations:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     violations = data_guard.collect_numeric_comparisons()
                     assert len(violations) >= 1
@@ -455,11 +474,67 @@ class TestDataframeLiterals:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     violations = data_guard.collect_dataframe_literals()
                     assert len(violations) >= 1
                     assert any("pd.DataFrame" in v.message for v in violations)
+
+
+class TestPathExclusion:
+    """Test path-based exclusion functionality."""
+
+    def test_path_excluded_matches_glob(self, tmp_path: Path) -> None:
+        """Test that path_excluded correctly matches glob patterns."""
+        with patch.object(
+            data_guard,
+            "ALLOWLIST",
+            TESTS_EXCLUDED_ALLOWLIST,
+        ):
+            test_file = tmp_path / "tests" / "test_module.py"
+            assert data_guard.path_excluded(test_file, tmp_path)
+
+    def test_path_excluded_no_match(self, tmp_path: Path) -> None:
+        """Test that path_excluded returns False for non-matching paths."""
+        with patch.object(
+            data_guard,
+            "ALLOWLIST",
+            TESTS_EXCLUDED_ALLOWLIST,
+        ):
+            src_file = tmp_path / "src" / "module.py"
+            assert not data_guard.path_excluded(src_file, tmp_path)
+
+    def test_path_excluded_empty_patterns(self, tmp_path: Path) -> None:
+        """Test that path_excluded returns False when no patterns defined."""
+        with patch.object(
+            data_guard,
+            "ALLOWLIST",
+            EMPTY_ALLOWLIST,
+        ):
+            test_file = tmp_path / "tests" / "test_module.py"
+            assert not data_guard.path_excluded(test_file, tmp_path)
+
+    def test_dataframe_literals_excluded_in_tests(self, tmp_path: Path) -> None:
+        """Test that DataFrame literals in test files are excluded."""
+        target = tmp_path / "tests" / "test_module.py"
+        target.parent.mkdir(parents=True)
+        write_module(
+            target,
+            """
+            import pandas as pd
+            df = pd.DataFrame([1, 2, 3])
+            """,
+        )
+
+        with patch.object(data_guard, "SCAN_DIRECTORIES", (tmp_path / "tests",)):
+            with patch.object(data_guard, "ROOT", tmp_path):
+                with patch.object(
+                    data_guard,
+                    "ALLOWLIST",
+                    TESTS_EXCLUDED_ALLOWLIST,
+                ):
+                    violations = data_guard.collect_dataframe_literals()
+                    assert len(violations) == 0
 
 
 class TestIterators:
@@ -519,7 +594,7 @@ class TestMainFunction:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     result = data_guard.main()
                     assert result == 0
@@ -541,7 +616,7 @@ class TestMainFunction:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     with pytest.raises(data_guard.DataGuardViolation) as exc_info:
                         data_guard.main()
@@ -562,7 +637,7 @@ class TestMainFunction:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     result = data_guard.main()
                     assert result == 0
@@ -596,7 +671,7 @@ class TestMainFunction:
                 with patch.object(
                     data_guard,
                     "ALLOWLIST",
-                    {"assignments": set(), "comparisons": set(), "dataframe": set()},
+                    EMPTY_ALLOWLIST,
                 ):
                     violations = data_guard.collect_all_violations()
                     assert len(violations) >= 3

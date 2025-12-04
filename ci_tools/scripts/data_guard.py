@@ -6,6 +6,7 @@ Guard against hard-coded thresholds, synthetic datasets, and literal fallbacks.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import json
 import sys
 from dataclasses import dataclass
@@ -64,9 +65,21 @@ class DataGuardAllowlistError(RuntimeError):
 
 
 def load_allowlist() -> Dict[str, set[str]]:
-    """Load the data guard allowlist from config file."""
+    """Load the data guard allowlist from config file.
+
+    Supported categories:
+        - assignments: Variable names that can have literal numeric assignments
+        - comparisons: Variable names that can be compared to literals
+        - dataframe: Function qualnames (e.g., "pd.DataFrame") to globally allow
+        - dataframe_paths: Glob patterns for file paths to exclude from dataframe checks
+    """
     if not ALLOWLIST_PATH.exists():
-        return {"assignments": set(), "comparisons": set(), "dataframe": set()}
+        return {
+            "assignments": set(),
+            "comparisons": set(),
+            "dataframe": set(),
+            "dataframe_paths": set(),
+        }
     try:
         payload = json.loads(ALLOWLIST_PATH.read_text())
     except json.JSONDecodeError as exc:
@@ -84,6 +97,7 @@ def load_allowlist() -> Dict[str, set[str]]:
         "assignments": _coerce_group("assignments"),
         "comparisons": _coerce_group("comparisons"),
         "dataframe": _coerce_group("dataframe"),
+        "dataframe_paths": _coerce_group("dataframe_paths"),
     }
 
 
@@ -95,6 +109,33 @@ def allowlisted(name: str, category: str) -> bool:
     if category not in ALLOWLIST:
         return False
     return name in ALLOWLIST[category]
+
+
+def path_excluded(path: Path, root: Path) -> bool:
+    """Check if a file path matches any dataframe_paths exclusion pattern.
+
+    Args:
+        path: Absolute path to the file being checked
+        root: Repository root for computing relative paths
+
+    Returns:
+        True if the path matches any exclusion pattern in dataframe_paths
+    """
+    patterns = ALLOWLIST.get("dataframe_paths", set())
+    if not patterns:
+        return False
+
+    # Convert to relative path string for matching
+    try:
+        rel_path = str(path.relative_to(root))
+    except ValueError:
+        rel_path = str(path)
+
+    # Check each glob pattern
+    for pattern in patterns:
+        if fnmatch.fnmatch(rel_path, pattern):
+            return True
+    return False
 
 
 class DataGuardViolation(Exception):
@@ -263,6 +304,10 @@ def call_contains_literal_arguments(node: ast.Call) -> bool:
 
 def iter_dataframe_literal_violations(path: Path, tree: ast.AST) -> Iterator[Violation]:
     """Iterate over DataFrame literal violations in a file."""
+    # Check path-based exclusions first (e.g., tests/**)
+    if path_excluded(path, ROOT):
+        return
+
     for node in iter_ast_nodes(tree, ast.Call):
         assert isinstance(node, ast.Call)  # Type narrowing for pyright
         qualname = get_call_qualname(node.func)
