@@ -67,7 +67,7 @@ UNUSED_MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --exclude tests conftes
 # ============================================================================
 SHARED_CODESPELL_IGNORE ?= $(if $(CI_TOOLS_CONFIG_PATH),$(CI_TOOLS_CONFIG_PATH)/codespell_ignore_words.txt)
 SHARED_PYTEST_EXTRA ?=
-SHARED_PYTEST_LOG_OPTIONS ?= --log-level=WARNING --log-cli-level=WARNING
+SHARED_PYTEST_LOG_OPTIONS ?= --log-level=ERROR
 PYLINT_ARGS ?=
 BANDIT_BASELINE ?=
 BANDIT_EXCLUDE ?= artifacts,trash,models,logs,htmlcov

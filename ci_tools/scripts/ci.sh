@@ -75,23 +75,14 @@ PY
   fi
 fi
 
-# pyproject.toml adds -v; stack quiet flags here so CI output stays concise unless callers opt in to verbosity.
 PYTEST_EXTRA="${SHARED_PYTEST_EXTRA:-}"
-PYTEST_QUIET="-qq"
-if [[ -z "${PYTEST_EXTRA}" ]]; then
-  MAKE_PYTEST_EXTRA="${PYTEST_QUIET}"
-elif [[ "${PYTEST_EXTRA}" == *"-qq"* ]]; then
-  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA}"
-elif [[ "${PYTEST_EXTRA}" == *"-q"* || "${PYTEST_EXTRA}" == *"--quiet"* ]]; then
-  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA} -q"
-elif [[ "${PYTEST_EXTRA}" == *"-v"* || "${PYTEST_EXTRA}" == *"--verbose"* ]]; then
-  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA}"
-else
-  MAKE_PYTEST_EXTRA="${PYTEST_EXTRA} ${PYTEST_QUIET}"
+MAKE_CHECK_CMD=(make -k check)
+if [[ -n "${PYTEST_EXTRA}" ]]; then
+  MAKE_CHECK_CMD+=("SHARED_PYTEST_EXTRA=${PYTEST_EXTRA}")
 fi
 
 echo "Running make check..."
-if ! make -k check SHARED_PYTEST_EXTRA="${MAKE_PYTEST_EXTRA}"; then
+if ! "${MAKE_CHECK_CMD[@]}"; then
   echo "make check failed; aborting commit and push." >&2
   exit 1
 fi
