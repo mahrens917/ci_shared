@@ -152,6 +152,8 @@ if [ -n "${COMMIT_BODY//[[:space:]]/}" ]; then
 else
   git commit -m "${COMMIT_MESSAGE}"
 fi
+LAST_COMMIT_SUMMARY="$(git log -1 --oneline | head -n 1)"
+echo "Created commit: ${LAST_COMMIT_SUMMARY}"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
