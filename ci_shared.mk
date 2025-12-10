@@ -71,6 +71,7 @@ SHARED_PYTEST_LOG_OPTIONS ?= --log-level=ERROR
 PYLINT_ARGS ?=
 BANDIT_BASELINE ?=
 BANDIT_EXCLUDE ?= artifacts,trash,models,logs,htmlcov
+BLACK_LINE_LENGTH ?= 140
 GITLEAKS_SOURCE_DIRS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy ci_shared.mk shared-tool-config.toml pyproject.toml Makefile README.md SECURITY.md)
 SHARED_CLEANUP_ROOTS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy)
 
@@ -89,7 +90,7 @@ shared-checks:
 	isort --profile black $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running black..."; \
-	black $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	black --line-length $(BLACK_LINE_LENGTH) $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running codespell..."; \
 	if [ -n "$(SHARED_CODESPELL_IGNORE)" ] && [ -f "$(SHARED_CODESPELL_IGNORE)" ]; then \
