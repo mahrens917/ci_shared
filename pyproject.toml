@@ -126,6 +126,7 @@ method-rgx = "([a-z_][a-z0-9_]*|visit_[A-Z][A-Za-z]*)"
 
 [tool.pylint.MAIN]
 init-hook = "import sys; sys.path.insert(0, 'tests')"
+max-line-length = 140
 
 [tool.pylint.SIMILARITIES]
 min-similarity-lines = 7
