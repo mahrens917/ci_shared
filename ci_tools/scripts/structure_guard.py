@@ -47,18 +47,12 @@ class StructureGuard(GuardRunner):
                 length = end - start + 1
                 if length > args.max_class_lines:
                     rel_path = relative_path(path, self.repo_root)
-                    violations.append(
-                        f"{rel_path}:{start} class {node.name} spans {length} lines "
-                        f"(limit {args.max_class_lines})"
-                    )
+                    violations.append(f"{rel_path}:{start} class {node.name} spans {length} lines " f"(limit {args.max_class_lines})")
         return violations
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""
-        return (
-            "Oversized classes detected. Refactor the following definitions "
-            f"to stay within {args.max_class_lines} lines:"
-        )
+        return "Oversized classes detected. Refactor the following definitions " f"to stay within {args.max_class_lines} lines:"
 
 
 if __name__ == "__main__":

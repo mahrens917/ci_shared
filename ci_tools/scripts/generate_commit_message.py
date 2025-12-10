@@ -119,9 +119,7 @@ def _write_payload(payload: str, output_path: Path | None) -> int | None:
     try:
         output_path.write_text(payload + "\n")
     except OSError as exc:
-        print(
-            f"Failed to write commit message to {output_path}: {exc}", file=sys.stderr
-        )
+        print(f"Failed to write commit message to {output_path}: {exc}", file=sys.stderr)
         return 1
     return 0
 
@@ -150,11 +148,7 @@ def _split_diff_sections(diff_text: str) -> list[str]:
             current.append(line)
     if current:
         sections.append(current)
-    return [
-        "\n".join(section).strip("\n")
-        for section in sections
-        if any(item.strip() for item in section)
-    ]
+    return ["\n".join(section).strip("\n") for section in sections if any(item.strip() for item in section)]
 
 
 def _chunk_by_sections(
@@ -185,9 +179,7 @@ def _chunk_by_sections(
     current_lines = 0
     for section in sections:
         section_lines = section.count("\n") + 1
-        if should_start_new_chunk(
-            bool(current), current_lines, section_lines, len(chunks)
-        ):
+        if should_start_new_chunk(bool(current), current_lines, section_lines, len(chunks)):
             chunks.append(current)
             current = []
             current_lines = 0
@@ -195,11 +187,7 @@ def _chunk_by_sections(
         current_lines += section_lines
     if current:
         chunks.append(current)
-    return [
-        "\n\n".join(chunk).strip("\n")
-        for chunk in chunks
-        if any(line.strip() for line in chunk)
-    ]
+    return ["\n\n".join(chunk).strip("\n") for chunk in chunks if any(line.strip() for line in chunk)]
 
 
 def _chunk_by_lines(diff_text: str, chunk_count: int) -> list[str]:
@@ -228,11 +216,7 @@ def _chunk_diff(
     sanitized_max_lines = max(0, max_chunk_lines)
     sanitized_max_chunks = max(1, max_chunks)
     total_lines = diff_text.count("\n") + 1
-    if (
-        sanitized_max_lines == 0
-        or sanitized_max_chunks == 1
-        or total_lines <= sanitized_max_lines
-    ):
+    if sanitized_max_lines == 0 or sanitized_max_chunks == 1 or total_lines <= sanitized_max_lines:
         return [diff_text]
 
     sections = _split_diff_sections(diff_text)
@@ -283,14 +267,9 @@ def _request_with_chunking(
 ) -> tuple[str, list[str]]:
     """Run multiple Codex requests across diff chunks and synthesize the final message."""
     total_chunks = len(chunks)
-    approx_lines = sum(chunk.count("\n") + 1 for chunk in chunks) // max(
-        total_chunks, 1
-    )
+    approx_lines = sum(chunk.count("\n") + 1 for chunk in chunks) // max(total_chunks, 1)
     print(
-        (
-            "[ci_shared] Large staged diff detected; splitting into "
-            f"{total_chunks} Codex prompts (~{approx_lines} lines each)."
-        ),
+        ("[ci_shared] Large staged diff detected; splitting into " f"{total_chunks} Codex prompts (~{approx_lines} lines each)."),
         file=sys.stderr,
     )
     chunk_summaries: list[tuple[str, list[str]]] = []
@@ -301,8 +280,7 @@ def _request_with_chunking(
             file=sys.stderr,
         )
         extra_context = (
-            f"This prompt contains chunk {index}/{total_chunks} of the staged diff. "
-            "Summarize only the changes visible in this chunk."
+            f"This prompt contains chunk {index}/{total_chunks} of the staged diff. Summarize only the changes visible in this chunk."
         )
         summary, body_lines = request_commit_message(
             model=model,
@@ -341,8 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     model_arg = _resolve_model_arg(args.model, commit_config)
     if not model_arg:
         print(
-            "Model must be specified via --model, CI_COMMIT_MODEL env var, "
-            "or commit_message.model in ci_shared.config.json",
+            "Model must be specified via --model, CI_COMMIT_MODEL env var, or commit_message.model in ci_shared.config.json",
             file=sys.stderr,
         )
         return 1
@@ -361,17 +338,11 @@ def main(argv: list[str] | None = None) -> int:
 
     staged_diff = _read_staged_diff()
     if not staged_diff.strip():
-        print(
-            "No staged diff available for commit message generation.", file=sys.stderr
-        )
+        print("No staged diff available for commit message generation.", file=sys.stderr)
         return 1
 
-    max_chunk_lines = _get_config_int(
-        commit_config, "chunk_line_limit", "CI_CODEX_COMMIT_CHUNK_LINE_LIMIT"
-    )
-    max_chunks = _get_config_int(
-        commit_config, "max_chunks", "CI_CODEX_COMMIT_MAX_CHUNKS"
-    )
+    max_chunk_lines = _get_config_int(commit_config, "chunk_line_limit", "CI_CODEX_COMMIT_CHUNK_LINE_LIMIT")
+    max_chunks = _get_config_int(commit_config, "max_chunks", "CI_CODEX_COMMIT_MAX_CHUNKS")
     chunks = _chunk_diff(staged_diff, max_chunk_lines, max_chunks)
 
     summary, body_lines = _generate_commit_message(

@@ -209,13 +209,9 @@ def _invoke_commit_message_generator(
     return summary, body_lines
 
 
-def _request_commit_message(
-    repo_path: Path, ci_shared_commit_msg: str
-) -> tuple[str, list[str]] | None:
+def _request_commit_message(repo_path: Path, ci_shared_commit_msg: str) -> tuple[str, list[str]] | None:
     """Generate a commit message, trying Codex first then falling back to Claude."""
-    commit_message = _invoke_commit_message_generator(
-        repo_path, env_overrides=None, label="Codex"
-    )
+    commit_message = _invoke_commit_message_generator(repo_path, env_overrides=None, label="Codex")
     if commit_message is None:
         fallback_model = _get_commit_message_fallback_model()
         print(
@@ -226,9 +222,7 @@ def _request_commit_message(
             "CI_COMMIT_MODEL": fallback_model,
             "CI_CLI_TYPE": "claude",
         }
-        commit_message = _invoke_commit_message_generator(
-            repo_path, env_overrides=fallback_env, label="Claude"
-        )
+        commit_message = _invoke_commit_message_generator(repo_path, env_overrides=fallback_env, label="Claude")
         if commit_message is None:
             print("⚠️  Commit message generation failed after fallback", file=sys.stderr)
             return None
@@ -238,9 +232,7 @@ def _request_commit_message(
     return summary, body_lines
 
 
-def _commit_and_push_update(
-    repo_path: Path, repo_name: str, ci_shared_commit_msg: str
-) -> bool:
+def _commit_and_push_update(repo_path: Path, repo_name: str, ci_shared_commit_msg: str) -> bool:
     """Stage, commit, and push the synced ci_shared files."""
     commit_message = _request_commit_message(repo_path, ci_shared_commit_msg)
     if commit_message is None:
@@ -389,22 +381,13 @@ def main() -> int:
 
     filtered_repos, blocked_repos = _filter_blocked_consumers(consuming_repos)
     if blocked_repos:
-        print(
-            "\nSkipping blocked repositories: "
-            + ", ".join(f"{repo.name} ({repo.path})" for repo in blocked_repos)
-        )
+        print("\nSkipping blocked repositories: " + ", ".join(f"{repo.name} ({repo.path})" for repo in blocked_repos))
 
     if not filtered_repos:
-        print(
-            "⚠️  No consuming repositories available after filtering; "
-            "skipping propagation"
-        )
+        print("⚠️  No consuming repositories available after filtering; skipping propagation")
         return 0
 
-    print(
-        "\nConsuming repos: "
-        + ", ".join(f"{repo.name} ({repo.path})" for repo in filtered_repos)
-    )
+    print("\nConsuming repos: " + ", ".join(f"{repo.name} ({repo.path})" for repo in filtered_repos))
 
     updated, skipped, failed = _process_repositories(filtered_repos, commit_msg, cwd)
 

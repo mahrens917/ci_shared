@@ -83,9 +83,7 @@ def load_allowlist() -> Dict[str, set[str]]:
     try:
         payload = json.loads(ALLOWLIST_PATH.read_text())
     except json.JSONDecodeError as exc:
-        raise DataGuardAllowlistError(
-            detail=f"JSON parse error at {ALLOWLIST_PATH}: {exc}"
-        ) from exc
+        raise DataGuardAllowlistError(detail=f"JSON parse error at {ALLOWLIST_PATH}: {exc}") from exc
 
     def _coerce_group(key: str) -> set[str]:
         values = payload.get(key)
@@ -165,11 +163,7 @@ def extract_target_names(target: ast.AST) -> Iterable[str]:
 def is_all_caps_identifier(name: str) -> bool:
     """Check if name is an all-caps identifier (constant)."""
     stripped = name.strip()
-    return (
-        bool(stripped)
-        and stripped.upper() == stripped
-        and any(ch.isalpha() for ch in stripped)
-    )
+    return bool(stripped) and stripped.upper() == stripped and any(ch.isalpha() for ch in stripped)
 
 
 def is_numeric_constant(node: ast.AST | None) -> TypeGuard[ast.Constant]:
@@ -221,9 +215,7 @@ def flatten_assignment_targets(targets: Iterable[ast.AST]) -> list[str]:
 def contains_sensitive_token(names: Iterable[str]) -> bool:
     """Check if any name contains a sensitive token."""
     lowered = [name.lower() for name in names]
-    return any(
-        token in candidate for candidate in lowered for token in SENSITIVE_NAME_TOKENS
-    )
+    return any(token in candidate for candidate in lowered for token in SENSITIVE_NAME_TOKENS)
 
 
 def build_assignment_violation(
@@ -239,9 +231,7 @@ def build_assignment_violation(
         return None
     if not should_flag_assignment(target_names, value):
         return None
-    message = (
-        f"{prefix} {literal_value_repr(value)} for {', '.join(sorted(target_names))}"
-    )
+    message = f"{prefix} {literal_value_repr(value)} for {', '.join(sorted(target_names))}"
     return Violation(path=path, lineno=lineno, message=message)
 
 
@@ -268,9 +258,7 @@ def assignment_violation_from_node(path: Path, node: ast.AST) -> Optional[Violat
     return None
 
 
-def iter_sensitive_assignment_violations(
-    path: Path, tree: ast.AST
-) -> Iterator[Violation]:
+def iter_sensitive_assignment_violations(path: Path, tree: ast.AST) -> Iterator[Violation]:
     """Iterate over all assignment violations in a file."""
     for node in iter_ast_nodes(tree, (ast.Assign, ast.AnnAssign)):
         violation = assignment_violation_from_node(path, node)
@@ -330,11 +318,7 @@ def collect_dataframe_literals() -> List[Violation]:
 
 def literal_comparators(node: ast.Compare) -> list[ast.Constant]:
     """Extract literal comparators from a comparison node."""
-    return [
-        comp
-        for comp in node.comparators
-        if is_numeric_constant(comp) and comp.value not in ALLOWED_NUMERIC_LITERALS
-    ]
+    return [comp for comp in node.comparators if is_numeric_constant(comp) and comp.value not in ALLOWED_NUMERIC_LITERALS]
 
 
 def comparison_targets(node: ast.Compare) -> list[str]:
@@ -350,16 +334,10 @@ def format_comparison_message(
 ) -> str:
     """Format a comparison violation message."""
     literal_repr = ", ".join(literal_value_repr(comp) for comp in comparator_literals)
-    return (
-        "comparison against literal "
-        + literal_repr
-        + f" for {', '.join(sorted(left_names))}"
-    )
+    return "comparison against literal " + literal_repr + f" for {', '.join(sorted(left_names))}"
 
 
-def iter_numeric_comparison_violations(
-    path: Path, tree: ast.AST
-) -> Iterator[Violation]:
+def iter_numeric_comparison_violations(path: Path, tree: ast.AST) -> Iterator[Violation]:
     """Iterate over numeric comparison violations in a file."""
     for node in iter_ast_nodes(tree, ast.Compare):
         assert isinstance(node, ast.Compare)  # Type narrowing for pyright
@@ -403,10 +381,7 @@ def main() -> int:
         ),
     )
     if violations:
-        details = "\n".join(
-            f"{relative_path(v.path, as_string=True)}:{v.lineno} -> {v.message}"
-            for v in violations
-        )
+        details = "\n".join(f"{relative_path(v.path, as_string=True)}:{v.lineno} -> {v.message}" for v in violations)
         raise DataGuardViolation("Data integrity violations detected:\n" + details)
     return 0
 

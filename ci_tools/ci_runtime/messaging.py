@@ -62,13 +62,10 @@ def _commit_summary_issue(summary: str) -> str | None:
             "your commit",
             "the diff shows",
         )
-        commit_message_prompt = re.search(
-            r"\b(?:the|this|your|our)\s+commit message\b", lowered
-        )
+        commit_message_prompt = re.search(r"\b(?:the|this|your|our)\s+commit message\b", lowered)
         checks.append(
             (
-                commit_message_prompt is not None
-                or any(phrase in lowered for phrase in disallowed_phrases),
+                commit_message_prompt is not None or any(phrase in lowered for phrase in disallowed_phrases),
                 "Commit summary referenced the prompt instead of the change.",
             )
         )
@@ -191,9 +188,7 @@ def request_commit_message(
         extra_context=extra_context,
         detailed=detailed,
     )
-    summary, body_lines = _invoke_commit_prompt(
-        prompt, model=model, reasoning_effort=reasoning_effort
-    )
+    summary, body_lines = _invoke_commit_prompt(prompt, model=model, reasoning_effort=reasoning_effort)
     validation_issue = _commit_summary_issue(summary)
     if not validation_issue:
         return summary, body_lines
@@ -206,9 +201,7 @@ def request_commit_message(
         detailed=detailed,
         invalid_reason=validation_issue,
     )
-    summary, body_lines = _invoke_commit_prompt(
-        retry_prompt, model=model, reasoning_effort=reasoning_effort
-    )
+    summary, body_lines = _invoke_commit_prompt(retry_prompt, model=model, reasoning_effort=reasoning_effort)
     retry_issue = _commit_summary_issue(summary)
     if retry_issue:
         raise CommitMessageError.invalid_response(reason=retry_issue)
@@ -238,9 +231,7 @@ def commit_and_push(
     remote_env = os.environ.get("GIT_REMOTE")
     if not remote_env:
         raise GitCommandAbort.missing_remote()
-    branch_result = run_command(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"], check=True
-    )
+    branch_result = run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], check=True)
     branch = branch_result.stdout.strip()
     print(f"[info] Pushing to {remote_env}/{branch}...")
     try:

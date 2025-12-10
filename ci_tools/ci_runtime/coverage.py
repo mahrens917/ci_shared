@@ -57,9 +57,7 @@ def _parse_coverage_entries(
     return deficits
 
 
-def extract_coverage_deficits(
-    output: str, *, threshold: float = COVERAGE_THRESHOLD
-) -> Optional[CoverageCheckResult]:
+def extract_coverage_deficits(output: str, *, threshold: float = COVERAGE_THRESHOLD) -> Optional[CoverageCheckResult]:
     """Extract modules that fall below the coverage threshold from pytest output."""
     if not output:
         return None
@@ -71,9 +69,7 @@ def extract_coverage_deficits(
     if not deficits:
         return None
     table_text = "\n".join(table_lines).strip()
-    return CoverageCheckResult(
-        table_text=table_text, deficits=deficits, threshold=threshold
-    )
+    return CoverageCheckResult(table_text=table_text, deficits=deficits, threshold=threshold)
 
 
 __all__ = ["extract_coverage_deficits"]

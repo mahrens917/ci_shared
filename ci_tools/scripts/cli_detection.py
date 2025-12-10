@@ -31,18 +31,12 @@ def is_main_guard_node(node: ast.If) -> bool:
 
 def has_main_function(tree: ast.AST) -> bool:
     """Check if AST contains a main() function definition."""
-    return any(
-        isinstance(node, ast.FunctionDef) and node.name == "main"
-        for node in iter_ast_nodes(tree, ast.FunctionDef)
-    )
+    return any(isinstance(node, ast.FunctionDef) and node.name == "main" for node in iter_ast_nodes(tree, ast.FunctionDef))
 
 
 def has_main_guard(tree: ast.AST) -> bool:
     """Check if AST contains if __name__ == '__main__' pattern."""
-    return any(
-        isinstance(node, ast.If) and is_main_guard_node(node)
-        for node in iter_ast_nodes(tree, ast.If)
-    )
+    return any(isinstance(node, ast.If) and is_main_guard_node(node) for node in iter_ast_nodes(tree, ast.If))
 
 
 def calls_class_main(node: ast.AST) -> bool:

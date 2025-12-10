@@ -40,28 +40,18 @@ class ModuleGuard(GuardRunner):
             tree = parse_python_ast(path, raise_on_error=True)
         except RuntimeError as exc:
             # Re-raise with consistent error message format
-            raise RuntimeError(
-                str(exc).replace("failed to parse", "failed to read")
-            ) from exc.__cause__
+            raise RuntimeError(str(exc).replace("failed to parse", "failed to read")) from exc.__cause__
 
-        assert (
-            tree is not None
-        )  # parse_python_ast raises on error when raise_on_error=True
+        assert tree is not None  # parse_python_ast raises on error when raise_on_error=True
         line_count = count_significant_lines(tree)
         if line_count > args.max_module_lines:
             rel_path = relative_path(path, self.repo_root)
-            return [
-                f"{rel_path} contains {line_count} lines "
-                f"(limit {args.max_module_lines})"
-            ]
+            return [f"{rel_path} contains {line_count} lines " f"(limit {args.max_module_lines})"]
         return []
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""
-        return (
-            "Oversized modules detected. Refactor the following files "
-            f"to stay within {args.max_module_lines} lines:"
-        )
+        return "Oversized modules detected. Refactor the following files " f"to stay within {args.max_module_lines} lines:"
 
 
 if __name__ == "__main__":

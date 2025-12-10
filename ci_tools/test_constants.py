@@ -11,9 +11,7 @@ from typing import Any
 @lru_cache(maxsize=1)
 def _load_constants() -> dict[str, Any]:
     """Load test constants from the JSON configuration file."""
-    constants_path = (
-        Path(__file__).resolve().parents[1] / "tests" / "test_constants.json"
-    )
+    constants_path = Path(__file__).resolve().parents[1] / "tests" / "test_constants.json"
     with constants_path.open(encoding="utf-8") as handle:
         return json.load(handle)
 

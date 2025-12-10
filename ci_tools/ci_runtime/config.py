@@ -69,9 +69,7 @@ def _coerce_coverage_threshold(config: dict[str, Any], initial: float) -> float:
     return initial
 
 
-def resolve_model_choice(
-    model_arg: Optional[str] = None, *, validate: bool = True
-) -> str:
+def resolve_model_choice(model_arg: Optional[str] = None, *, validate: bool = True) -> str:
     """Resolve the Codex model to use.
 
     Args:
@@ -89,20 +87,14 @@ def resolve_model_choice(
     if not candidate:
         candidate = os.environ.get("OPENAI_MODEL")
     if not candidate:
-        raise ModelSelectionAbort.unsupported_model(
-            received="(none)", required=REQUIRED_MODEL
-        )
+        raise ModelSelectionAbort.unsupported_model(received="(none)", required=REQUIRED_MODEL)
     if validate and candidate != REQUIRED_MODEL:
-        raise ModelSelectionAbort.unsupported_model(
-            received=candidate, required=REQUIRED_MODEL
-        )
+        raise ModelSelectionAbort.unsupported_model(received=candidate, required=REQUIRED_MODEL)
     os.environ["OPENAI_MODEL"] = candidate
     return candidate
 
 
-def resolve_reasoning_choice(
-    reasoning_arg: Optional[str] = None, *, validate: bool = True
-) -> str:
+def resolve_reasoning_choice(reasoning_arg: Optional[str] = None, *, validate: bool = True) -> str:
     """Resolve the reasoning effort level to use.
 
     Args:
@@ -122,13 +114,9 @@ def resolve_reasoning_choice(
         if env_reasoning:
             candidate = env_reasoning.lower()
     if not candidate:
-        raise ReasoningEffortAbort.unsupported_choice(
-            received="(none)", allowed=REASONING_EFFORT_CHOICES
-        )
+        raise ReasoningEffortAbort.unsupported_choice(received="(none)", allowed=REASONING_EFFORT_CHOICES)
     if validate and candidate not in REASONING_EFFORT_CHOICES:
-        raise ReasoningEffortAbort.unsupported_choice(
-            received=candidate, allowed=REASONING_EFFORT_CHOICES
-        )
+        raise ReasoningEffortAbort.unsupported_choice(received=candidate, allowed=REASONING_EFFORT_CHOICES)
     os.environ["OPENAI_REASONING_EFFORT"] = candidate
     return candidate
 
@@ -147,9 +135,7 @@ DEFAULT_REPO_CONTEXT = (
     "requires manual verification."
 )
 REPO_CONTEXT = _coerce_repo_context(REPO_CONFIG, DEFAULT_REPO_CONTEXT)
-PROTECTED_PATH_PREFIXES = _coerce_protected_prefixes(
-    REPO_CONFIG, DEFAULT_PROTECTED_PATH_PREFIXES
-)
+PROTECTED_PATH_PREFIXES = _coerce_protected_prefixes(REPO_CONFIG, DEFAULT_PROTECTED_PATH_PREFIXES)
 COVERAGE_THRESHOLD = _coerce_coverage_threshold(REPO_CONFIG, 80.0)
 
 

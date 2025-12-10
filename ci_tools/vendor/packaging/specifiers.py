@@ -147,9 +147,7 @@ class SpecifierSet:
     def __str__(self) -> str:
         return ",".join(str(spec) for spec in self._specs)
 
-    def filter(
-        self, iterable: Iterable[_T], prereleases: bool | None = None
-    ) -> Iterator[_T]:
+    def filter(self, iterable: Iterable[_T], prereleases: bool | None = None) -> Iterator[_T]:
         """Yield items from *iterable* that satisfy every specifier."""
 
         del prereleases  # pragma: no cover - compatibility argument

@@ -33,9 +33,7 @@ class ComplexityViolation(NamedTuple):
     violation_type: str
 
 
-def _increment_nesting_complexity(
-    visitor: "CognitiveComplexityVisitor", node: ast.AST
-) -> None:
+def _increment_nesting_complexity(visitor: "CognitiveComplexityVisitor", node: ast.AST) -> None:
     """Increment complexity based on nesting level and recurse."""
     visitor.complexity += 1 + visitor.nesting_level
     visitor.nesting_level += 1
@@ -143,9 +141,7 @@ def _check_function_complexity(
     return None
 
 
-def check_file_complexity(
-    file_path: Path, max_cyclomatic: int, max_cognitive: int
-) -> list[ComplexityViolation]:
+def check_file_complexity(file_path: Path, max_cyclomatic: int, max_cognitive: int) -> list[ComplexityViolation]:
     """Check complexity for all functions in a file."""
     violations: list[ComplexityViolation] = []
 
@@ -158,9 +154,7 @@ def check_file_complexity(
         function_nodes = _build_function_node_map(tree)
 
         for result in cyclomatic_results:
-            violation = _check_function_complexity(
-                result, function_nodes, file_path, max_cyclomatic, max_cognitive
-            )
+            violation = _check_function_complexity(result, function_nodes, file_path, max_cyclomatic, max_cognitive)
             if violation is not None:
                 violations.append(violation)
 
@@ -172,12 +166,8 @@ def check_file_complexity(
 
 def build_parser() -> argparse.ArgumentParser:
     """Create and configure the CLI argument parser."""
-    parser = argparse.ArgumentParser(
-        description="Enforce complexity limits (cyclomatic ≤10, cognitive ≤15)"
-    )
-    parser.add_argument(
-        "--root", type=Path, required=True, help="Root directory to scan"
-    )
+    parser = argparse.ArgumentParser(description="Enforce complexity limits (cyclomatic ≤10, cognitive ≤15)")
+    parser.add_argument("--root", type=Path, required=True, help="Root directory to scan")
     parser.add_argument(
         "--max-cyclomatic",
         type=int,
@@ -195,10 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="PATH",
-        help=(
-            "Path relative to --root to exclude from scanning. "
-            "May be provided multiple times."
-        ),
+        help=("Path relative to --root to exclude from scanning. " "May be provided multiple times."),
     )
     return parser
 
@@ -218,30 +205,20 @@ def resolve_excludes(root_path: Path, excludes: list[str]) -> list[Path]:
 
 def gather_python_files(root_path: Path, exclude_paths: list[Path]) -> list[Path]:
     """Return all python files under root that are not excluded."""
-    python_files = [
-        path for path in root_path.rglob("*.py") if not is_excluded(path, exclude_paths)
-    ]
+    python_files = [path for path in root_path.rglob("*.py") if not is_excluded(path, exclude_paths)]
     if not python_files:
         print(f"No Python files found in {root_path}", file=sys.stderr)
         sys.exit(1)
     return python_files
 
 
-def report_violations(
-    violations: list[ComplexityViolation], max_cyclomatic: int, max_cognitive: int
-) -> None:
+def report_violations(violations: list[ComplexityViolation], max_cyclomatic: int, max_cognitive: int) -> None:
     """Print a summary of violations and exit with appropriate status."""
     if not violations:
-        print(
-            f"✓ All functions meet complexity limits "
-            f"(cyclomatic ≤{max_cyclomatic}, cognitive ≤{max_cognitive})"
-        )
+        print(f"✓ All functions meet complexity limits " f"(cyclomatic ≤{max_cyclomatic}, cognitive ≤{max_cognitive})")
         sys.exit(0)
 
-    print(
-        f"Complexity violations detected (cyclomatic ≤{max_cyclomatic}, "
-        f"cognitive ≤{max_cognitive}):"
-    )
+    print(f"Complexity violations detected (cyclomatic ≤{max_cyclomatic}, " f"cognitive ≤{max_cognitive}):")
     print()
 
     by_file: dict[str, list[ComplexityViolation]] = {}
@@ -273,9 +250,7 @@ def main():
 
     all_violations = []
     for file_path in python_files:
-        violations = check_file_complexity(
-            file_path, args.max_cyclomatic, args.max_cognitive
-        )
+        violations = check_file_complexity(file_path, args.max_cyclomatic, args.max_cognitive)
         all_violations.extend(violations)
 
     report_violations(all_violations, args.max_cyclomatic, args.max_cognitive)

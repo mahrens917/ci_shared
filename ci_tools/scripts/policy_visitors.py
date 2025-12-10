@@ -68,10 +68,7 @@ def _handler_catches_broad(handler: ast.ExceptHandler) -> bool:
     if isinstance(handler.type, ast.Name):
         return handler.type.id in BROAD_EXCEPTION_NAMES
     if isinstance(handler.type, ast.Tuple):
-        return any(
-            isinstance(elt, ast.Name) and elt.id in BROAD_EXCEPTION_NAMES
-            for elt in handler.type.elts
-        )
+        return any(isinstance(elt, ast.Name) and elt.id in BROAD_EXCEPTION_NAMES for elt in handler.type.elts)
     return False
 
 
@@ -126,11 +123,7 @@ class GenericRaiseVisitor(ast.NodeVisitor):
             return
         if isinstance(exc, ast.Name) and exc.id in BROAD_EXCEPTION_NAMES:
             self.records.append((self.rel_path, node.lineno))
-        elif (
-            isinstance(exc, ast.Call)
-            and isinstance(exc.func, ast.Name)
-            and exc.func.id in BROAD_EXCEPTION_NAMES
-        ):
+        elif isinstance(exc, ast.Call) and isinstance(exc.func, ast.Name) and exc.func.id in BROAD_EXCEPTION_NAMES:
             self.records.append((self.rel_path, node.lineno))
         self.generic_visit(node)
 
@@ -155,9 +148,7 @@ class LiteralFallbackVisitor(ast.NodeVisitor):
         qualname = _safe_get_qualname(node.func)
         if not qualname.endswith(".get"):
             return
-        default_arg = _resolve_default_argument(
-            node, positional_index=1, keyword_names={"default", "fallback"}
-        )
+        default_arg = _resolve_default_argument(node, positional_index=1, keyword_names={"default", "fallback"})
         self._maybe_record(node, default_arg, f"{qualname} literal fallback")
 
     def _check_getattr(self, node: ast.Call) -> None:
@@ -169,9 +160,7 @@ class LiteralFallbackVisitor(ast.NodeVisitor):
         qualname = _safe_get_qualname(node.func)
         if qualname not in {"os.getenv", "os.environ.get"}:
             return
-        default_arg = _resolve_default_argument(
-            node, positional_index=1, keyword_names={"default"}
-        )
+        default_arg = _resolve_default_argument(node, positional_index=1, keyword_names={"default"})
         self._maybe_record(node, default_arg, f"{qualname} literal fallback")
 
     def _check_setdefault(self, node: ast.Call) -> None:
@@ -179,9 +168,7 @@ class LiteralFallbackVisitor(ast.NodeVisitor):
         if qualname.endswith(".setdefault") and len(node.args) >= MIN_SETDEFAULT_ARGS:
             self._maybe_record(node, node.args[1], f"{qualname} literal fallback")
 
-    def _maybe_record(
-        self, node: ast.Call, default_arg: ast.AST | None, message: str
-    ) -> None:
+    def _maybe_record(self, node: ast.Call, default_arg: ast.AST | None, message: str) -> None:
         """Record a violation if the default argument is a non-None literal."""
         if is_non_none_literal(default_arg):
             self.records.append((self.rel_path, node.lineno, message))
@@ -242,18 +229,14 @@ class LegacyVisitor(ast.NodeVisitor):
             segment = ""
         lowered = segment.lower()
         if any(token in lowered for token in LEGACY_GUARD_TOKENS):
-            self.records.append(
-                (self.ctx.rel_path, node.lineno, "conditional legacy guard")
-            )
+            self.records.append((self.ctx.rel_path, node.lineno, "conditional legacy guard"))
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Check Attribute nodes for legacy suffixes."""
         attr_name = node.attr.lower()
         if attr_name.endswith(LEGACY_SUFFIXES):
-            self.records.append(
-                (self.ctx.rel_path, node.lineno, "legacy attribute access")
-            )
+            self.records.append((self.ctx.rel_path, node.lineno, "legacy attribute access"))
         self.generic_visit(node)
 
     def visit_Name(self, node: ast.Name) -> None:

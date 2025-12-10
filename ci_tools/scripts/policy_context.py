@@ -155,9 +155,7 @@ def _determine_default_bases() -> Sequence[Path]:
     return (ROOT,)
 
 
-def _load_module_text(
-    path: Path, include_source: bool, include_lines: bool
-) -> tuple[Optional[str], Optional[List[str]]]:
+def _load_module_text(path: Path, include_source: bool, include_lines: bool) -> tuple[Optional[str], Optional[List[str]]]:
     """Load source text and lines if requested."""
     if not (include_source or include_lines):
         return None, None
@@ -277,11 +275,7 @@ def classify_handler(handler: ast.ExceptHandler) -> str | None:
 
 def is_literal_none_guard(test: ast.AST) -> bool:
     """Check if a test expression is a None comparison (e.g., 'x is None', 'x == None')."""
-    if (
-        isinstance(test, ast.Compare)
-        and len(test.ops) == 1
-        and len(test.comparators) == 1
-    ):
+    if isinstance(test, ast.Compare) and len(test.ops) == 1 and len(test.comparators) == 1:
         comparator = test.comparators[0]
         if isinstance(comparator, ast.Constant) and comparator.value is None:
             if isinstance(test.ops[0], (ast.Is, ast.Eq)):

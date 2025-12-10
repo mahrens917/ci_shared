@@ -38,9 +38,7 @@ class CoverageResult:
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     """Parse command-line arguments for coverage guard."""
-    parser = argparse.ArgumentParser(
-        description="Fail when any measured file falls below the coverage threshold."
-    )
+    parser = argparse.ArgumentParser(description="Fail when any measured file falls below the coverage threshold.")
     parser.add_argument(
         "--threshold",
         type=float,
@@ -99,10 +97,7 @@ def should_include(path: Path, prefixes: Sequence[Path]) -> bool:
         return False
     if not prefixes:
         return True
-    return any(
-        path == prefix or str(path).startswith(str(prefix) + os.sep)
-        for prefix in prefixes
-    )
+    return any(path == prefix or str(path).startswith(str(prefix) + os.sep) for prefix in prefixes)
 
 
 def _matches_omit_pattern(path_str: str, patterns: Sequence[str]) -> bool:
@@ -182,11 +177,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"coverage_guard: failed to load coverage data: {exc}", file=sys.stderr)
         return 1
     threshold = float(args.threshold)
-    failures = [
-        result
-        for result in results
-        if result.statements > 0 and result.percent + 1e-9 < threshold
-    ]
+    failures = [result for result in results if result.statements > 0 and result.percent + 1e-9 < threshold]
     if failures:
         print(
             "coverage_guard: per-file coverage below threshold " f"({threshold:.2f}%):",
@@ -196,8 +187,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rel_path = result.path.relative_to(ROOT)
             covered = result.statements - result.missing
             print(
-                f"  {rel_path.as_posix()}: {result.percent:.2f}% "
-                f"({covered}/{result.statements} lines covered)",
+                f"  {rel_path.as_posix()}: {result.percent:.2f}% " f"({covered}/{result.statements} lines covered)",
                 file=sys.stderr,
             )
         return 1

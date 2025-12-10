@@ -47,9 +47,7 @@ def extract_tool_config(data: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in data.items() if k == "tool"}
 
 
-def compare_configs(
-    shared: dict[str, Any], repo: dict[str, Any]
-) -> tuple[bool, list[str]]:
+def compare_configs(shared: dict[str, Any], repo: dict[str, Any]) -> tuple[bool, list[str]]:
     """
     Compare tool configurations.
 
@@ -65,9 +63,7 @@ def compare_configs(
         return True, []
 
     if "tool" not in repo:
-        differences.append(
-            "Repository pyproject.toml is missing [tool] section entirely"
-        )
+        differences.append("Repository pyproject.toml is missing [tool] section entirely")
         return False, differences
 
     shared_tools = shared["tool"]
@@ -86,9 +82,7 @@ def compare_configs(
 
     # Compare existing tools - recursively check subsections
     for tool in shared_keys & repo_keys:
-        tool_diffs = _compare_tool_section(
-            shared_tools[tool], repo_tools[tool], f"tool.{tool}"
-        )
+        tool_diffs = _compare_tool_section(shared_tools[tool], repo_tools[tool], f"tool.{tool}")
         differences.extend(tool_diffs)
 
     return len(differences) == 0, differences
@@ -109,16 +103,12 @@ def _compare_tool_section(shared: Any, repo: Any, path: str) -> list[str]:
                 differences.append(f"Missing configuration: [{path}.{key}]")
             else:
                 # Recursively compare subsections
-                sub_diffs = _compare_tool_section(
-                    shared_value, repo[key], f"{path}.{key}"
-                )
+                sub_diffs = _compare_tool_section(shared_value, repo[key], f"{path}.{key}")
                 differences.extend(sub_diffs)
         # Note: extra keys in repo are OK (repo-specific settings allowed)
     elif shared != repo:
         # Leaf value comparison
-        differences.append(
-            f"Configuration mismatch: [{path}] (expected: {shared}, got: {repo})"
-        )
+        differences.append(f"Configuration mismatch: [{path}] (expected: {shared}, got: {repo})")
 
     return differences
 
@@ -255,11 +245,7 @@ def _remove_tool_sections(pyproject_text: str, managed_tools: set[str]) -> str:
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
             section_name = stripped[1:-1].strip()
-            inside_tool_section = any(
-                section_name == f"tool.{tool}"
-                or section_name.startswith(f"tool.{tool}.")
-                for tool in managed_tools
-            )
+            inside_tool_section = any(section_name == f"tool.{tool}" or section_name.startswith(f"tool.{tool}.") for tool in managed_tools)
             if inside_tool_section:
                 continue
         if not inside_tool_section:
@@ -356,9 +342,7 @@ def _find_shared_config(repo_root: Path, shared_config: Path | None) -> Path:
 def _validate_paths(shared_config_path: Path, repo_pyproject: Path) -> int | None:
     """Validate that required paths exist. Returns error code or None if valid."""
     if not shared_config_path.exists():
-        print(
-            f"Error: Shared config not found at {shared_config_path}", file=sys.stderr
-        )
+        print(f"Error: Shared config not found at {shared_config_path}", file=sys.stderr)
         print("Specify path with --shared-config", file=sys.stderr)
         return 2
 
@@ -380,10 +364,7 @@ def _handle_config_mismatch(
         status_icon = "✓"
     else:
         status_icon = "✗"
-    print(
-        f"{status_icon} Tool configurations in {repo_pyproject.name} "
-        f"differ from shared config:"
-    )
+    print(f"{status_icon} Tool configurations in {repo_pyproject.name} " f"differ from shared config:")
     for diff in differences:
         print(f"  - {diff}")
 
@@ -398,9 +379,7 @@ def _handle_config_mismatch(
 
 def main() -> int:
     """Main entry point for tool config guard."""
-    parser = argparse.ArgumentParser(
-        description="Validate or sync tool configurations across repositories"
-    )
+    parser = argparse.ArgumentParser(description="Validate or sync tool configurations across repositories")
     parser.add_argument(
         "--repo-root",
         type=Path,
@@ -436,9 +415,7 @@ def main() -> int:
         print(f"✓ Tool configurations in {repo_pyproject.name} match shared config")
         return 0
 
-    return _handle_config_mismatch(
-        repo_pyproject, differences, args.sync, shared_config_path
-    )
+    return _handle_config_mismatch(repo_pyproject, differences, args.sync, shared_config_path)
 
 
 if __name__ == "__main__":

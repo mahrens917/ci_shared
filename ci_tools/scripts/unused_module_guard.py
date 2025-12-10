@@ -46,9 +46,7 @@ def should_skip_file(py_file: Path, exclude_patterns: List[str]) -> bool:
     return is_cli_entry_point(py_file)
 
 
-def find_unused_modules(
-    root: Path, exclude_patterns: Optional[List[str]] = None
-) -> List[Tuple[Path, str]]:
+def find_unused_modules(root: Path, exclude_patterns: Optional[List[str]] = None) -> List[Tuple[Path, str]]:
     """
     Find Python modules that are never imported.
 
@@ -105,20 +103,14 @@ def load_whitelist(whitelist_path: Path) -> Set[str]:
     return whitelist
 
 
-def apply_whitelist_filtering(
-    unused: List[Tuple[Path, str]], whitelist_path: Path, root: Path
-) -> List[Tuple[Path, str]]:
+def apply_whitelist_filtering(unused: List[Tuple[Path, str]], whitelist_path: Path, root: Path) -> List[Tuple[Path, str]]:
     """Apply whitelist filtering to unused modules and return filtered list."""
     whitelist = load_whitelist(whitelist_path)
     if not whitelist:
         return unused
 
     original_count = len(unused)
-    filtered = [
-        (file_path, reason)
-        for file_path, reason in unused
-        if str(file_path.relative_to(root)) not in whitelist
-    ]
+    filtered = [(file_path, reason) for file_path, reason in unused if str(file_path.relative_to(root)) not in whitelist]
     filtered_count = original_count - len(filtered)
     if filtered_count > 0:
         print(f"(Filtered {filtered_count} whitelisted module(s))")
@@ -150,9 +142,7 @@ def report_results(
     if not issues_found:
         print("✅ No unused modules found")
     else:
-        print(
-            "\nTip: Remove unused files or add them to .gitignore if they're work-in-progress"
-        )
+        print("\nTip: Remove unused files or add them to .gitignore if they're work-in-progress")
 
     return issues_found
 
@@ -181,10 +171,7 @@ def main() -> int:
     parser.add_argument(
         "--whitelist",
         type=Path,
-        help=(
-            "Path to whitelist file with known false positives "
-            "(default: .unused_module_guard_whitelist)"
-        ),
+        help=("Path to whitelist file with known false positives " "(default: .unused_module_guard_whitelist)"),
         default=Path(".unused_module_guard_whitelist"),
     )
     parser.set_defaults(root=Path("src"), exclude=["__init__.py", "conftest.py"])

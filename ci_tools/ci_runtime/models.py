@@ -134,9 +134,7 @@ class RepositoryStateAbort(CiAbort):
     @classmethod
     def detached_head(cls) -> "RepositoryStateAbort":
         """Factory raised when running outside a branch (detached HEAD)."""
-        return cls(
-            detail="detached HEAD detected; checkout a branch before running ci.py"
-        )
+        return cls(detail="detached HEAD detected; checkout a branch before running ci.py")
 
 
 class ModelSelectionAbort(CiAbort):
@@ -145,9 +143,7 @@ class ModelSelectionAbort(CiAbort):
     default_message = "Unsupported model configuration"
 
     @classmethod
-    def unsupported_model(
-        cls, *, received: str, required: str
-    ) -> "ModelSelectionAbort":
+    def unsupported_model(cls, *, received: str, required: str) -> "ModelSelectionAbort":
         """Factory when a CLI caller passes an unsupported model."""
         return cls(detail=f"requires `{required}` but received `{received}`")
 
@@ -158,9 +154,7 @@ class ReasoningEffortAbort(CiAbort):
     default_message = "Unsupported reasoning effort"
 
     @classmethod
-    def unsupported_choice(
-        cls, *, received: str, allowed: Iterable[str]
-    ) -> "ReasoningEffortAbort":
+    def unsupported_choice(cls, *, received: str, allowed: Iterable[str]) -> "ReasoningEffortAbort":
         """Factory when the reasoning effort flag is not recognised."""
         choices = ", ".join(allowed)
         return cls(detail=f"expected one of {choices}; received `{received}`")
@@ -189,9 +183,7 @@ class PatchLifecycleAbort(CiAbort):
     @classmethod
     def retries_exhausted(cls) -> "PatchLifecycleAbort":
         """Factory when patch retries were exhausted after repeated failures."""
-        return cls(
-            detail="Codex patches failed after exhausting retries; manual review required"
-        )
+        return cls(detail="Codex patches failed after exhausting retries; manual review required")
 
 
 @dataclass
@@ -348,17 +340,11 @@ class PatchApplyError(CiError):
         return cls(detail=detail, retryable=True)
 
     @classmethod
-    def preflight_failed(
-        cls, *, check_output: str, dry_output: str
-    ) -> "PatchApplyError":
+    def preflight_failed(cls, *, check_output: str, dry_output: str) -> "PatchApplyError":
         """Factory when both git and patch dry-runs are unable to apply."""
         check_display = display_value(_normalize_output(check_output), "(none)")
         dry_display = display_value(_normalize_output(dry_output), "(none)")
-        detail = (
-            "Patch dry-run failed.\n"
-            f"git apply --check output:\n{check_display}\n\n"
-            f"patch --dry-run output:\n{dry_display}"
-        )
+        detail = "Patch dry-run failed.\n" f"git apply --check output:\n{check_display}\n\n" f"patch --dry-run output:\n{dry_display}"
         return cls(detail=detail, retryable=True)
 
     @classmethod

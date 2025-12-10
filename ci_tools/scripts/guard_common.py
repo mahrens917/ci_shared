@@ -101,9 +101,7 @@ def detect_repo_root() -> Path:
     return Path.cwd().resolve()
 
 
-def relative_path(
-    path: Path, repo_root: Path | None = None, *, as_string: bool = False
-) -> Path | str:
+def relative_path(path: Path, repo_root: Path | None = None, *, as_string: bool = False) -> Path | str:
     """Convert a path to repo-relative format.
 
     This unified function consolidates the functionality of the former
@@ -157,9 +155,7 @@ iter_ast_nodes = ast_utils.iter_ast_nodes
 count_significant_lines = ast_utils.count_significant_lines
 
 
-def create_guard_parser(
-    description: str, default_root: Path = Path("src")
-) -> argparse.ArgumentParser:
+def create_guard_parser(description: str, default_root: Path = Path("src")) -> argparse.ArgumentParser:
     """Create an argument parser with common guard script options.
 
     Args:

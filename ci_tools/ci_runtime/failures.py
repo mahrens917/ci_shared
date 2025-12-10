@@ -27,10 +27,7 @@ def _gather_focused_diff(implicated_files: Iterable[str]) -> str:
 def _render_coverage_context(report: CoverageCheckResult) -> tuple[str, str, list[str]]:
     """Derive coverage summary text and implicated file list."""
     deficits = [f"- {item.path}: {item.coverage:.1f}%" for item in report.deficits]
-    intro = (
-        "Coverage guard triggered: add or expand tests so each listed module "
-        f"meets the {report.threshold:.0f}% threshold."
-    )
+    intro = "Coverage guard triggered: add or expand tests so each listed module " f"meets the {report.threshold:.0f}% threshold."
     header = f"Coverage deficits detected (threshold {report.threshold:.0f}%):"
     summary = "\n".join([intro, *deficits])
     log_excerpt = "\n".join(
@@ -57,10 +54,7 @@ def build_failure_context(
         print(
             "[coverage] Coverage below "
             f"{coverage_report.threshold:.0f}% detected for: "
-            + ", ".join(
-                f"{item.path} ({item.coverage:.1f}%)"
-                for item in coverage_report.deficits
-            )
+            + ", ".join(f"{item.path} ({item.coverage:.1f}%)" for item in coverage_report.deficits)
         )
         print("[loop] Consulting Codex for additional tests to lift coverage.")
     else:
@@ -78,9 +72,7 @@ def build_failure_context(
         if attribute_error_hint:
             print(f"[guard] {attribute_error_hint}", file=sys.stderr)
             raise CiAbort(detail="Manual intervention required")
-        print(
-            f"[loop] CI failed with exit code {result.returncode}. Consulting Codex..."
-        )
+        print(f"[loop] CI failed with exit code {result.returncode}. Consulting Codex...")
     focused_diff = _gather_focused_diff(implicated)
     return FailureContext(
         log_excerpt=log_excerpt,

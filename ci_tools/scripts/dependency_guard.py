@@ -83,9 +83,7 @@ class DependencyGuard(GuardRunner):
             help="Maximum allowed object instantiations in __init__/__post_init__ (default: 8).",
         )
 
-    def _check_class_init(
-        self, node: ast.ClassDef, path: Path, max_inst: int
-    ) -> Optional[str]:
+    def _check_class_init(self, node: ast.ClassDef, path: Path, max_inst: int) -> Optional[str]:
         """Check __init__/__post_init__ for excessive instantiations."""
         for item in node.body:
             if not isinstance(item, ast.FunctionDef) or item.name not in (
@@ -101,8 +99,7 @@ class DependencyGuard(GuardRunner):
                     remaining = len(instantiated) - MAX_CLASSES_TO_DISPLAY
                     classes_str += f", ... ({remaining} more)"
                 return (
-                    f"{rel_path}:{node.lineno} class {node.name} instantiates {count} dependencies "
-                    f"(limit {max_inst}) - [{classes_str}]"
+                    f"{rel_path}:{node.lineno} class {node.name} instantiates {count} dependencies " f"(limit {max_inst}) - [{classes_str}]"
                 )
         return None
 
@@ -119,17 +116,11 @@ class DependencyGuard(GuardRunner):
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""
-        return (
-            "Classes with too many dependency instantiations detected. "
-            "Consider dependency injection or extracting coordinators:"
-        )
+        return "Classes with too many dependency instantiations detected. " "Consider dependency injection or extracting coordinators:"
 
     def get_violations_footer(self, args: argparse.Namespace) -> Optional[str]:
         """Get the footer tip for violations report."""
-        return (
-            "Tip: Pass dependencies via __init__ parameters "
-            "instead of instantiating them internally"
-        )
+        return "Tip: Pass dependencies via __init__ parameters " "instead of instantiating them internally"
 
 
 if __name__ == "__main__":

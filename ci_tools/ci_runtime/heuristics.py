@@ -9,12 +9,8 @@ from typing import List, Optional, Tuple
 from .config import REPO_ROOT
 from .process import tail_text
 
-IMPORT_ERROR_PATTERN = re.compile(
-    r"ImportError: cannot import name '([^']+)' from '([^']+)'"
-)
-ATTRIBUTE_ERROR_PATTERN = re.compile(
-    r"AttributeError:\s+(?:'[^']+'\s+object\s+has\s+no\s+attribute\s+'([^']+)')"
-)
+IMPORT_ERROR_PATTERN = re.compile(r"ImportError: cannot import name '([^']+)' from '([^']+)'")
+ATTRIBUTE_ERROR_PATTERN = re.compile(r"AttributeError:\s+(?:'[^']+'\s+object\s+has\s+no\s+attribute\s+'([^']+)')")
 
 
 def detect_missing_symbol_error(log_excerpt: str) -> Optional[str]:

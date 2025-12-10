@@ -74,10 +74,7 @@ def count_class_methods(node: ast.ClassDef) -> tuple[int, int]:
             continue
 
         # Skip properties (they're data access, not behavior)
-        is_property = any(
-            isinstance(dec, ast.Name) and dec.id == "property"
-            for dec in item.decorator_list
-        )
+        is_property = any(isinstance(dec, ast.Name) and dec.id == "property" for dec in item.decorator_list)
         if is_property:
             continue
 
@@ -90,9 +87,7 @@ def count_class_methods(node: ast.ClassDef) -> tuple[int, int]:
     return public_count, total_count
 
 
-def iter_ast_nodes(
-    tree: ast.AST, node_types: type[ast.AST] | tuple[type[ast.AST], ...]
-) -> Iterable[ast.AST]:
+def iter_ast_nodes(tree: ast.AST, node_types: type[ast.AST] | tuple[type[ast.AST], ...]) -> Iterable[ast.AST]:
     """Iterate over AST nodes of specified types.
 
     Args:

@@ -47,9 +47,7 @@ class MethodCountGuard(GuardRunner):
             help="Maximum allowed total methods (public + private) per class (default: 25).",
         )
 
-    def _check_class_methods(
-        self, path: Path, node: ast.ClassDef, args: argparse.Namespace
-    ) -> Optional[str]:
+    def _check_class_methods(self, path: Path, node: ast.ClassDef, args: argparse.Namespace) -> Optional[str]:
         """Check class method counts and build violation message if exceeded."""
         pub, tot = count_class_methods(node)
         if pub <= args.max_public_methods and tot <= args.max_total_methods:
@@ -76,8 +74,7 @@ class MethodCountGuard(GuardRunner):
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""
         return (
-            "Classes with too many methods detected (multi-concern indicator). "
-            "Consider extracting service objects or using composition:"
+            "Classes with too many methods detected (multi-concern indicator). " "Consider extracting service objects or using composition:"
         )
 
     def get_violations_footer(self, args: argparse.Namespace) -> Optional[str]:

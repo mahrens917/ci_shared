@@ -113,10 +113,7 @@ class InheritanceGuard(GuardRunner):
             "--max-depth",
             type=int,
             default=2,
-            help=(
-                "Maximum allowed inheritance depth "
-                "(default: 2, meaning class → parent → grandparent)."
-            ),
+            help=("Maximum allowed inheritance depth " "(default: 2, meaning class → parent → grandparent)."),
         )
 
     def scan_file(self, path: Path, args: argparse.Namespace) -> List[str]:
@@ -152,9 +149,7 @@ class InheritanceGuard(GuardRunner):
 
     def get_violations_footer(self, args: argparse.Namespace) -> Optional[str]:
         """Get the footer tip for violations report."""
-        return (
-            "Tip: Replace mixin inheritance with service objects injected via __init__"
-        )
+        return "Tip: Replace mixin inheritance with service objects injected via __init__"
 
 
 if __name__ == "__main__":

@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import Set
 
 
-def check_exact_match(
-    module_name: str, file_stem: str, all_imports: Set[str], root: Path
-) -> bool:
+def check_exact_match(module_name: str, file_stem: str, all_imports: Set[str], root: Path) -> bool:
     """Check for exact module name matches."""
     if module_name in all_imports:
         return True
@@ -29,13 +27,9 @@ def check_child_imported(module_name: str, all_imports: Set[str]) -> bool:
     return False
 
 
-def has_specific_child_imports(
-    parent: str, module_name: str, all_imports: Set[str]
-) -> bool:
+def has_specific_child_imports(parent: str, module_name: str, all_imports: Set[str]) -> bool:
     """Check if parent has specific child imports that exclude this module."""
-    return any(
-        imp.startswith(parent + ".") and imp != module_name for imp in all_imports
-    )
+    return any(imp.startswith(parent + ".") and imp != module_name for imp in all_imports)
 
 
 def check_parent_imported(module_name: str, all_imports: Set[str]) -> bool:

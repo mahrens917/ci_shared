@@ -112,9 +112,7 @@ def _run_command_streaming(
     stderr_text = "".join(stderr_lines)
 
     if check and returncode != 0:
-        raise subprocess.CalledProcessError(
-            returncode, process.args, output=stdout_text, stderr=stderr_text
-        )
+        raise subprocess.CalledProcessError(returncode, process.args, output=stdout_text, stderr=stderr_text)
 
     return CommandResult(
         returncode=returncode,
@@ -257,9 +255,7 @@ def get_commit_message(ref: str = "HEAD", cwd: Optional[Path] = None) -> str:
     Raises:
         subprocess.CalledProcessError: If git command fails
     """
-    result = run_command(
-        ["git", "log", "-1", "--pretty=format:%s", ref], check=True, cwd=cwd
-    )
+    result = run_command(["git", "log", "-1", "--pretty=format:%s", ref], check=True, cwd=cwd)
     return result.stdout.strip()
 
 

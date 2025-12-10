@@ -25,12 +25,8 @@ _SKIP_PATH_PREFIXES = ("scripts/", "ci_runtime/", "vendor/", "tests/test_policy"
 # Pre-computed legacy patterns (forbidden suffixes, directory parts, and prefixes)
 _FORBIDDEN_SUFFIXES = tuple(f"{suffix}.py" for suffix in LEGACY_SUFFIXES)
 _DIR_TOKENS = tuple(token.strip("_") for token in LEGACY_SUFFIXES)
-_FORBIDDEN_PARTS = tuple(f"/{token}/" for token in _DIR_TOKENS) + tuple(
-    f"\\{token}\\" for token in _DIR_TOKENS
-)
-_FORBIDDEN_PREFIXES = tuple(f"{token}/" for token in _DIR_TOKENS) + tuple(
-    f"{token}\\" for token in _DIR_TOKENS
-)
+_FORBIDDEN_PARTS = tuple(f"/{token}/" for token in _DIR_TOKENS) + tuple(f"\\{token}\\" for token in _DIR_TOKENS)
+_FORBIDDEN_PREFIXES = tuple(f"{token}/" for token in _DIR_TOKENS) + tuple(f"{token}\\" for token in _DIR_TOKENS)
 _LEGACY_PATTERNS = (_FORBIDDEN_SUFFIXES, _FORBIDDEN_PARTS, _FORBIDDEN_PREFIXES)
 
 

@@ -83,11 +83,7 @@ def _should_apply_patch(
     if approval_mode == "auto":
         print(f"[codex] Auto-approving patch attempt {attempt}.")
         return True
-    decision = (
-        input(f"[prompt] Apply patch attempt {attempt}? [y]es/[n]o/[q]uit: ")
-        .strip()
-        .lower()
-    )
+    decision = input(f"[prompt] Apply patch attempt {attempt}? [y]es/[n]o/[q]uit: ").strip().lower()
     if decision in {"q", "quit"}:
         raise PatchLifecycleAbort.user_declined()
     return decision in {"y", "yes", ""}  # treat empty input as yes

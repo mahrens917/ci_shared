@@ -46,9 +46,7 @@ class SyncResult:
 
 
 def parse_args(argv: Iterable[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Copy shared CI configs into multiple project directories."
-    )
+    parser = argparse.ArgumentParser(description="Copy shared CI configs into multiple project directories.")
     parser.add_argument(
         "projects",
         nargs="*",
@@ -68,10 +66,7 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
         dest="files",
         action="append",
         default=None,
-        help=(
-            "Specific relative file to sync. Can be supplied multiple times. "
-            "Defaults to a curated list if omitted."
-        ),
+        help=("Specific relative file to sync. Can be supplied multiple times. " "Defaults to a curated list if omitted."),
     )
     parser.add_argument(
         "--dry-run",
@@ -82,8 +77,7 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
         "--backup-suffix",
         default="",
         help=(
-            "Optional suffix to append when writing backups of overwritten files "
-            "(e.g. '.bak'). Empty string disables backups (default)."
+            "Optional suffix to append when writing backups of overwritten files " "(e.g. '.bak'). Empty string disables backups (default)."
         ),
     )
     parser.add_argument(
@@ -162,9 +156,7 @@ def sync_target_root(
     for rel_path in files:
         src = source_root / rel_path
         dest = target_root / rel_path
-        results.append(
-            sync_file(project_root, target_root, src, dest, dry_run, backup_suffix)
-        )
+        results.append(sync_file(project_root, target_root, src, dest, dry_run, backup_suffix))
     return results
 
 
@@ -182,9 +174,7 @@ def sync_proxy_files(
         dest_parent = dest.parent
         if not dest_parent.exists() and not dry_run:
             dest_parent.mkdir(parents=True, exist_ok=True)
-        results.append(
-            sync_file(project_root, dest_parent, src, dest, dry_run, backup_suffix)
-        )
+        results.append(sync_file(project_root, dest_parent, src, dest, dry_run, backup_suffix))
     return results
 
 
@@ -214,9 +204,7 @@ def main(argv: Iterable[str]) -> int:
     for project in projects:
         project_root = Path(project).expanduser().resolve()
         if not project_root.exists():
-            summary.append(
-                SyncResult(project_root, project_root, "skipped", "project missing")
-            )
+            summary.append(SyncResult(project_root, project_root, "skipped", "project missing"))
             continue
 
         summary.extend(
@@ -229,11 +217,7 @@ def main(argv: Iterable[str]) -> int:
                 args.backup_suffix,
             )
         )
-        summary.extend(
-            sync_proxy_files(
-                project_root, source_root, args.dry_run, args.backup_suffix
-            )
-        )
+        summary.extend(sync_proxy_files(project_root, source_root, args.dry_run, args.backup_suffix))
 
         for subdir in subdirs:
             target_root = project_root / subdir
@@ -254,11 +238,7 @@ def main(argv: Iterable[str]) -> int:
     for result in summary:
         try:
             rel_target = result.target_root.relative_to(result.project)
-            project_label = (
-                result.project.name
-                if rel_target == Path(".")
-                else f"{result.project.name}/{rel_target}"
-            )
+            project_label = result.project.name if rel_target == Path(".") else f"{result.project.name}/{rel_target}"
         except ValueError:
             project_label = result.target_root.as_posix()
 

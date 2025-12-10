@@ -25,9 +25,7 @@ def _detect_cli_type(model: str) -> str:
         return "claude"
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "claude"
-    raise ValueError(
-        "CI_CLI_TYPE must be set to 'claude' or 'codex', or ANTHROPIC_API_KEY must be set"
-    )
+    raise ValueError("CI_CLI_TYPE must be set to 'claude' or 'codex', or ANTHROPIC_API_KEY must be set")
 
 
 def build_codex_command(model: str, reasoning_effort: Optional[str]) -> list[str]:
@@ -75,18 +73,10 @@ def _stream_output(process: subprocess.Popen[str]) -> tuple[list[str], list[str]
 
     threads: list[threading.Thread] = []
     if process.stdout:
-        threads.append(
-            threading.Thread(
-                target=stream_pipe, args=(process.stdout, stdout_lines), daemon=True
-            )
-        )
+        threads.append(threading.Thread(target=stream_pipe, args=(process.stdout, stdout_lines), daemon=True))
         threads[-1].start()
     if process.stderr:
-        threads.append(
-            threading.Thread(
-                target=stream_pipe, args=(process.stderr, stderr_lines), daemon=True
-            )
-        )
+        threads.append(threading.Thread(target=stream_pipe, args=(process.stderr, stderr_lines), daemon=True))
         threads[-1].start()
 
     for thread in threads:
@@ -111,9 +101,7 @@ def invoke_codex(
         text=True,
         bufsize=1,
     ) as process:
-        feeder = threading.Thread(
-            target=_feed_prompt, args=(process, prompt), daemon=True
-        )
+        feeder = threading.Thread(target=_feed_prompt, args=(process, prompt), daemon=True)
         feeder.start()
         feeder.join()
         stdout_lines, stderr_lines = _stream_output(process)
@@ -193,9 +181,7 @@ def request_codex_patch(
     """Ask Codex for a patch diff based on the supplied failure context."""
     git_status_display = _format_git_status(prompt.git_status)
     summary_display = _format_summary(prompt.failure_context.summary)
-    focused_diff_display = _format_diff(
-        prompt.failure_context.focused_diff, "/* no focused diff */"
-    )
+    focused_diff_display = _format_diff(prompt.failure_context.focused_diff, "/* no focused diff */")
     git_diff_display = _format_diff(prompt.git_diff, "/* no diff */")
 
     prompt_text = textwrap.dedent(
@@ -245,13 +231,9 @@ def request_codex_patch(
     )
 
 
-def truncate_diff_summary(
-    diff_text: str, line_limit: int
-) -> tuple[bool, Optional[str]]:
+def truncate_diff_summary(diff_text: str, line_limit: int) -> tuple[bool, Optional[str]]:
     """Return whether a diff exceeds the allowed change budget."""
-    changed_lines = sum(
-        1 for line in diff_text.splitlines() if line.startswith(("+", "-"))
-    )
+    changed_lines = sum(1 for line in diff_text.splitlines() if line.startswith(("+", "-")))
     if changed_lines > line_limit:
         return (
             True,

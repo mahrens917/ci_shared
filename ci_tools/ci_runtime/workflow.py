@@ -31,9 +31,7 @@ from .patch_cycle import request_and_apply_patches
 from .process import gather_git_diff_limited, run_command
 
 
-def _derive_runtime_flags(
-    args: argparse.Namespace, command_tokens: list[str]
-) -> tuple[bool, dict[str, str], bool, bool, bool]:
+def _derive_runtime_flags(args: argparse.Namespace, command_tokens: list[str]) -> tuple[bool, dict[str, str], bool, bool, bool]:
     """Derive automation flags based on CLI args and the requested command."""
     if command_tokens:
         command_basename = Path(command_tokens[0]).name
@@ -173,9 +171,7 @@ def finalize_worktree(args: argparse.Namespace, options: RuntimeOptions) -> int:
         _warn_missing_staged_changes()
         return 0
 
-    summary, body_lines = _maybe_request_commit_message(
-        options, staged_diff, args.commit_extra_context
-    )
+    summary, body_lines = _maybe_request_commit_message(options, staged_diff, args.commit_extra_context)
     _maybe_push_or_notify(options, summary, body_lines)
     return 0
 
@@ -186,9 +182,7 @@ def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> 
     for iteration in range(1, args.max_iterations + 1):
         print(f"[loop] Iteration {iteration} — running `{args.command}`")
         result = run_command(options.command_tokens, live=True, env=options.command_env)
-        coverage_report = (
-            extract_coverage_deficits(result.combined_output) if result.ok else None
-        )
+        coverage_report = extract_coverage_deficits(result.combined_output) if result.ok else None
         if result.ok and coverage_report is None:
             print(f"[loop] CI command succeeded on iteration {iteration}.")
             return
@@ -205,9 +199,7 @@ def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments for the workflow CLI."""
-    parser = argparse.ArgumentParser(
-        description="Automate CI fixes via LLM (Codex or Claude)."
-    )
+    parser = argparse.ArgumentParser(description="Automate CI fixes via LLM (Codex or Claude).")
     parser.add_argument(
         "--command",
         help="Command to run for CI (initial: ./scripts/ci.sh)",

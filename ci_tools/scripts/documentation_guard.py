@@ -20,9 +20,7 @@ from typing import Callable, List, Tuple
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for documentation guard."""
-    parser = argparse.ArgumentParser(
-        description="Verify required documentation exists. FAIL on missing required docs."
-    )
+    parser = argparse.ArgumentParser(description="Verify required documentation exists. FAIL on missing required docs.")
     parser.add_argument(
         "--root",
         type=Path,
@@ -32,9 +30,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _should_check_directory(
-    base_dir: Path, has_content_check: Callable[[Path], bool] | None
-) -> bool:
+def _should_check_directory(base_dir: Path, has_content_check: Callable[[Path], bool] | None) -> bool:
     """Check if directory should be checked for README requirement."""
     if has_content_check is not None:
         return has_content_check(base_dir)
@@ -248,9 +244,7 @@ CATEGORY_KEYS = [
 ]
 
 
-def group_missing_docs(
-    missing: List[str], discovery_info: dict
-) -> dict[str, List[str]]:
+def group_missing_docs(missing: List[str], discovery_info: dict) -> dict[str, List[str]]:
     """Group missing documentation files by category."""
     grouped: dict[str, List[str]] = {label: [] for label, _ in CATEGORY_KEYS}
     for doc in missing:
