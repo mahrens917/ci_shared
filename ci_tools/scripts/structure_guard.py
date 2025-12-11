@@ -40,14 +40,24 @@ class StructureGuard(GuardRunner):
         tree = parse_python_ast(path)
         assert tree is not None  # parse_python_ast raises on error by default
         assert isinstance(tree, ast.Module)  # Type narrowing for tree.body access
+
+        source_lines = path.read_text().splitlines()
         violations: List[str] = []
         for node in tree.body:
             if isinstance(node, ast.ClassDef):
                 start, end = get_class_line_span(node)
-                length = end - start + 1
-                if length > args.max_class_lines:
+                # Count only non-blank lines (ignore blank lines and comment-only lines)
+                non_blank_count = 0
+                for line_idx in range(start - 1, end):  # Convert 1-based to 0-based
+                    if line_idx < len(source_lines):
+                        line = source_lines[line_idx].strip()
+                        # Count line if it's not blank and not a comment-only line
+                        if line and not line.startswith("#"):
+                            non_blank_count += 1
+
+                if non_blank_count > args.max_class_lines:
                     rel_path = relative_path(path, self.repo_root)
-                    violations.append(f"{rel_path}:{start} class {node.name} spans {length} lines " f"(limit {args.max_class_lines})")
+                    violations.append(f"{rel_path}:{start} class {node.name} spans {non_blank_count} significant lines " f"(limit {args.max_class_lines})")
         return violations
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
