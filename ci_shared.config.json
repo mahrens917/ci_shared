@@ -1,5 +1,5 @@
 {
-  "repo_context": "Shared CI tooling for Zeus, Kalshi, AWS, and API repositories.",
+  "repo_context": "Shared CI tooling for Zeus, Kalshi, AWS, API, common, and peak repositories.",
   "protected_path_prefixes": [
     "ci_tools/",
     "scripts/ci.sh",
@@ -22,6 +22,14 @@
     {
       "name": "aws",
       "path": "../aws"
+    },
+    {
+      "name": "common",
+      "path": "~/common"
+    },
+    {
+      "name": "peak",
+      "path": "~/peak"
     }
   ],
   "commit_message": {

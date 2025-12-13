@@ -3,7 +3,7 @@
 Propagate ci_shared updates to consuming repositories.
 
 After ci_shared is successfully pushed, this script copies the canonical CI files
-into all consuming repositories (api, zeus, kalshi, aws) and pushes the changes.
+into all consuming repositories (api, zeus, kalshi, aws, common, peak) and pushes the changes.
 Repositories that are explicitly blocked (for example, personal chess/tictactoe
 checkouts) are skipped automatically to avoid unintended pushes.
 """

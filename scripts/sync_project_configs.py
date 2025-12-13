@@ -2,7 +2,7 @@
 """Sync shared CI config files into one or more project directories.
 
 Typical usage:
-    python scripts/sync_project_configs.py ~/zeus ~/aws ~/kalshi
+    python scripts/sync_project_configs.py ~/zeus ~/aws ~/kalshi ~/common ~/peak
 
 The script copies a curated set of config files from the local ci_shared repo
 into each target project. Files are only overwritten when the source content
@@ -204,7 +204,7 @@ def main(argv: Iterable[str]) -> int:
     for project in projects:
         project_root = Path(project).expanduser().resolve()
         if not project_root.exists():
-            summary.append(SyncResult(project_root, project_root, "skipped", "project missing"))
+            summary.append(SyncResult(project_root, project_root, Path("."), "skipped", "project missing"))
             continue
 
         summary.extend(

@@ -34,10 +34,10 @@ Distributes shared config files (e.g. `.gitleaks.toml`, `ci_shared.mk`, `shared-
 **Usage examples:**
 ```bash
 # Preview what would change
-python scripts/sync_project_configs.py --dry-run ~/zeus ~/aws ~/kalshi
+python scripts/sync_project_configs.py --dry-run ~/zeus ~/aws ~/kalshi ~/common ~/peak
 
 # Apply updates and keep backups with .bak suffix
-python scripts/sync_project_configs.py ~/zeus ~/aws ~/kalshi --backup-suffix .bak
+python scripts/sync_project_configs.py ~/zeus ~/aws ~/kalshi ~/common ~/peak --backup-suffix .bak
 ```
 
 **Flags:**
