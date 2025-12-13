@@ -16,6 +16,23 @@ from ci_tools.scripts.guard_common import (
 )
 
 
+def _iter_toplevel_classes(tree: ast.Module) -> List[ast.ClassDef]:
+    return [node for node in tree.body if isinstance(node, ast.ClassDef)]
+
+
+def _count_significant_lines(source_lines: List[str], start: int, end: int) -> int:
+    if start > end:
+        return 0
+
+    last_line_index = min(end, len(source_lines))
+    count = 0
+    for line in source_lines[start - 1 : last_line_index]:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            count += 1
+    return count
+
+
 class StructureGuard(GuardRunner):
     """Guard that detects oversized Python classes."""
 
@@ -43,21 +60,15 @@ class StructureGuard(GuardRunner):
 
         source_lines = path.read_text().splitlines()
         violations: List[str] = []
-        for node in tree.body:
-            if isinstance(node, ast.ClassDef):
-                start, end = get_class_line_span(node)
-                # Count only non-blank lines (ignore blank lines and comment-only lines)
-                non_blank_count = 0
-                for line_idx in range(start - 1, end):  # Convert 1-based to 0-based
-                    if line_idx < len(source_lines):
-                        line = source_lines[line_idx].strip()
-                        # Count line if it's not blank and not a comment-only line
-                        if line and not line.startswith("#"):
-                            non_blank_count += 1
-
-                if non_blank_count > args.max_class_lines:
-                    rel_path = relative_path(path, self.repo_root)
-                    violations.append(f"{rel_path}:{start} class {node.name} spans {non_blank_count} significant lines " f"(limit {args.max_class_lines})")
+        max_class_lines = args.max_class_lines
+        for class_node in _iter_toplevel_classes(tree):
+            start, end = get_class_line_span(class_node)
+            significant_lines = _count_significant_lines(source_lines, start, end)
+            if significant_lines > max_class_lines:
+                rel_path = relative_path(path, self.repo_root)
+                violations.append(
+                    f"{rel_path}:{start} class {class_node.name} spans {significant_lines} significant lines " f"(limit {max_class_lines})"
+                )
         return violations
 
     def get_violations_header(self, args: argparse.Namespace) -> str:
