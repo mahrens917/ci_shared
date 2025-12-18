@@ -147,7 +147,7 @@ skips = [
     "B607",  # start_process_with_partial_path - standard system commands (git, etc.)
     "B608",  # hardcoded_sql_expressions - false positive with internal field names
 ]
-exclude_dirs = ["/vendor/", "/.venv/", "/venv/", "/artifacts/", "/trash/", "/models/", "/logs/"]
+exclude_dirs = ["/vendor/", "/.venv/", "/venv/", "/artifacts/", "/trash/", "/models/", "/logs/", "/data/"]
 
 [tool.ruff]
 extend-exclude = ["ci_tools/vendor"]

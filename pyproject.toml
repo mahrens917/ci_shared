@@ -78,6 +78,7 @@ exclude_dirs = [
     "/trash/",
     "/models/",
     "/logs/",
+    "/data/",
 ]
 skips = [
     "B101",
