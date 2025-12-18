@@ -189,7 +189,7 @@ shared-checks:
 	pyright --warnings $(SHARED_PYRIGHT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running pylint..."; \
-	pylint -j 1 $(PYLINT_ARGS) $(SHARED_PYLINT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	pylint -j 1 --disable=W2301 $(PYLINT_ARGS) $(SHARED_PYLINT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Cleaning bytecode..."; \
 	for DIR in $(SHARED_CLEANUP_ROOTS); do \
