@@ -170,6 +170,10 @@ max-statements = 50
 [tool.pylint.MAIN]
 init-hook = "import sys; sys.path.insert(0, 'tests')"
 
+[tool.pylint.format]
+# Match black's line length setting
+max-line-length = 140
+
 [tool.pylint.BASIC]
 # Allow ast.NodeVisitor method naming pattern (visit_Name, visit_If, etc.)
 method-rgx = "([a-z_][a-z0-9_]*|visit_[A-Z][A-Za-z]*)"
