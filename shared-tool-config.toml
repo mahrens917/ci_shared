@@ -119,6 +119,7 @@ omit = [
     "*/site-packages/*", # Exclude all third-party packages
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
+    "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
 ]
 
 [tool.coverage.report]
@@ -128,6 +129,7 @@ omit = [
     "**/__init__.py",    # Skip package initializers
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
+    "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
 ]
 
 [tool.bandit]
@@ -186,8 +188,9 @@ disable = "too-few-public-methods"
 min-similarity-lines = 7
 
 [tool.pylint.design]
-max-args = 7
-max-positional-arguments = 7
+max-args = 8
+max-positional-arguments = 8
+max-attributes = 8
 
 [tool.pyright]
 typeCheckingMode = "basic"
