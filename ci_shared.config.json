@@ -1,5 +1,5 @@
 {
-  "repo_context": "Shared CI tooling for Zeus, Kalshi, AWS, API, common, and peak repositories.",
+  "repo_context": "Shared CI tooling for Zeus, Monitor, AWS, API, common, peak, and service repositories (cfb, deribit, kalshi, pdf, tracker, weather).",
   "protected_path_prefixes": [
     "ci_tools/",
     "scripts/ci.sh",
@@ -9,27 +9,51 @@
   "consuming_repositories": [
     {
       "name": "api",
-      "path": "../api"
+      "path": "~/projects/api"
     },
     {
       "name": "zeus",
-      "path": "../zeus"
+      "path": "~/projects/zeus"
     },
     {
-      "name": "kalshi",
-      "path": "../kalshi"
+      "name": "monitor",
+      "path": "~/projects/monitor"
     },
     {
       "name": "aws",
-      "path": "../aws"
+      "path": "~/projects/aws"
     },
     {
       "name": "common",
-      "path": "~/common"
+      "path": "~/projects/common"
     },
     {
       "name": "peak",
-      "path": "~/peak"
+      "path": "~/projects/peak"
+    },
+    {
+      "name": "cfb",
+      "path": "~/projects/cfb"
+    },
+    {
+      "name": "deribit",
+      "path": "~/projects/deribit"
+    },
+    {
+      "name": "kalshi",
+      "path": "~/projects/kalshi"
+    },
+    {
+      "name": "pdf",
+      "path": "~/projects/pdf"
+    },
+    {
+      "name": "tracker",
+      "path": "~/projects/tracker"
+    },
+    {
+      "name": "weather",
+      "path": "~/projects/weather"
     }
   ],
   "commit_message": {
