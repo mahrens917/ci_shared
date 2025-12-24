@@ -31,6 +31,7 @@ DEFAULT_FILES = [
 
 PROXY_MAPPINGS = {
     "ci_tools_proxy/__init__.py": Path("ci_tools") / "__init__.py",
+    "scripts_proxy/ci.sh": Path("scripts") / "ci.sh",
 }
 
 DEFAULT_SUBDIRS = ["ci_shared"]
