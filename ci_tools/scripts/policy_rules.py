@@ -26,6 +26,7 @@ from .policy_collectors_text import (
     scan_keywords,
 )
 from .policy_context import (
+    ALLOWED_SUPPRESSION_TOKENS,
     FUNCTION_LENGTH_THRESHOLD,
     FunctionEntry,
 )
@@ -156,7 +157,11 @@ def _check_suppressions() -> None:
     suppressions = collect_suppressions()
     if not suppressions:
         return
-    details = "\n".join(f"{path}:{lineno} -> suppression token '{token}' detected" for path, lineno, token in sorted(suppressions))
+    # Filter out allowed policy_guard suppression tokens
+    filtered = [(path, lineno, token) for path, lineno, token in suppressions if token not in ALLOWED_SUPPRESSION_TOKENS]
+    if not filtered:
+        return
+    details = "\n".join(f"{path}:{lineno} -> suppression token '{token}' detected" for path, lineno, token in sorted(filtered))
     raise PolicyViolation("Suppression policy violations detected:\n" + details)
 
 

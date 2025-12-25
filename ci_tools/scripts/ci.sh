@@ -9,7 +9,7 @@ fi
 set -euo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-CI_SHARED_ROOT="${CI_SHARED_ROOT:-${HOME}/ci_shared}"
+CI_SHARED_ROOT="${CI_SHARED_ROOT:-${HOME}/projects/ci_shared}"
 if [[ ! -d "${CI_SHARED_ROOT}" ]]; then
   echo "Shared CI root not found at ${CI_SHARED_ROOT}. Set CI_SHARED_ROOT to your ci_shared checkout." >&2
   exit 1

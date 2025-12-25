@@ -35,7 +35,18 @@ FLAGGED_TOKENS = ("TODO", "FIXME", "HACK", "WORKAROUND", "LEGACY", "DEPRECATED")
 FUNCTION_LENGTH_THRESHOLD = 150
 BROAD_EXCEPT_SUPPRESSION = "policy_guard: allow-broad-except"
 SILENT_HANDLER_SUPPRESSION = "policy_guard: allow-silent-handler"
-SUPPRESSION_PATTERNS: tuple[str, ...] = ("# noqa", "pylint: disable")
+SUPPRESSION_PATTERNS: tuple[str, ...] = (
+    "# noqa",
+    "pylint: disable",
+    "policy_guard: allow-silent-handler",
+    "policy_guard: allow-broad-except",
+)
+# Tokens that are allowed (exempted from suppression violations)
+# Only specific policy_guard tokens are allowed; generic suppressions like # noqa are banned
+ALLOWED_SUPPRESSION_TOKENS: tuple[str, ...] = (
+    "policy_guard: allow-silent-handler",
+    "policy_guard: allow-broad-except",
+)
 FORBIDDEN_SYNC_CALLS: tuple[str, ...] = (
     "time.sleep",
     "subprocess.run",
@@ -313,6 +324,7 @@ __all__ = [
     "BROAD_EXCEPT_SUPPRESSION",
     "SILENT_HANDLER_SUPPRESSION",
     "SUPPRESSION_PATTERNS",
+    "ALLOWED_SUPPRESSION_TOKENS",
     "FORBIDDEN_SYNC_CALLS",
     "LEGACY_GUARD_TOKENS",
     "LEGACY_SUFFIXES",
