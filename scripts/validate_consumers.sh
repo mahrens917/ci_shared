@@ -15,15 +15,10 @@ PARALLEL_JOBS=$(( (NUM_CORES + 1) / 2 ))
 echo "Validating ${PARALLEL_JOBS} consuming repos in parallel (${NUM_CORES} cores available)"
 echo ""
 
-# Create temp directory for logs
-LOGS_DIR="$(mktemp -d)"
+# Create persistent logs directory with timestamp to separate runs
+LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
 export LOGS_DIR
-# Don't cleanup yet - subshells may still be writing to logs
-cleanup_logs() {
-    sleep 1  # Give subshells time to finish writing
-    rm -rf "${LOGS_DIR}"
-}
-trap "cleanup_logs" EXIT
+mkdir -p "${LOGS_DIR}"
 
 # Load consuming repos
 CONSUMER_DIRS=()
@@ -76,24 +71,29 @@ run_repo_wrapper() {
     local logs_dir="$2"
     local repo_name="$3"
     local log_file="${logs_dir}/${repo_name}.log"
+    local status_file="${logs_dir}/${repo_name}.status"
+
+    echo "  [TESTING] ${repo_name}..."
 
     if [ ! -d "${repo_dir}" ]; then
-        {
-            echo "  ${repo_name}: MISSING"
-        } | tee /dev/stderr
+        echo "MISSING" > "${status_file}"
+        echo "  [MISSING] ${repo_name}"
         return 2
     fi
 
-    cd "${repo_dir}"
-    if bash scripts/ci.sh 2>&1 | tee "${log_file}"; then
-        {
-            echo "  ${repo_name}: PASS ✓"
-        } | tee /dev/stderr > /dev/null
+    if ! cd "${repo_dir}"; then
+        echo "MISSING" > "${status_file}"
+        echo "  [MISSING] ${repo_name}"
+        return 2
+    fi
+
+    if bash scripts/ci.sh > "${log_file}" 2>&1; then
+        echo "PASS" > "${status_file}"
+        echo "  [PASS] ${repo_name} ✓"
         return 0
     else
-        {
-            echo "  ${repo_name}: FAIL ✗"
-        } | tee /dev/stderr > /dev/null
+        echo "FAIL" > "${status_file}"
+        echo "  [FAIL] ${repo_name} ✗"
         return 1
     fi
 }
@@ -125,7 +125,6 @@ for repo_dir in "${CONSUMER_DIRS[@]}"; do
     done
 
     # Start new job - print output immediately
-    echo "  ${repo_name}: WORKING..." >&2
     run_repo_wrapper "${repo_dir}" "${LOGS_DIR}" "${repo_name}" &
 
     job_pids+=($!)
@@ -140,39 +139,54 @@ done
 # Collect and display final results
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Results:"
+echo "Results Summary:"
 echo ""
 
 pass_count=0
 fail_count=0
 missing_count=0
+declare -a pass_repos
+declare -a fail_repos
+declare -a missing_repos
 
 for repo_dir in "${CONSUMER_DIRS[@]}"; do
     repo_name=$(basename "${repo_dir}")
-    log_file="${LOGS_DIR}/${repo_name}.log"
+    status_file="${LOGS_DIR}/${repo_name}.status"
 
-    if [ ! -f "${log_file}" ]; then
-        echo "  ? ${repo_name}: UNKNOWN"
+    if [ ! -f "${status_file}" ]; then
+        missing_repos+=("${repo_name}")
+        ((missing_count++)) || true
         continue
     fi
 
-    # Check if script completed successfully (last line should be "Done.")
-    if tail -1 "${log_file}" 2>/dev/null | grep -q "^Done\.$"; then
-        echo "  ✓ ${repo_name}: PASS"
-        ((pass_count++))
-    elif grep -q "scripts/ci.sh: Shared CI script not found" "${log_file}" 2>/dev/null; then
-        echo "  ? ${repo_name}: MISSING"
-        ((missing_count++))
-    else
-        # Check for errors in the last lines
-        if tail -50 "${log_file}" 2>/dev/null | grep -qiE "^(error|failed|Error|FAILED|exit code)"; then
-            echo "  ✗ ${repo_name}: FAIL"
-            ((fail_count++))
-        else
-            echo "  ✓ ${repo_name}: PASS"
-            ((pass_count++))
-        fi
-    fi
+    status=$(cat "${status_file}" 2>/dev/null || echo "UNKNOWN")
+    case "${status}" in
+        PASS)
+            pass_repos+=("${repo_name}")
+            ((pass_count++)) || true
+            ;;
+        FAIL)
+            fail_repos+=("${repo_name}")
+            ((fail_count++)) || true
+            ;;
+        MISSING)
+            missing_repos+=("${repo_name}")
+            ((missing_count++)) || true
+            ;;
+    esac
+done
+
+# Display results in compact format
+for repo in "${pass_repos[@]}"; do
+    echo "  ✓ ${repo}"
+done
+
+for repo in "${fail_repos[@]}"; do
+    echo "  ✗ ${repo}"
+done
+
+for repo in "${missing_repos[@]}"; do
+    echo "  ? ${repo}"
 done
 
 echo ""
@@ -189,13 +203,11 @@ fi
 # Show log file paths for failed repos (for debugging)
 if [ "${fail_count}" -gt 0 ]; then
     echo ""
-    echo "Failed repo logs:"
-    for repo_dir in "${CONSUMER_DIRS[@]}"; do
-        repo_name=$(basename "${repo_dir}")
-        log_file="${LOGS_DIR}/${repo_name}.log"
-        if [ -f "${log_file}" ] && ! tail -1 "${log_file}" 2>/dev/null | grep -q "^Done\.$"; then
-            echo "  ${repo_name}: ${log_file}"
-        fi
+    echo "Failed repo logs (in logs/ directory):"
+    logs_relative=$(echo "${LOGS_DIR}" | sed "s|${PROJECT_ROOT}/||")
+    for repo in "${fail_repos[@]}"; do
+        log_file="${logs_relative}/${repo}.log"
+        echo "  ${repo}: ${log_file}"
     done
 fi
 
