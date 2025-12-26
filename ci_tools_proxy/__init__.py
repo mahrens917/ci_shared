@@ -58,8 +58,16 @@ def _load_shared_package(shared_ci_tools: Path) -> ModuleType:
 
 def _bootstrap_shared_ci_tools() -> None:
     """Replace this shim module with the shared ci_tools implementation."""
+    # Detect if we're already in the canonical ci_shared location to avoid infinite recursion
+    current_file = Path(__file__).resolve()
     shared_root = _resolve_shared_root()
     shared_ci_tools = shared_root / "ci_tools"
+    shared_init = shared_ci_tools / "__init__.py"
+
+    if current_file == shared_init.resolve():
+        # Already running from the canonical location; no redirection needed
+        return
+
     if not shared_ci_tools.exists():
         msg = (
             f"Shared ci_tools directory not found at {shared_ci_tools}. "

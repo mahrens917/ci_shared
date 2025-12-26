@@ -1,4 +1,4 @@
-"""Unit tests for ci_tools.ci_runtime module."""
+"""Unit tests for ci_tools.ci_runtime module and ci_tools.ci re-exports."""
 
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ from ci_tools.ci_runtime.workflow import (
 )
 from ci_tools.ci_runtime import workflow, process, patching, messaging
 import ci_tools.ci_runtime as ci_module
+import ci_tools.ci as ci_reexport_module
 
 
 class TestCiRuntimeExports:
@@ -220,3 +221,25 @@ class TestCiIntegration:
         """Test that ci_runtime has a module docstring."""
         assert ci_module.__doc__ is not None
         assert len(ci_module.__doc__.strip()) > 0
+
+
+class TestCiReexportModule:
+    """Tests for the ci_tools.ci re-export module."""
+
+    def test_ci_reexport_module_has_all_attribute(self):
+        """Test that ci_tools.ci defines __all__ for explicit exports."""
+        assert hasattr(ci_reexport_module, "__all__")
+        assert isinstance(ci_reexport_module.__all__, list)
+        assert len(ci_reexport_module.__all__) > 0
+
+    def test_all_items_in_reexport_all_are_exported(self):
+        """Test that every item in __all__ is actually exported."""
+        for name in ci_reexport_module.__all__:
+            assert hasattr(ci_reexport_module, name), f"{name} in __all__ but not exported"
+
+    def test_reexports_match_ci_runtime(self):
+        """Test that re-exports from ci_tools.ci match ci_tools.ci_runtime."""
+        for name in ci_reexport_module.__all__:
+            reexport_obj = getattr(ci_reexport_module, name)
+            runtime_obj = getattr(ci_module, name)
+            assert reexport_obj is runtime_obj, f"{name} differs between ci and ci_runtime"

@@ -166,24 +166,11 @@ if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
   echo "Syncing shared config files into consuming repositories..."
 
   CONSUMER_DIRS=()
-  CONSUMER_TMP="$(mktemp)"
-  if python - "${PROJECT_ROOT}" "${CONSUMER_TMP}" <<'PY'; then
-import sys
-from pathlib import Path
-from ci_tools.utils.consumers import load_consuming_repos
-
-repo_root = Path(sys.argv[1]).resolve()
-output_file = Path(sys.argv[2])
-repos = load_consuming_repos(repo_root)
-with output_file.open("w", encoding="utf-8") as handle:
-    for repo in repos:
-        handle.write(f"{repo.path}\n")
-PY
-    mapfile -t CONSUMER_DIRS < "${CONSUMER_TMP}" 2>/dev/null || CONSUMER_DIRS=()
+  if CONSUMER_OUTPUT=$(python "${CI_SHARED_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
+    mapfile -t CONSUMER_DIRS <<< "${CONSUMER_OUTPUT}"
   else
     echo "⚠️  Failed to resolve consuming repositories; skipping sync." >&2
   fi
-  rm -f "${CONSUMER_TMP}"
 
   if [ "${#CONSUMER_DIRS[@]}" -eq 0 ]; then
     echo "No consuming repositories configured; update ci_shared.config.json if needed."

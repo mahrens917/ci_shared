@@ -6,6 +6,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${PROJECT_ROOT}"
+export CI_SHARED_ROOT="${PROJECT_ROOT}"
 
 # Calculate parallelism: 50% of available cores, minimum 1
 NUM_CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
@@ -20,35 +21,18 @@ LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
 export LOGS_DIR
 mkdir -p "${LOGS_DIR}"
 
-# Load consuming repos
-CONSUMER_DIRS=()
-CONSUMER_TMP="$(mktemp)"
-if python - "${PROJECT_ROOT}" "${CONSUMER_TMP}" <<'PY'; then
-import sys
-from pathlib import Path
-from ci_tools.utils.consumers import load_consuming_repos
-
-repo_root = Path(sys.argv[1]).resolve()
-output_file = Path(sys.argv[2])
-try:
-    repos = load_consuming_repos(repo_root)
-    with output_file.open("w", encoding="utf-8") as handle:
-        for repo in repos:
-            handle.write(f"{repo.path}\n")
-except Exception as e:
-    print(f"Error: {e}", file=sys.stderr)
-    sys.exit(1)
-PY
-    mapfile -t CONSUMER_DIRS < "${CONSUMER_TMP}" 2>/dev/null || CONSUMER_DIRS=()
+# Load consuming repos (ci_shared first, then consumers from config)
+CONSUMER_DIRS=("${PROJECT_ROOT}")
+if CONSUMER_OUTPUT=$(python "${PROJECT_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
+    mapfile -t EXTRA_DIRS <<< "${CONSUMER_OUTPUT}"
+    CONSUMER_DIRS+=("${EXTRA_DIRS[@]}")
 else
-    echo "Failed to load consuming repositories" >&2
-    rm -f "${CONSUMER_TMP}"
+    echo "Failed to load consuming repositories: ${CONSUMER_OUTPUT}" >&2
     exit 1
 fi
-rm -f "${CONSUMER_TMP}"
 
 if [ "${#CONSUMER_DIRS[@]}" -eq 0 ]; then
-    echo "No consuming repositories configured."
+    echo "No repositories to validate."
     exit 0
 fi
 

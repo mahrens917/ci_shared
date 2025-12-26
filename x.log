@@ -1,0 +1,159 @@
+Syncing pyproject.toml tool configuration with shared template...
+✓ Tool configurations in pyproject.toml match shared config
+Running make check...
+Running shared CI checks...
+→ Running isort...
+→ Running black...
+All done! ✨ 🍰 ✨
+55 files left unchanged.
+→ Running codespell...
+→ Running vulture...
+→ Running deptry...
+Scanning 56 files...
+
+[1m[32mSuccess! No dependency issues found.[m
+→ Running gitleaks...
+  → scanning ci_tools
+  → scanning tests
+  → scanning scripts
+  → scanning docs
+  → scanning ci_tools
+  → scanning ci_tools_proxy
+  → scanning ci_shared.mk
+  → scanning shared-tool-config.toml
+  → scanning pyproject.toml
+  → scanning Makefile
+  → scanning README.md
+  → scanning SECURITY.md
+→ Running bandit...
+→ Running safety...
+Safety 3.6.2 scanning /Users/mahrens917/projects/ci_shared
+2025-12-26 05:25:33 UTC
+
+Account: Michael Ahrens, mahrens917@gmail.com 
+Project: ci-shared
+ Git branch: main
+ Environment: Stage.development
+ Scan policy: fetched from Safety Platform, ignoring any local Safety 
+CLI policy files
+
+Python detected. Found 1 Python pyproject.toml file and 1 Python 
+requirement file
+
+✅ pyproject.toml: No issues found.
+
+✅ scripts/requirements.txt: No issues found.
+
+Tested 22 dependencies for security issues using policy fetched from 
+Safety Platform
+7 vulnerabilities found, 7 ignored due to policy.
+0 fixes suggested, resolving 0 vulnerabilities.
+
+Project dashboard: 
+https://platform.safetycli.com/codebases/ci-shared/findings?branch=mai
+n
+→ Running policy_guard...
+→ Running data_guard...
+→ Running structure_guard...
+→ Running complexity_guard...
+✓ All functions meet complexity limits (cyclomatic ≤10, cognitive ≤15)
+→ Running module_guard...
+→ Running function_size_guard...
+→ Running inheritance_guard...
+→ Running method_count_guard...
+→ Running dependency_guard...
+→ Running unused_module_guard...
+Checking for unused modules in ci_tools...
+✅ No unused modules found
+→ Running documentation_guard...
+✅ documentation_guard: All required documentation present
+   (3 docs verified)
+→ Running ruff...
+All checks passed!
+→ Running pyright...
+0 errors, 0 warnings, 0 informations
+→ Running pylint...
+
+--------------------------------------------------------------------
+Your code has been rated at 10.00/10 (previous run: 10.00/10, +0.00)
+
+→ Cleaning bytecode...
+→ Running pytest...
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 19%]
+........................................................................ [ 25%]
+........................................................................ [ 32%]
+........................................................................ [ 38%]
+........................................................................ [ 45%]
+........................................................................ [ 51%]
+........................................................................ [ 58%]
+........................................................................ [ 64%]
+........................................................................ [ 71%]
+........................................................................ [ 77%]
+........................................................................ [ 84%]
+........................................................................ [ 90%]
+........................................................................ [ 97%]
+.................................                                        [100%]
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.12.11-final-0 _______________
+
+Name                                          Stmts   Miss  Cover
+-----------------------------------------------------------------
+ci_tools/_messages.py                             7      0   100%
+ci_tools/ci.py                                    3      0   100%
+ci_tools/ci_runtime/bandit_wrapper.py            46      1    98%
+ci_tools/ci_runtime/codex.py                    122     11    91%
+ci_tools/ci_runtime/config.py                    65      0   100%
+ci_tools/ci_runtime/coverage.py                  55      0   100%
+ci_tools/ci_runtime/environment.py               24      0   100%
+ci_tools/ci_runtime/failures.py                  40      0   100%
+ci_tools/ci_runtime/heuristics.py                55      0   100%
+ci_tools/ci_runtime/messaging.py                 85      1    99%
+ci_tools/ci_runtime/models.py                   221      2    99%
+ci_tools/ci_runtime/patch_cycle.py               66      1    98%
+ci_tools/ci_runtime/patching.py                  88      1    99%
+ci_tools/ci_runtime/process.py                   91     12    87%
+ci_tools/ci_runtime/workflow.py                 132      0   100%
+ci_tools/scripts/ast_utils.py                    51      9    82%
+ci_tools/scripts/cli_detection.py                52      8    85%
+ci_tools/scripts/complexity_guard.py            131     10    92%
+ci_tools/scripts/config_loader.py                23      0   100%
+ci_tools/scripts/coverage_guard.py              119     10    92%
+ci_tools/scripts/data_guard.py                  187     18    90%
+ci_tools/scripts/dependency_guard.py             62      6    90%
+ci_tools/scripts/documentation_guard.py         138      2    99%
+ci_tools/scripts/duplicate_detection.py          24      0   100%
+ci_tools/scripts/function_size_guard.py          30      1    97%
+ci_tools/scripts/generate_commit_message.py     218     38    83%
+ci_tools/scripts/guard_common.py                123      3    98%
+ci_tools/scripts/import_analysis.py              82      1    99%
+ci_tools/scripts/import_checking.py              39      3    92%
+ci_tools/scripts/inheritance_guard.py            80      2    98%
+ci_tools/scripts/method_count_guard.py           39      1    97%
+ci_tools/scripts/module_guard.py                 26      1    96%
+ci_tools/scripts/policy_checks.py                28      5    82%
+ci_tools/scripts/policy_collectors_ast.py       127     12    91%
+ci_tools/scripts/policy_collectors_text.py      100     12    88%
+ci_tools/scripts/policy_context.py              166     10    94%
+ci_tools/scripts/policy_guard.py                  6      0   100%
+ci_tools/scripts/policy_rules.py                102      1    99%
+ci_tools/scripts/policy_visitors.py             163     13    92%
+ci_tools/scripts/propagate_ci_shared.py         207     25    88%
+ci_tools/scripts/structure_guard.py              42      2    95%
+ci_tools/scripts/tool_config_guard.py           229     16    93%
+ci_tools/scripts/unused_module_guard.py          94      4    96%
+ci_tools/test_constants.py                       15      0   100%
+ci_tools/utils/consumers.py                      70      4    94%
+-----------------------------------------------------------------
+TOTAL                                          3873    246    94%
+Required test coverage of 80% reached. Total coverage: 93.65%
+============================= slowest 10 durations =============================
+
+(10 durations < 0.1s hidden.)
+1113 passed in 3.89s
+→ Running coverage_guard...
+→ Running compileall...
+
+✅ All shared CI checks passed!
+Staging repository changes...
