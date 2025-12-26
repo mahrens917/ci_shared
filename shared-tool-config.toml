@@ -170,7 +170,7 @@ max-statements = 50
 "tests/**" = ["TRY002", "TRY203", "PLR2004"]
 
 [tool.pylint.MAIN]
-init-hook = "import sys; sys.path.insert(0, 'tests')"
+init-hook = "import sys; sys.path.insert(0, 'src'); sys.path.insert(0, 'tests')"
 
 [tool.pylint.format]
 # Match black's line length setting
@@ -222,6 +222,7 @@ disable = [
     "assignment-from-no-return",
     "no-value-for-parameter",
     "invalid-overridden-method",
+    "global-statement",
 ]
 
 [tool.pylint.SIMILARITIES]
