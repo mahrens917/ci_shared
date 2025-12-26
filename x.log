@@ -157,3 +157,259 @@ Required test coverage of 80% reached. Total coverage: 93.65%
 
 ✅ All shared CI checks passed!
 Staging repository changes...
+Requesting commit message from Codex (model: gpt-5.1-codex-mini)...
+Using Codex commit summary: Updated ci_tools proxy bootstrap, CI scripts, and tests to rely on shared implementations
+Creating commit...
+[main 711420c] Updated ci_tools proxy bootstrap, CI scripts, and tests to rely on shared implementations
+ 8 files changed, 327 insertions(+), 52 deletions(-)
+ create mode 100755 scripts/list_consumers.py
+ create mode 100644 x.log
+Created commit: 711420c Updated ci_tools proxy bootstrap, CI scripts, and tests to rely on shared implementations
+Pushing to origin/main...
+To github.com:mahrens917/ci_shared.git
+   7b15966..711420c  main -> main
+
+Syncing shared config files into consuming repositories...
+
+Sync results:
+  [api] .gitleaks.toml: up-to-date
+  [api] ci_shared.mk: up-to-date
+  [api] shared-tool-config.toml: up-to-date
+  [api/ci_tools] __init__.py: up-to-date
+  [api/scripts] ci.sh: up-to-date
+  [zeus] .gitleaks.toml: up-to-date
+  [zeus] ci_shared.mk: up-to-date
+  [zeus] shared-tool-config.toml: up-to-date
+  [zeus/ci_tools] __init__.py: up-to-date
+  [zeus/scripts] ci.sh: up-to-date
+  [monitor] .gitleaks.toml: up-to-date
+  [monitor] ci_shared.mk: up-to-date
+  [monitor] shared-tool-config.toml: up-to-date
+  [monitor/ci_tools] __init__.py: updated
+  [monitor/scripts] ci.sh: up-to-date
+  [aws] .gitleaks.toml: up-to-date
+  [aws] ci_shared.mk: up-to-date
+  [aws] shared-tool-config.toml: up-to-date
+  [aws/ci_tools] __init__.py: up-to-date
+  [aws/scripts] ci.sh: up-to-date
+  [common] .gitleaks.toml: up-to-date
+  [common] ci_shared.mk: up-to-date
+  [common] shared-tool-config.toml: up-to-date
+  [common/ci_tools] __init__.py: up-to-date
+  [common/scripts] ci.sh: up-to-date
+  [peak] .gitleaks.toml: up-to-date
+  [peak] ci_shared.mk: up-to-date
+  [peak] shared-tool-config.toml: up-to-date
+  [peak/ci_tools] __init__.py: up-to-date
+  [peak/scripts] ci.sh: up-to-date
+  [cfb] .gitleaks.toml: up-to-date
+  [cfb] ci_shared.mk: up-to-date
+  [cfb] shared-tool-config.toml: up-to-date
+  [cfb/ci_tools] __init__.py: up-to-date
+  [cfb/scripts] ci.sh: up-to-date
+  [deribit] .gitleaks.toml: up-to-date
+  [deribit] ci_shared.mk: up-to-date
+  [deribit] shared-tool-config.toml: up-to-date
+  [deribit/ci_tools] __init__.py: up-to-date
+  [deribit/scripts] ci.sh: up-to-date
+  [kalshi] .gitleaks.toml: up-to-date
+  [kalshi] ci_shared.mk: up-to-date
+  [kalshi] shared-tool-config.toml: up-to-date
+  [kalshi/ci_tools] __init__.py: up-to-date
+  [kalshi/scripts] ci.sh: up-to-date
+  [pdf] .gitleaks.toml: up-to-date
+  [pdf] ci_shared.mk: up-to-date
+  [pdf] shared-tool-config.toml: up-to-date
+  [pdf/ci_tools] __init__.py: up-to-date
+  [pdf/scripts] ci.sh: up-to-date
+  [tracker] .gitleaks.toml: up-to-date
+  [tracker] ci_shared.mk: up-to-date
+  [tracker] shared-tool-config.toml: up-to-date
+  [tracker/ci_tools] __init__.py: updated
+  [tracker/scripts] ci.sh: up-to-date
+  [weather] .gitleaks.toml: up-to-date
+  [weather] ci_shared.mk: up-to-date
+  [weather] shared-tool-config.toml: up-to-date
+  [weather/ci_tools] __init__.py: up-to-date
+  [weather/scripts] ci.sh: up-to-date
+✓ Config sync complete
+
+Running shared tool-config sync in consuming repositories...
+  • /Users/mahrens917/projects/api
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/zeus
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/monitor
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/aws
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/common
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/peak
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/cfb
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/deribit
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/kalshi
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/pdf
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/tracker
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+  • /Users/mahrens917/projects/weather
+✓ Tool configurations in pyproject.toml match shared config
+    ✓ tool configuration synced
+✓ Tool-config sync complete across consuming repositories.
+
+Propagating ci_shared updates into consuming repositories...
+
+======================================================================
+Propagating ci_shared updates to consuming repositories
+======================================================================
+
+Latest ci_shared commit: Updated ci_tools proxy bootstrap, CI scripts, and tests to rely on shared implementations
+
+Consuming repos: api (/Users/mahrens917/projects/api), zeus (/Users/mahrens917/projects/zeus), monitor (/Users/mahrens917/projects/monitor), aws (/Users/mahrens917/projects/aws), common (/Users/mahrens917/projects/common), peak (/Users/mahrens917/projects/peak), cfb (/Users/mahrens917/projects/cfb), deribit (/Users/mahrens917/projects/deribit), kalshi (/Users/mahrens917/projects/kalshi), pdf (/Users/mahrens917/projects/pdf), tracker (/Users/mahrens917/projects/tracker), weather (/Users/mahrens917/projects/weather)
+
+======================================================================
+Updating ci_shared assets in api...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ api already up to date
+Reinstalling ci_shared in api...
+✓ Successfully reinstalled ci_shared in api
+
+======================================================================
+Updating ci_shared assets in zeus...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ zeus already up to date
+Reinstalling ci_shared in zeus...
+✓ Successfully reinstalled ci_shared in zeus
+
+======================================================================
+Updating ci_shared assets in monitor...
+======================================================================
+📝 monitor has uncommitted changes, committing automatically...
+✓ Successfully committed changes in monitor
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ monitor already up to date
+Reinstalling ci_shared in monitor...
+✓ Successfully reinstalled ci_shared in monitor
+
+======================================================================
+Updating ci_shared assets in aws...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ aws already up to date
+Reinstalling ci_shared in aws...
+✓ Successfully reinstalled ci_shared in aws
+
+======================================================================
+Updating ci_shared assets in common...
+======================================================================
+📝 common has uncommitted changes, committing automatically...
+✓ Successfully committed changes in common
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ common already up to date
+Reinstalling ci_shared in common...
+✓ Successfully reinstalled ci_shared in common
+
+======================================================================
+Updating ci_shared assets in peak...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ peak already up to date
+Reinstalling ci_shared in peak...
+✓ Successfully reinstalled ci_shared in peak
+
+======================================================================
+Updating ci_shared assets in cfb...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ cfb already up to date
+Reinstalling ci_shared in cfb...
+✓ Successfully reinstalled ci_shared in cfb
+
+======================================================================
+Updating ci_shared assets in deribit...
+======================================================================
+📝 deribit has uncommitted changes, committing automatically...
+✓ Successfully committed changes in deribit
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ deribit already up to date
+Reinstalling ci_shared in deribit...
+✓ Successfully reinstalled ci_shared in deribit
+
+======================================================================
+Updating ci_shared assets in kalshi...
+======================================================================
+📝 kalshi has uncommitted changes, committing automatically...
+✓ Successfully committed changes in kalshi
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ kalshi already up to date
+Reinstalling ci_shared in kalshi...
+✓ Successfully reinstalled ci_shared in kalshi
+
+======================================================================
+Updating ci_shared assets in pdf...
+======================================================================
+📝 pdf has uncommitted changes, committing automatically...
+✓ Successfully committed changes in pdf
+Syncing shared config files...
+Running tool_config_guard sync...
+Reinstalling ci_shared in pdf...
+✓ Successfully reinstalled ci_shared in pdf
+Requesting Codex commit message...
+✓ Committed shared CI updates in pdf
+✓ Pushed shared CI updates to pdf
+
+======================================================================
+Updating ci_shared assets in tracker...
+======================================================================
+📝 tracker has uncommitted changes, committing automatically...
+✓ Successfully committed changes in tracker
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ tracker already up to date
+Reinstalling ci_shared in tracker...
+✓ Successfully reinstalled ci_shared in tracker
+
+======================================================================
+Updating ci_shared assets in weather...
+======================================================================
+Syncing shared config files...
+Running tool_config_guard sync...
+✓ weather already up to date
+Reinstalling ci_shared in weather...
+✓ Successfully reinstalled ci_shared in weather
+
+======================================================================
+Propagation Summary
+======================================================================
+✅ Updated and pushed: pdf
+⊘  Skipped: api, zeus, monitor, aws, common, peak, cfb, deribit, kalshi, tracker, weather
+
+✓ Propagation complete
+Done.

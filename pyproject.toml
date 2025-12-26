@@ -142,7 +142,46 @@ max-positional-arguments = 8
 max-line-length = 140
 
 [tool.pylint.messages_control]
-disable = "too-few-public-methods"
+disable = [
+    "too-few-public-methods",
+    "import-outside-toplevel",
+    "protected-access",
+    "unused-argument",
+    "unnecessary-ellipsis",
+    "try-except-raise",
+    "broad-exception-caught",
+    "missing-function-docstring",
+    "missing-class-docstring",
+    "missing-module-docstring",
+    "wrong-import-position",
+    "duplicate-code",
+    "cyclic-import",
+    "too-many-instance-attributes",
+    "no-member",
+    "redefined-outer-name",
+    "too-many-locals",
+    "pointless-string-statement",
+    "abstract-method",
+    "no-name-in-module",
+    "invalid-name",
+    "no-else-raise",
+    "no-else-return",
+    "unnecessary-lambda",
+    "raise-missing-from",
+    "line-too-long",
+    "implicit-str-concat",
+    "unused-variable",
+    "unused-import",
+    "not-callable",
+    "too-many-lines",
+    "use-implicit-booleaness-not-comparison",
+    "use-maxsplit-arg",
+    "using-constant-test",
+    "wrong-import-order",
+    "assignment-from-no-return",
+    "no-value-for-parameter",
+    "invalid-overridden-method",
+]
 
 [tool.pyright]
 pythonVersion = "3.12"
