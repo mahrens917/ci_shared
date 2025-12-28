@@ -120,6 +120,8 @@ omit = [
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
+    "*/peak_ui/*.py",    # Exclude curses terminal UI modules (hard to unit test)
+    "*/ui.py",           # Exclude UI entrypoint scripts
 ]
 
 [tool.coverage.report]
@@ -130,6 +132,8 @@ omit = [
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
+    "*/peak_ui/*.py",    # Exclude curses terminal UI modules (hard to unit test)
+    "*/ui.py",           # Exclude UI entrypoint scripts
 ]
 
 [tool.bandit]

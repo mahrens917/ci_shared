@@ -104,6 +104,8 @@ omit = [
     "*helpers/__init__.py",
     "*/_module_references.py",
     "*/_path_init.py",
+    "*/peak_ui/*.py",
+    "*/ui.py",
 ]
 
 [tool.coverage.run]
@@ -120,6 +122,8 @@ omit = [
     "*helpers/__init__.py",
     "*/_module_references.py",
     "*/_path_init.py",
+    "*/peak_ui/*.py",
+    "*/ui.py",
 ]
 
 [tool.pylint]

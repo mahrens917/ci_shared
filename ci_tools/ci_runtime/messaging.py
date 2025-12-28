@@ -12,8 +12,6 @@ from .codex import invoke_codex
 from .models import CommitMessageError, GitCommandAbort
 from .process import run_command
 
-COMMIT_SUMMARY_MAX_LENGTH = 90
-
 
 def _format_staged_diff(staged_diff: str) -> str:
     """Format staged diff for display."""
@@ -27,10 +25,6 @@ def _commit_summary_issue(summary: str) -> str | None:
     trimmed = summary.strip()
     checks: list[tuple[bool, str]] = [
         (not trimmed, "Commit summary was blank."),
-        (
-            len(trimmed) > COMMIT_SUMMARY_MAX_LENGTH,
-            f"Commit summary exceeded {COMMIT_SUMMARY_MAX_LENGTH} characters ({len(trimmed)}).",
-        ),
         (
             ". " in trimmed,
             "Commit summary contained multiple sentences; use one concise line.",
