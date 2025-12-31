@@ -8,7 +8,7 @@ Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for 
 - `python scripts/sync_project_configs.py <consumer...>` → push updated shared assets into consuming repos.
 
 ## Code Hygiene
-- Avoid adding fallbacks, duplicate code, backward-compatibility breaks, fail-fast gaps, or dead code; if you encounter existing issues, call them out and fix them.
+- Avoid adding fallbacks, duplicate code, or backward-compatibility shims (backward compatibility is not required); call out and fix fail-fast gaps or dead code when encountered.
 - Prefer config JSON files over new environment variables; only introduce ENV when necessary and document it.
 
 ## Duplicate Code Rule

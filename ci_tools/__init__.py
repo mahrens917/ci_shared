@@ -32,7 +32,7 @@ def _resolve_shared_root() -> Path:
     env_override = os.environ.get("CI_SHARED_ROOT")
     if env_override:
         return Path(env_override).expanduser().resolve()
-    return (Path.home() / "projects" / "ci_shared").resolve()
+    return (Path.home() / "ci_shared").resolve()
 
 
 def _load_shared_package(shared_ci_tools: Path) -> ModuleType:
