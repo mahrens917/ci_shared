@@ -123,7 +123,7 @@ CI_COMMIT_REASONING=high               # Reasoning effort
 
 ### Comprehensive Guard Suite
 - **Code Quality**: complexity, module size, function length, structure
-- **Security**: gitleaks (secrets), bandit (vulnerabilities), safety (CVE database)
+- **Security**: gitleaks (secrets), bandit (vulnerabilities), pip-audit (dependency CVEs)
 - **Policy**: banned keywords, TODO markers, exception handling rules
 - **Documentation**: enforces README files for packages and domains
 - **Dependencies**: limits instantiations, validates imports
@@ -156,7 +156,7 @@ Key guard scripts live under `ci_tools/scripts/` and `scripts/`:
 - `coverage_guard.py` – enforces per-file coverage thresholds
 - `documentation_guard.py` – verifies that required docs exist
 - `scripts/complexity_guard.py` – limits cyclomatic and cognitive complexity
-- **Security**: gitleaks (secret detection), bandit (security linting), safety (dependency CVEs)
+- **Security**: gitleaks (secret detection), bandit (security linting), pip-audit (dependency CVEs)
 
 See the [Guard Suite reference](docs/guard-suite.md) and [Security Guidelines](SECURITY.md) for details.
 

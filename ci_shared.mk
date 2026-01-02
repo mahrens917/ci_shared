@@ -145,8 +145,8 @@ shared-checks:
 	$(PYTHON) -m ci_tools.ci_runtime.bandit_wrapper -c pyproject.toml -r $(FORMAT_TARGETS) -q --exclude $(BANDIT_EXCLUDE) $$BANDIT_BASELINE_FLAG || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	if [ -z "$(CI_AUTOMATION)" ]; then \
-		echo "→ Running safety..."; \
-		$(PYTHON) -m safety scan --json --cache tail || echo "⚠️  safety scan failed or rate limited"; \
+		echo "→ Running pip-audit..."; \
+		$(PYTHON) -m pip_audit --fix || echo "⚠️  pip-audit failed"; \
 	fi; \
 	\
 	echo "→ Running policy_guard..."; \

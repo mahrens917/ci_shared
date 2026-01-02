@@ -21,7 +21,7 @@ Everything below is enforced by `ci_tools/scripts/ci.sh` (which just runs `make 
 | `deptry` | `deptry --config pyproject.toml .` → dependencies declared & used consistently. |
 | `gitleaks` | Scans `src`, `tests`, `scripts`, `docs`, `ci_tools`, `shared-tool-config.toml`, etc. Never commit secrets—whitelist safe strings in `.gitleaks.toml` or `ci_tools/config/*`. |
 | `bandit` | `python -m ci_tools.scripts.bandit_wrapper -c pyproject.toml -r src tests --exclude artifacts,trash,models,logs`; skip list in `shared-tool-config.toml`. |
-| `safety` | Runs outside CI_AUTOMATION: `python -m safety scan --json --cache tail`. |
+| `pip-audit` | Runs outside CI_AUTOMATION: `python -m pip_audit`. |
 | `ruff` | `ruff check --target-version=py310 --fix src tests` with rulesets `TRY`, `C90` (McCabe ≤10), `PLR` (refactor hints). |
 | `pyright` | `pyright --warnings src` — treat warnings as failures. |
 | `pylint` | `pylint -j 7 src` plus any repo-specific arguments. Max args 7, branches 10, statements 50 (from Ruff’s Pylint profile). |

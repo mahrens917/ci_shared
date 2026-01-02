@@ -16,7 +16,7 @@
 - Search `ci_tools/` before adding helpers (`rg "def <name>" ci_tools`). Consolidate shared logic into `ci_tools/utils/` or `ci_tools/common/`, update callers to import the canonical function, and document the delegation.
 
 ## CI Contract (from `ci_tools/scripts/ci.sh`)
-- Order: `codespell` → `vulture` → `deptry` → `gitleaks` → `bandit_wrapper` → `safety scan` (skipped with `CI_AUTOMATION`) → `ruff --fix` → `pyright --warnings` → `pylint` → `pytest` → `coverage_guard` → `compileall`.
+- Order: `codespell` → `vulture` → `deptry` → `gitleaks` → `bandit_wrapper` → `pip-audit` (skipped with `CI_AUTOMATION`) → `ruff --fix` → `pyright --warnings` → `pylint` → `pytest` → `coverage_guard` → `compileall`.
 - Limits: classes ≤100 lines; functions ≤80; modules ≤400; cyclomatic ≤10 / cognitive ≤15; inheritance depth ≤2; ≤15 public / 25 total methods; ≤5 instantiations in `__init__`/`__post_init__`; `unused_module_guard --strict`; documentation guard requires README/CLAUDE/docs hierarchy.
 - Policy guard: bans `legacy`, `fallback`, `default`, `catch_all`, `failover`, `backup`, `compat`, `backwards`, `deprecated`, `legacy_mode`, `old_api`, `legacy_flag`, TODO/FIXME/HACK/WORKAROUND; no broad/empty exception handlers; no literal fallbacks in `.get`/`setdefault`/ternaries/`os.getenv`/`if x is None`; blocks `time.sleep`, `subprocess.*`, and `requests.*` inside `ci_tools`.
 - Prep: `tool_config_guard --sync` runs first; PYTHONPATH includes `ci_shared`; packaging shim activates if `packaging` is missing.

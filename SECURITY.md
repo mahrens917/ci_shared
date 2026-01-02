@@ -23,11 +23,11 @@ gitleaks detect --log-opts="--all" --verbose
 - **Config**: `pyproject.toml` `[tool.bandit]`
 - **Install**: Included in `scripts/requirements.txt`
 
-### Dependency Vulnerability Scanning - Safety
-- **Tool**: [safety](https://pyup.io/safety/) (checks PyPI packages against CVE database)
-- **When**: Interactive mode only (skipped in CI_AUTOMATION to avoid rate limits)
+### Dependency Vulnerability Scanning - pip-audit
+- **Tool**: [pip-audit](https://github.com/pypa/pip-audit) (checks PyPI packages against OSV/PyPI vulnerability databases)
+- **When**: Interactive mode only (skipped in CI_AUTOMATION)
 - **Install**: Included in `scripts/requirements.txt`
-- **Run manually**: `python -m safety scan`
+- **Run manually**: `python -m pip_audit`
 
 ## Protected Files
 
