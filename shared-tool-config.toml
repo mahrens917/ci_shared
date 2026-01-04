@@ -120,8 +120,8 @@ omit = [
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
-    "*/peak_ui/*.py",    # Exclude curses terminal UI modules (hard to unit test)
     "*/ui.py",           # Exclude UI entrypoint scripts
+    "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
 ]
 
 [tool.coverage.report]
@@ -132,8 +132,8 @@ omit = [
     "*helpers/__init__.py",    # Exclude helper module re-exports (only contain imports)
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
-    "*/peak_ui/*.py",    # Exclude curses terminal UI modules (hard to unit test)
     "*/ui.py",           # Exclude UI entrypoint scripts
+    "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
 ]
 
 [tool.bandit]
@@ -227,6 +227,7 @@ disable = [
     "no-value-for-parameter",
     "invalid-overridden-method",
     "global-statement",
+    "redefined-builtin",
 ]
 
 [tool.pylint.SIMILARITIES]
