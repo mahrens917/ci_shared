@@ -1,5 +1,5 @@
 {
-  "repo_context": "Shared CI tooling for Zeus, Monitor, AWS, API, common, peak, and service repositories (cfb, deribit, kalshi, pdf, tracker, weather).",
+  "repo_context": "Shared CI tooling for Zeus, Monitor, AWS, API, common, signals, analytics, and service repositories (cfb, deribit, kalshi, pdf, tracker, weather).",
   "protected_path_prefixes": [
     "ci_tools/",
     "scripts/ci.sh",
@@ -28,8 +28,12 @@
       "path": "~/projects/common"
     },
     {
-      "name": "peak",
-      "path": "~/projects/peak"
+      "name": "signals",
+      "path": "~/projects/signals"
+    },
+    {
+      "name": "analytics",
+      "path": "~/projects/analytics"
     },
     {
       "name": "cfb",
