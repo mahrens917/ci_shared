@@ -122,6 +122,7 @@ omit = [
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
     "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/log/core/*",       # Exclude pdf log/core modules (complex math/optimization code)
 ]
 
 [tool.coverage.report]
@@ -134,6 +135,7 @@ omit = [
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
     "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/log/core/*",       # Exclude pdf log/core modules (complex math/optimization code)
 ]
 
 [tool.bandit]
