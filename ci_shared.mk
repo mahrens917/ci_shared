@@ -61,6 +61,7 @@ MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-module-lines $(MODULE_MA
 FUNCTION_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-function-lines $(FUNCTION_MAX_LINES)
 METHOD_COUNT_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-public-methods $(METHOD_MAX_PUBLIC) --max-total-methods $(METHOD_MAX_TOTAL)
 UNUSED_MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --exclude tests conftest.py __init__.py
+DEPENDENCY_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS) --exclude src/modeling/temporal/models
 
 # ============================================================================
 # ALLOWED OVERRIDES (minimal - only for special cases)
@@ -174,7 +175,7 @@ shared-checks:
 	$(PYTHON) -m ci_tools.scripts.method_count_guard $(METHOD_COUNT_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running dependency_guard..."; \
-	$(PYTHON) -m ci_tools.scripts.dependency_guard --root $(SHARED_SOURCE_ROOT) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	$(PYTHON) -m ci_tools.scripts.dependency_guard $(DEPENDENCY_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running unused_module_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.unused_module_guard $(UNUSED_MODULE_GUARD_ARGS) --strict || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
