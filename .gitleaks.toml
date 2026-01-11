@@ -33,6 +33,8 @@ paths = [
     '''\.DS_Store$''',
     '''tests/data/parquet/''',
     '''src/weather_data_collector\.egg-info/''',
+    # Test file with ANSI escape codes in event key assertions
+    '''tests/unit/kalshi_market_updater/test_event_extractor\.py''',
 ]
 
 # Allowlist specific patterns
