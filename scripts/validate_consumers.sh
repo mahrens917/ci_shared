@@ -224,10 +224,10 @@ PROMPT_EOF
         echo "Errors:" >> "${prompt_file}"
         echo "${errors}" >> "${prompt_file}"
 
-        # Run Claude in the repo directory
+        # Run Claude in the repo directory (script -q forces TTY for streaming output)
         (
             cd "${repo_dir}"
-            claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
+            script -q /dev/null claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
         )
 
         rm -f "${prompt_file}"
