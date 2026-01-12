@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts import data_guard
 from ci_tools.scripts.guard_common import parse_python_ast, relative_path
 

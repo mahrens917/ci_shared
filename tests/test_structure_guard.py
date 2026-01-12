@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from unittest.mock import patch
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts.structure_guard import StructureGuard
 
 

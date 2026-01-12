@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts.cli_detection import (
     has_class_main_call,
     has_main_function,

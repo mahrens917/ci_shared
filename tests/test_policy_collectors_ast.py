@@ -6,7 +6,7 @@ import ast
 
 import pytest
 
-from conftest import (
+from tests.conftest import (
     assert_collector_finds_issue,
     assert_collector_finds_reason,
     write_module,

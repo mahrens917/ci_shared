@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts import function_size_guard
 from ci_tools.scripts.guard_common import count_ast_node_lines
 

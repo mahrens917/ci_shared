@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts import unused_module_guard
 from ci_tools.scripts.duplicate_detection import (
     SUSPICIOUS_PATTERNS,

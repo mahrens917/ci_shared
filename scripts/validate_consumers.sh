@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # Validate all consuming repositories after pushing ci_shared config updates.
 # Runs `scripts/ci.sh` in each consuming repo in parallel with live status reporting.
-# If validation fails, automatically invokes Claude (haiku) to fix issues and retries.
+# If validation fails, automatically invokes Claude (opus) to fix issues, then exits.
 
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${PROJECT_ROOT}"
 export CI_SHARED_ROOT="${PROJECT_ROOT}"
-
-# Auto-fix configuration
-MAX_FIX_ITERATIONS=5
 
 # Calculate parallelism: 50% of available cores, minimum 1
 NUM_CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
@@ -230,7 +227,7 @@ PROMPT_EOF
         # Run Claude in the repo directory
         (
             cd "${repo_dir}"
-            claude -p "$(cat "${prompt_file}")" --model haiku --dangerously-skip-permissions 2>&1 || true
+            claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
         )
 
         rm -f "${prompt_file}"
@@ -300,27 +297,12 @@ run_validation
 
 display_results
 
-# Auto-fix loop
-fix_iteration=0
-while [ "${fail_count}" -gt 0 ] && [ "${fix_iteration}" -lt "${MAX_FIX_ITERATIONS}" ]; do
-    ((fix_iteration++)) || true
-
+# Auto-fix failed repos (single pass, then exit)
+if [ "${fail_count}" -gt 0 ]; then
     attempt_auto_fixes
-
-    run_validation "Re-validation after auto-fix (attempt ${fix_iteration}/${MAX_FIX_ITERATIONS})"
-
-    display_results
-done
-
-# Final status
-if [ "${fail_count}" -eq 0 ]; then
-    if [ "${fix_iteration}" -gt 0 ]; then
-        echo ""
-        echo "All issues resolved after ${fix_iteration} auto-fix iteration(s)."
-    fi
-    exit 0
-else
     echo ""
-    echo "Still ${fail_count} failing repo(s) after ${MAX_FIX_ITERATIONS} auto-fix attempts."
+    echo "Auto-fix complete. Re-run to verify fixes."
     exit 1
 fi
+
+exit 0

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import assert_collector_finds_token, write_module
+from tests.conftest import assert_collector_finds_token, write_module
 from ci_tools.scripts.policy_collectors_text import (
     collect_flagged_tokens,
     collect_legacy_configs,

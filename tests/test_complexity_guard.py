@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import write_module
+from tests.conftest import write_module
 from ci_tools.scripts import complexity_guard
 from ci_tools.test_constants import get_constant
 
