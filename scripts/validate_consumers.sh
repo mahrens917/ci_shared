@@ -303,7 +303,7 @@ display_results
 # Auto-fix loop
 fix_iteration=0
 while [ "${fail_count}" -gt 0 ] && [ "${fix_iteration}" -lt "${MAX_FIX_ITERATIONS}" ]; do
-    ((fix_iteration++))
+    ((fix_iteration++)) || true
 
     attempt_auto_fixes
 
