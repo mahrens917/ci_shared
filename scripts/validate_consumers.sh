@@ -224,18 +224,21 @@ PROMPT_EOF
         echo "Errors:" >> "${prompt_file}"
         echo "${errors}" >> "${prompt_file}"
 
-        # Log the prompt being sent to Claude
-        local claude_input_log="${LOGS_DIR}/${repo_name}.claude_input.log"
-        local claude_output_log="${LOGS_DIR}/${repo_name}.claude_output.log"
-        cp "${prompt_file}" "${claude_input_log}"
-        echo "  [INPUT] ${claude_input_log}"
+        # Display the prompt being sent to Claude
+        echo ""
+        echo "━━━ CLAUDE INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "${prompt_file}"
+        echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "━━━ CLAUDE OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         # Run Claude in the repo directory (script -q forces TTY for streaming output)
+        local claude_output_log="${LOGS_DIR}/${repo_name}.claude_output.log"
         (
             cd "${repo_dir}"
-            script -q /dev/null claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 | tee "${claude_output_log}" || true
+            script -q "${claude_output_log}" claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
         )
-        echo "  [OUTPUT] ${claude_output_log}"
+        echo "━━━ END OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         rm -f "${prompt_file}"
         echo "  [DONE] ${repo_name}"
