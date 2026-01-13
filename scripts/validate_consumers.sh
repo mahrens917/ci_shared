@@ -211,10 +211,11 @@ attempt_auto_fixes() {
         # grep -v returns exit code 1 if no lines selected; protect with || true
         filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "${log_file}" || true)
         # Take first 50 lines (early failures) + last 300 filtered lines
+        # Use printf instead of echo to avoid SIGPIPE with large output and pipefail
         local head_part
-        head_part=$(echo "${filtered_log}" | head -50)
+        head_part=$(printf '%s\n' "${filtered_log}" | head -50 || true)
         local tail_part
-        tail_part=$(echo "${filtered_log}" | tail -300)
+        tail_part=$(printf '%s\n' "${filtered_log}" | tail -300 || true)
         errors="${head_part}
 
 [... middle of log omitted ...]
