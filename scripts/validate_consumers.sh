@@ -208,7 +208,8 @@ attempt_auto_fixes() {
         # Coverage lines look like: "src/foo.py    100    10    90%"
         local errors
         local filtered_log
-        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "${log_file}")
+        # grep -v returns exit code 1 if no lines selected; protect with || true
+        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "${log_file}" || true)
         # Take first 50 lines (early failures) + last 300 filtered lines
         local head_part
         head_part=$(echo "${filtered_log}" | head -50)
@@ -246,10 +247,11 @@ PROMPT_EOF
 
         # Run Claude in the repo directory (script -q forces TTY for streaming output)
         local claude_output_log="${LOGS_DIR}/${repo_name}.claude_output.log"
+        # Protect subshell so failures don't exit the main script
         (
-            cd "${repo_dir}"
+            cd "${repo_dir}" || exit 1
             script -q "${claude_output_log}" claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
-        )
+        ) || echo "  [WARN] Claude invocation failed for ${repo_name}"
         echo "━━━ END OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         rm -f "${prompt_file}"
