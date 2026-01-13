@@ -209,7 +209,8 @@ attempt_auto_fixes() {
         local errors
         local filtered_log
         # grep -v returns exit code 1 if no lines selected; protect with || true
-        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "${log_file}" || true)
+        # Filter out coverage table lines and PASSED test lines
+        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|PASSED' "${log_file}" || true)
         # Take first 50 lines (early failures) + last 300 filtered lines
         # Use printf instead of echo to avoid SIGPIPE with large output and pipefail
         local head_part
