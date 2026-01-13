@@ -204,9 +204,21 @@ attempt_auto_fixes() {
 
         echo "  [FIXING] ${repo_name}..."
 
-        # Extract last 200 lines of errors for context
+        # Extract actual errors, filtering out coverage table noise
+        # Coverage lines look like: "src/foo.py    100    10    90%"
         local errors
-        errors=$(tail -200 "${log_file}")
+        local filtered_log
+        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "${log_file}")
+        # Take first 50 lines (early failures) + last 300 filtered lines
+        local head_part
+        head_part=$(echo "${filtered_log}" | head -50)
+        local tail_part
+        tail_part=$(echo "${filtered_log}" | tail -300)
+        errors="${head_part}
+
+[... middle of log omitted ...]
+
+${tail_part}"
 
         # Create a temp file with the prompt to avoid escaping issues
         local prompt_file
