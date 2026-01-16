@@ -39,6 +39,7 @@ config.json
 # CI runtime files (logs and temp files)
 .xci/
 .xci.log
+.ci_check_marker
 
 # Python cache and build artifacts
 __pycache__/

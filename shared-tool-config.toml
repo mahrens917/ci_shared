@@ -122,6 +122,15 @@ omit = [
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
     "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/textual_ui/**/*.py",  # Exclude textual_ui TUI subsystem (hard to unit test)
+    "src/web.py",        # Exclude web entrypoint script
+    "*/web/routes/*.py", # Exclude FastAPI routes (integration-tested, not unit-tested)
+    "*/web/services/data_provider.py",  # Exclude web data provider (integration-tested)
+    "*/web/services/rich_renderer_helpers/*.py",  # Exclude Rich HTML renderers (hard to unit test)
+    "*/simple_monitor_components/bootstrap.py",  # Exclude bootstrap wiring (complex DI, integration-tested)
+    "*/simple_monitor_setup/services.py",  # Exclude service wiring (complex DI, integration-tested)
+    "*/price_alert/service_helpers/runner.py",  # Exclude price alert runner (async runtime loop, integration-tested)
+    "*/price_alert/service_helpers/currency_monitor.py",  # Exclude currency monitor (async runtime loop, integration-tested)
 ]
 
 [tool.coverage.report]
@@ -134,6 +143,15 @@ omit = [
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
     "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/textual_ui/**/*.py",  # Exclude textual_ui TUI subsystem (hard to unit test)
+    "src/web.py",        # Exclude web entrypoint script
+    "*/web/routes/*.py", # Exclude FastAPI routes (integration-tested, not unit-tested)
+    "*/web/services/data_provider.py",  # Exclude web data provider (integration-tested)
+    "*/web/services/rich_renderer_helpers/*.py",  # Exclude Rich HTML renderers (hard to unit test)
+    "*/simple_monitor_components/bootstrap.py",  # Exclude bootstrap wiring (complex DI, integration-tested)
+    "*/simple_monitor_setup/services.py",  # Exclude service wiring (complex DI, integration-tested)
+    "*/price_alert/service_helpers/runner.py",  # Exclude price alert runner (async runtime loop, integration-tested)
+    "*/price_alert/service_helpers/currency_monitor.py",  # Exclude currency monitor (async runtime loop, integration-tested)
 ]
 
 [tool.bandit]

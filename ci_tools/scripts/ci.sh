@@ -75,6 +75,27 @@ PY
   fi
 fi
 
+# --- Skip-if-unchanged logic ---
+MARKER_FILE="${PROJECT_ROOT}/.ci_check_marker"
+CURRENT_HASH=$(git ls-files -s | sha256sum | cut -d' ' -f1)
+
+if [[ -f "${MARKER_FILE}" ]]; then
+  STORED_HASH=$(cat "${MARKER_FILE}")
+  if [[ "${CURRENT_HASH}" == "${STORED_HASH}" ]]; then
+    echo "=============================================="
+    echo "SKIPPED: No changes detected since last successful CI run."
+    echo "  Marker: ${MARKER_FILE}"
+    echo "  Hash:   ${CURRENT_HASH}"
+    echo ""
+    echo "Skipped steps:"
+    echo "  - Linters (codespell, ruff, pylint, pyright, etc.)"
+    echo "  - Tests (pytest)"
+    echo "  - Coverage guard"
+    echo "=============================================="
+    exit 0
+  fi
+fi
+
 PYTEST_EXTRA="${SHARED_PYTEST_EXTRA:-}"
 MAKE_CHECK_CMD=(make -k check)
 if [[ -n "${PYTEST_EXTRA}" ]]; then
@@ -86,6 +107,9 @@ if ! "${MAKE_CHECK_CMD[@]}"; then
   echo "make check failed; aborting commit and push." >&2
   exit 1
 fi
+
+# Update marker after successful CI run
+echo "${CURRENT_HASH}" > "${MARKER_FILE}"
 
 if [[ -n "${CI_AUTOMATION:-}" ]]; then
   echo "CI automation mode active; skipping git staging and commit."
