@@ -77,15 +77,16 @@ fi
 
 # --- Skip-if-unchanged logic ---
 MARKER_FILE="${PROJECT_ROOT}/.ci_check_marker"
-CURRENT_HASH=$(git ls-files -s | sha256sum | cut -d' ' -f1)
+CURRENT_COMMIT=$(git rev-parse HEAD)
 
 if [[ -f "${MARKER_FILE}" ]]; then
-  STORED_HASH=$(cat "${MARKER_FILE}")
-  if [[ "${CURRENT_HASH}" == "${STORED_HASH}" ]]; then
+  STORED_COMMIT=$(cat "${MARKER_FILE}")
+  # Skip only if on the same commit AND working tree is clean
+  if [[ "${CURRENT_COMMIT}" == "${STORED_COMMIT}" ]] && [[ -z "$(git status --porcelain)" ]]; then
     echo "=============================================="
     echo "SKIPPED: No changes detected since last successful CI run."
     echo "  Marker: ${MARKER_FILE}"
-    echo "  Hash:   ${CURRENT_HASH}"
+    echo "  Commit: ${CURRENT_COMMIT}"
     echo ""
     echo "Skipped steps:"
     echo "  - Linters (codespell, ruff, pylint, pyright, etc.)"
@@ -108,11 +109,10 @@ if ! "${MAKE_CHECK_CMD[@]}"; then
   exit 1
 fi
 
-# Update marker after successful CI run
-echo "${CURRENT_HASH}" > "${MARKER_FILE}"
-
 if [[ -n "${CI_AUTOMATION:-}" ]]; then
   echo "CI automation mode active; skipping git staging and commit."
+  # Update marker with current commit (no new commit will be made)
+  echo "$(git rev-parse HEAD)" > "${MARKER_FILE}"
   exit 0
 fi
 
@@ -121,6 +121,8 @@ git add -A
 
 if git diff --cached --quiet; then
   echo "No staged changes detected; nothing to commit." >&2
+  # Update marker with current commit
+  echo "$(git rev-parse HEAD)" > "${MARKER_FILE}"
   exit 0
 fi
 
@@ -178,6 +180,9 @@ else
 fi
 LAST_COMMIT_SUMMARY="$(git log -1 --oneline | head -n 1)"
 echo "Created commit: ${LAST_COMMIT_SUMMARY}"
+
+# Update marker with new commit SHA
+echo "$(git rev-parse HEAD)" > "${MARKER_FILE}"
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
