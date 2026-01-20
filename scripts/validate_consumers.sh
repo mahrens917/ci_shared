@@ -36,9 +36,11 @@ fi
 
 # Global arrays for tracking results (populated by run_validation)
 declare -a pass_repos
+declare -a skip_repos
 declare -a fail_repos
 declare -a missing_repos
 pass_count=0
+skip_count=0
 fail_count=0
 missing_count=0
 
@@ -65,8 +67,14 @@ run_repo_wrapper() {
     fi
 
     if bash scripts/ci.sh > "${log_file}" 2>&1; then
-        echo "PASS" > "${status_file}"
-        echo "  [PASS] ${repo_name} ✓"
+        # Check if CI was skipped (no changes since last run)
+        if grep -q "^SKIPPED:" "${log_file}"; then
+            echo "SKIP" > "${status_file}"
+            echo "  [SKIP] ${repo_name} (no changes)"
+        else
+            echo "PASS" > "${status_file}"
+            echo "  [PASS] ${repo_name} ✓"
+        fi
         return 0
     else
         echo "FAIL" > "${status_file}"
@@ -134,9 +142,11 @@ run_validation() {
 
     # Reset counters and arrays
     pass_repos=()
+    skip_repos=()
     fail_repos=()
     missing_repos=()
     pass_count=0
+    skip_count=0
     fail_count=0
     missing_count=0
 
@@ -156,6 +166,10 @@ run_validation() {
             PASS)
                 pass_repos+=("${repo_name}")
                 ((pass_count++)) || true
+                ;;
+            SKIP)
+                skip_repos+=("${repo_name}")
+                ((skip_count++)) || true
                 ;;
             FAIL)
                 fail_repos+=("${repo_name}")
@@ -272,6 +286,10 @@ display_results() {
         echo "  ✓ ${repo}"
     done
 
+    for repo in "${skip_repos[@]}"; do
+        echo "  ○ ${repo} (skipped)"
+    done
+
     for repo in "${fail_repos[@]}"; do
         echo "  ✗ ${repo}"
     done
@@ -282,8 +300,8 @@ display_results() {
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    local total=$((pass_count + fail_count + missing_count))
-    echo "Summary: ${pass_count}/${total} passed"
+    local total=$((pass_count + skip_count + fail_count + missing_count))
+    echo "Summary: ${pass_count}/${total} passed, ${skip_count} skipped"
     if [ "${fail_count}" -gt 0 ]; then
         echo "         ${fail_count} failed"
     fi

@@ -81,8 +81,8 @@ CURRENT_COMMIT=$(git rev-parse HEAD)
 
 if [[ -f "${MARKER_FILE}" ]]; then
   STORED_COMMIT=$(cat "${MARKER_FILE}")
-  # Skip only if on the same commit AND working tree is clean
-  if [[ "${CURRENT_COMMIT}" == "${STORED_COMMIT}" ]] && [[ -z "$(git status --porcelain)" ]]; then
+  WORKING_TREE_DIRTY=$(git status --porcelain)
+  if [[ "${CURRENT_COMMIT}" == "${STORED_COMMIT}" ]] && [[ -z "${WORKING_TREE_DIRTY}" ]]; then
     echo "=============================================="
     echo "SKIPPED: No changes detected since last successful CI run."
     echo "  Marker: ${MARKER_FILE}"
