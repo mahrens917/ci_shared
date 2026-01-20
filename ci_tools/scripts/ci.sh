@@ -81,7 +81,7 @@ CURRENT_COMMIT=$(git rev-parse HEAD)
 
 if [[ -f "${MARKER_FILE}" ]]; then
   STORED_COMMIT=$(cat "${MARKER_FILE}")
-  WORKING_TREE_DIRTY=$(git status --porcelain)
+  WORKING_TREE_DIRTY=$(git status --porcelain | grep -v "^.. \.ci_check_marker$" || true)
   if [[ "${CURRENT_COMMIT}" == "${STORED_COMMIT}" ]] && [[ -z "${WORKING_TREE_DIRTY}" ]]; then
     echo "=============================================="
     echo "SKIPPED: No changes detected since last successful CI run."
