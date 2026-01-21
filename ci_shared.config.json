@@ -58,6 +58,10 @@
     {
       "name": "weather",
       "path": "~/projects/weather"
+    },
+    {
+      "name": "poly",
+      "path": "~/projects/poly"
     }
   ],
   "commit_message": {
