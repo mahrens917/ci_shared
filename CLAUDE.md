@@ -1,6 +1,6 @@
 # ci_shared: Claude Guide
 
-Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for all repos (api, zeus, monitor, aws, common, peak, cfb, deribit, kalshi, tracker, weather, pdf). Code in `ci_tools/`, helpers in `scripts/`, configs in `ci_shared.mk` + `shared-tool-config.toml`, tests in `tests/`, docs in `docs/`.
+Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for all repos (api, zeus, monitor, aws, common, peak, cfb, deribit, kalshi, tracker, weather, pdf, poly). Code in `ci_tools/`, helpers in `scripts/`, configs in `ci_shared.mk` + `shared-tool-config.toml`, tests in `tests/`, docs in `docs/`.
 
 ## Quick Commands
 - `make check` → runs `ci_tools/scripts/ci.sh` (syncs tool configs, ensures deps, then executes the guard + test pipeline).
