@@ -55,7 +55,9 @@ def _validate_repo_state(repo_path: Path, repo_name: str) -> bool:
         cwd=repo_path,
         check=False,
     )
-    if result.stdout.strip():
+    # Exclude .ci_check_marker from dirty check (matches ci.sh behavior)
+    status_lines = [line for line in result.stdout.splitlines() if not line.endswith(".ci_check_marker")]
+    if status_lines:
         print(f"📝 {repo_name} has uncommitted changes, committing automatically...")
 
         # Stage all changes
