@@ -1,13 +1,79 @@
 #!/usr/bin/env bash
 # Validate all consuming repositories after pushing ci_shared config updates.
 # Runs `scripts/ci.sh` in each consuming repo in parallel with live status reporting.
-# If validation fails, automatically invokes Claude (opus) to fix issues, then exits.
+# If validation fails, automatically invokes LLM CLI (configured in xci.config.json) to fix issues, then exits.
 
 set -euo pipefail
+
+# Kill background jobs on Ctrl-C or termination
+trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
+
+# Fix Node.js DNS resolution issue (IPv6 causes "Invalid DNS result order" errors)
+export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4first"
+
+# Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
+# Args: repo_dir prompt_file output_log cli model
+run_llm_with_dns_retry() {
+    local repo_dir="$1"
+    local prompt_file="$2"
+    local output_log="$3"
+    local cli="$4"
+    local model="$5"
+    local max_attempts=3
+    local attempt=1
+    local delay=2
+
+    cd "${repo_dir}" || return 1
+
+    local prompt_content
+    prompt_content=$(cat "${prompt_file}")
+
+    while [ ${attempt} -le ${max_attempts} ]; do
+        # Run CLI and capture to temp file for DNS error detection
+        local temp_output
+        temp_output=$(mktemp)
+
+        # Build and run CLI command based on which CLI we're using
+        if [[ "${cli}" == "claude" ]]; then
+            timeout 300 claude -p "${prompt_content}" --model "${model}" --dangerously-skip-permissions > "${temp_output}" 2>&1 || true
+        else
+            # Codex uses: codex exec "prompt" -m MODEL --dangerously-bypass-approvals-and-sandbox
+            timeout 300 codex exec "${prompt_content}" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
+        fi
+
+        # Check for DNS error
+        if grep -q "Invalid DNS result order" "${temp_output}"; then
+            echo "  [RETRY] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
+            rm -f "${temp_output}"
+            sleep ${delay}
+            ((attempt++))
+            delay=$((delay * 2))
+        else
+            # Success or non-DNS error - output and exit
+            cat "${temp_output}" | tee "${output_log}"
+            rm -f "${temp_output}"
+            return 0
+        fi
+    done
+
+    echo "  [ERROR] DNS errors persisted after ${max_attempts} attempts"
+    return 1
+}
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${PROJECT_ROOT}"
 export CI_SHARED_ROOT="${PROJECT_ROOT}"
+
+# Read LLM CLI configuration from xci.config.json
+XCI_CONFIG="${PROJECT_ROOT}/xci.config.json"
+if [[ -f "${XCI_CONFIG}" ]]; then
+    LLM_CLI=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['codex_cli'])")
+    LLM_MODEL=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['model'])")
+else
+    echo "Warning: xci.config.json not found, using defaults" >&2
+    LLM_CLI="codex"
+    LLM_MODEL="gpt-5-codex"
+fi
 
 # Calculate parallelism: 50% of available cores, minimum 1
 NUM_CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
@@ -261,13 +327,12 @@ PROMPT_EOF
         echo ""
         echo "━━━ CLAUDE OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-        # Run Claude in the repo directory (script -q forces TTY for streaming output)
-        local claude_output_log="${LOGS_DIR}/${repo_name}.claude_output.log"
+        # Run LLM CLI with timeout (5 minutes max), retry on DNS errors
+        local llm_output_log="${LOGS_DIR}/${repo_name}.llm_output.log"
         # Protect subshell so failures don't exit the main script
         (
-            cd "${repo_dir}" || exit 1
-            script -q "${claude_output_log}" claude -p "$(cat "${prompt_file}")" --model opus --dangerously-skip-permissions 2>&1 || true
-        ) || echo "  [WARN] Claude invocation failed for ${repo_name}"
+            run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
+        ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
         echo "━━━ END OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         rm -f "${prompt_file}"
