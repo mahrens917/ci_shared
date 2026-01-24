@@ -37,8 +37,8 @@ run_llm_with_dns_retry() {
         if [[ "${cli}" == "claude" ]]; then
             timeout 300 claude -p "${prompt_content}" --model "${model}" --dangerously-skip-permissions > "${temp_output}" 2>&1 || true
         else
-            # Codex uses: codex exec "prompt" -m MODEL; force API key auth
-            timeout 300 codex exec "${prompt_content}" -m "${model}" -c 'preferred_auth_method="apikey"' --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
+            # Codex uses: codex exec "prompt" -m MODEL
+            timeout 300 codex exec "${prompt_content}" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
         fi
 
         # Check for DNS error
@@ -71,8 +71,8 @@ if [[ -f "${XCI_CONFIG}" ]]; then
     LLM_MODEL=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['model'])")
 else
     echo "Warning: xci.config.json not found, using defaults" >&2
-    LLM_CLI="codex"
-    LLM_MODEL="gpt-5.2-codex"
+    LLM_CLI="claude"
+    LLM_MODEL="claude-sonnet-4-5-20250514"
 fi
 
 # Calculate parallelism: 50% of available cores, minimum 1
