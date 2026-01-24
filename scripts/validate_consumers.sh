@@ -413,8 +413,7 @@ display_results
 # Auto-fix failed repos (single pass, then exit)
 if [ "${fail_count}" -gt 0 ]; then
     attempt_auto_fixes
-    echo ""
-    echo "Auto-fix complete. Re-run to verify fixes."
+    display_results
     exit 1
 fi
 
