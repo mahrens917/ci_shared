@@ -25,9 +25,6 @@ run_llm_with_dns_retry() {
 
     cd "${repo_dir}" || return 1
 
-    local prompt_content
-    prompt_content=$(cat "${prompt_file}")
-
     while [ ${attempt} -le ${max_attempts} ]; do
         # Run CLI and capture to temp file for DNS error detection
         local temp_output
@@ -35,11 +32,15 @@ run_llm_with_dns_retry() {
 
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
-            timeout 300 claude -p "${prompt_content}" --model "${model}" --dangerously-skip-permissions > "${temp_output}" 2>&1 || true
+            # Pipe prompt via stdin to avoid shell argument size limits
+            timeout 300 claude -p "$(cat "${prompt_file}")" --model "${model}" --dangerously-skip-permissions > "${temp_output}" 2>&1 || true
         else
-            # Codex uses: codex exec "prompt" -m MODEL
-            timeout 300 codex exec "${prompt_content}" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
+            timeout 300 codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
         fi
+
+        local output_size
+        output_size=$(wc -c < "${temp_output}" 2>/dev/null || echo 0)
+        echo "  [DEBUG] ${cli} output: ${output_size} bytes" >&2
 
         # Check for DNS error
         if grep -q "Invalid DNS result order" "${temp_output}"; then
@@ -325,7 +326,9 @@ PROMPT_EOF
         cat "${prompt_file}"
         echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
-        echo "━━━ LLM OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        local start_time
+        start_time=$(date +%s)
+        echo "━━━ LLM OUTPUT (started $(date '+%H:%M:%S')) ━━━━━━━━━━━━━━━━━━"
 
         # Run LLM CLI with timeout (5 minutes max), retry on DNS errors
         local llm_output_log="${LOGS_DIR}/${repo_name}.llm_output.log"
@@ -333,7 +336,8 @@ PROMPT_EOF
         (
             run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
         ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
-        echo "━━━ END LLM OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        local elapsed=$(( $(date +%s) - start_time ))
+        echo "━━━ END LLM OUTPUT (${elapsed}s elapsed) ━━━━━━━━━━━━━━━━━━━━━"
 
         rm -f "${prompt_file}"
         echo "  [DONE] ${repo_name}"
