@@ -23,12 +23,15 @@ def run_claude_with_pty(prompt_file: str, model: str) -> int:
     master, slave = os.openpty()
 
     proc = subprocess.Popen(
-        [CLAUDE_BIN, "-p", prompt, "--model", model, "--dangerously-skip-permissions"],
+        [CLAUDE_BIN, "-p", "--model", model, "--dangerously-skip-permissions"],
         stdout=slave,
         stderr=slave,
-        stdin=slave,
+        stdin=subprocess.PIPE,
     )
     os.close(slave)
+
+    proc.stdin.write(prompt.encode())
+    proc.stdin.close()
 
     output = b""
     while True:
