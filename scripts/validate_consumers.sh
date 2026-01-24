@@ -72,7 +72,7 @@ if [[ -f "${XCI_CONFIG}" ]]; then
 else
     echo "Warning: xci.config.json not found, using defaults" >&2
     LLM_CLI="claude"
-    LLM_MODEL="claude-sonnet-4-5-20250514"
+    LLM_MODEL="sonnet"
 fi
 
 # Calculate parallelism: 50% of available cores, minimum 1
