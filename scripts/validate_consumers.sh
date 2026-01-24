@@ -307,7 +307,7 @@ ${tail_part}"
         local prompt_file
         prompt_file=$(mktemp)
         cat > "${prompt_file}" << 'PROMPT_EOF'
-Resolve all issues identified in the CI errors below. Fix the code directly.
+Implement fixes for all CI errors below. Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation, do NOT use the plan skill. Edit the files immediately.
 
 Rules:
 - Do NOT modify CI config, Makefiles, or pyproject.toml
@@ -319,13 +319,13 @@ PROMPT_EOF
         echo "Errors:" >> "${prompt_file}"
         echo "${errors}" >> "${prompt_file}"
 
-        # Display the prompt being sent to Claude
+        # Display the prompt being sent to the LLM
         echo ""
-        echo "━━━ CLAUDE INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}) ━━━━━━━━━━━━━━━━━━━━━━"
         cat "${prompt_file}"
         echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
-        echo "━━━ CLAUDE OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "━━━ LLM OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         # Run LLM CLI with timeout (5 minutes max), retry on DNS errors
         local llm_output_log="${LOGS_DIR}/${repo_name}.llm_output.log"
@@ -333,7 +333,7 @@ PROMPT_EOF
         (
             run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
         ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
-        echo "━━━ END OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "━━━ END LLM OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         rm -f "${prompt_file}"
         echo "  [DONE] ${repo_name}"
