@@ -268,6 +268,15 @@ attempt_auto_fixes() {
     echo "Attempting auto-fix for ${#fail_repos[@]} failed repo(s)..."
     echo ""
 
+    # Kill any stale Claude processes that might interfere
+    local stale_count
+    stale_count=$(pgrep -f "claude.*dangerously-skip-permissions" 2>/dev/null | wc -l || echo 0)
+    if [ "${stale_count}" -gt 2 ]; then
+        echo "  [CLEANUP] Killing ${stale_count} stale Claude processes..."
+        pkill -9 -f "claude.*dangerously-skip-permissions" 2>/dev/null || true
+        sleep 1
+    fi
+
     for repo_name in "${fail_repos[@]}"; do
         local repo_dir
         repo_dir=$(get_repo_dir "${repo_name}")
@@ -285,40 +294,19 @@ attempt_auto_fixes() {
 
         echo "  [FIXING] ${repo_name}..."
 
-        # Extract actual errors, filtering out coverage table noise
-        # Coverage lines look like: "src/foo.py    100    10    90%"
-        local errors
-        local filtered_log
-        # grep -v returns exit code 1 if no lines selected; protect with || true
-        # Filter out coverage table lines and PASSED test lines
-        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|PASSED' "${log_file}" || true)
-        # Take first 50 lines (early failures) + last 300 filtered lines
-        # Use printf instead of echo to avoid SIGPIPE with large output and pipefail
-        local head_part
-        head_part=$(printf '%s\n' "${filtered_log}" | head -50 || true)
-        local tail_part
-        tail_part=$(printf '%s\n' "${filtered_log}" | tail -300 || true)
-        errors="${head_part}
-
-[... middle of log omitted ...]
-
-${tail_part}"
-
-        # Create a temp file with the prompt to avoid escaping issues
+        # Create a temp file with the prompt - tell Claude to read the log file itself
         local prompt_file
         prompt_file=$(mktemp)
-        cat > "${prompt_file}" << 'PROMPT_EOF'
-Implement fixes for all CI errors below. Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation, do NOT use the plan skill. Edit the files immediately.
+        cat > "${prompt_file}" << PROMPT_EOF
+Implement fixes for all CI errors. The CI log is at: ${log_file}
+Read that file to understand what failed, then fix the code.
 
 Rules:
 - Do NOT modify CI config, Makefiles, or pyproject.toml
 - Do NOT add noqa, pylint:disable, type:ignore, or similar bypass comments
 - Do NOT add fallbacks or backwards-compatibility shims
 - Focus on fixing the actual code issues
-
 PROMPT_EOF
-        echo "Errors:" >> "${prompt_file}"
-        echo "${errors}" >> "${prompt_file}"
 
         # Display the prompt being sent to the LLM
         echo ""
