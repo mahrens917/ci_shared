@@ -8,17 +8,18 @@ provide a PTY environment.
 Usage: python claude_pty_wrapper.py <prompt_file> <model>
 """
 
+import os
 import shlex
 import subprocess
 import sys
 
-CLAUDE_BIN = shlex.quote("$HOME/.local/bin/claude")
+CLAUDE_BIN = os.path.expanduser("~/.local/bin/claude")
 
 
 def run_claude_with_pty(prompt_file: str, model: str) -> int:
     # Use `script` command to provide PTY. On macOS: script -q /dev/null command
     # The inner bash -c handles the pipe from cat to claude
-    inner_cmd = f"cat {shlex.quote(prompt_file)} | " f"{CLAUDE_BIN} --model {shlex.quote(model)} --dangerously-skip-permissions"
+    inner_cmd = f"cat {shlex.quote(prompt_file)} | {shlex.quote(CLAUDE_BIN)} --model {shlex.quote(model)} --dangerously-skip-permissions"
     cmd = ["script", "-q", "/dev/null", "bash", "-c", inner_cmd]
 
     try:
