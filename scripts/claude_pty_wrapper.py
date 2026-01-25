@@ -3,18 +3,31 @@
 
 Usage: python claude_pty_wrapper.py <prompt_file> <model>
 
-This wrapper runs Claude in a PTY to work around the Bun AVX hang issue
-that occurs when stdout is not a TTY. It properly captures and outputs
-the response even when stdout is redirected.
+Uses pty.spawn with a custom read function to capture output while
+passing the prompt via --print argument. Sanitizes input to remove
+null bytes and ANSI escape sequences that break command line parsing.
 """
 
 import os
 import pty
-import select
-import subprocess
+import re
 import sys
 
 CLAUDE_BIN = os.path.expanduser("~/.local/bin/claude")
+
+# Maximum prompt size (characters) to pass via command line
+MAX_PROMPT_SIZE = 100000
+
+
+def sanitize_prompt(text: str) -> str:
+    """Remove null bytes, ANSI escapes, and other control characters."""
+    # Remove ANSI escape sequences
+    text = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", text)
+    # Remove null bytes
+    text = text.replace("\x00", "")
+    # Remove other control characters except newline and tab
+    text = "".join(c for c in text if c == "\n" or c == "\t" or (32 <= ord(c) < 127) or ord(c) > 127)
+    return text
 
 
 def main() -> int:
@@ -25,66 +38,29 @@ def main() -> int:
     prompt_file = sys.argv[1]
     model = sys.argv[2]
 
-    with open(prompt_file) as f:
+    with open(prompt_file, encoding="utf-8", errors="replace") as f:
         prompt = f.read()
 
-    # Create a pseudo-terminal
-    master_fd, slave_fd = pty.openpty()
+    # Sanitize the prompt
+    prompt = sanitize_prompt(prompt)
 
-    try:
-        # Run Claude with the PTY as stdin/stdout/stderr
-        proc = subprocess.Popen(
-            [CLAUDE_BIN, "-p", prompt, "--model", model, "--dangerously-skip-permissions"],
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            close_fds=True,
-        )
+    # Truncate very large prompts
+    if len(prompt) > MAX_PROMPT_SIZE:
+        prompt = prompt[:MAX_PROMPT_SIZE] + "\n\n[... truncated ...]"
 
-        # Close slave in parent - child has it
-        os.close(slave_fd)
+    def read_fn(fd: int) -> bytes:
+        """Custom read function that captures and forwards output."""
+        data = os.read(fd, 4096)
+        if data:
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+        return data
 
-        # Read from master and write to stdout
-        output = []
-        while True:
-            ready, _, _ = select.select([master_fd], [], [], 0.1)
-            if ready:
-                try:
-                    data = os.read(master_fd, 4096)
-                    if not data:
-                        break
-                    output.append(data)
-                    # Write to stdout for real-time output
-                    sys.stdout.buffer.write(data)
-                    sys.stdout.buffer.flush()
-                except OSError:
-                    break
-
-            # Check if process has finished
-            if proc.poll() is not None:
-                # Drain any remaining output
-                while True:
-                    ready, _, _ = select.select([master_fd], [], [], 0.1)
-                    if not ready:
-                        break
-                    try:
-                        data = os.read(master_fd, 4096)
-                        if not data:
-                            break
-                        output.append(data)
-                        sys.stdout.buffer.write(data)
-                        sys.stdout.buffer.flush()
-                    except OSError:
-                        break
-                break
-
-        return proc.returncode if proc.returncode is not None else 1
-
-    finally:
-        try:
-            os.close(master_fd)
-        except OSError:
-            pass
+    # Use pty.spawn which handles the PTY setup properly
+    return pty.spawn(
+        [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"],
+        read_fn,
+    )
 
 
 if __name__ == "__main__":
