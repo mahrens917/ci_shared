@@ -268,15 +268,6 @@ attempt_auto_fixes() {
     echo "Attempting auto-fix for ${#fail_repos[@]} failed repo(s)..."
     echo ""
 
-    # Kill any stale Claude processes that might interfere
-    local stale_count
-    stale_count=$(pgrep -f "claude.*dangerously-skip-permissions" 2>/dev/null | wc -l || echo 0)
-    if [ "${stale_count}" -gt 2 ]; then
-        echo "  [CLEANUP] Killing ${stale_count} stale Claude processes..."
-        pkill -9 -f "claude.*dangerously-skip-permissions" 2>/dev/null || true
-        sleep 1
-    fi
-
     for repo_name in "${fail_repos[@]}"; do
         local repo_dir
         repo_dir=$(get_repo_dir "${repo_name}")
