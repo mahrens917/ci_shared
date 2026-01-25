@@ -32,8 +32,8 @@ run_llm_with_dns_retry() {
 
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
-            # Use -p flag (stdin piping hangs on AVX-less CPUs)
-            timeout 300 claude -p "$(cat "${prompt_file}")" --model "${model}" --dangerously-skip-permissions > "${temp_output}" 2>&1 || true
+            # Use PTY wrapper to prevent Bun AVX hang when stdout is not a TTY
+            timeout 300 python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>&1 || true
         else
             timeout 300 codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
         fi
