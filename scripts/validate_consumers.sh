@@ -12,7 +12,8 @@ trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 # Diagnostic logging functions
 # ============================================================================
 DIAG_LOG=""
-SCRIPT_START_TIME=$(date +%s%3N 2>/dev/null || date +%s)
+# macOS date doesn't support %3N, use seconds only
+SCRIPT_START_TIME=$(date +%s)
 export SCRIPT_START_TIME  # Export for subshells
 
 diag_init() {
@@ -29,11 +30,11 @@ diag_init() {
 diag() {
     local msg="$1"
     local now
-    now=$(date +%s%3N 2>/dev/null || date +%s)
+    now=$(date +%s)
     local elapsed=$((now - SCRIPT_START_TIME))
     local timestamp
     timestamp=$(date '+%H:%M:%S')
-    local line="[${timestamp}] [+${elapsed}ms] ${msg}"
+    local line="[${timestamp}] [+${elapsed}s] ${msg}"
     echo "${line}" >&2
     # Append to log file if it exists
     if [[ -n "${DIAG_LOG:-}" && -f "${DIAG_LOG}" ]]; then
@@ -544,6 +545,7 @@ if [ "${fail_count}" -gt 0 ]; then
     diag "Script completed with failures"
     echo ""
     echo "Diagnostic log: ${DIAG_LOG}"
+    echo "=== SCRIPT END (with failures) ===" >&2
     exit 1
 fi
 
@@ -551,4 +553,5 @@ diag_section "FINAL STATUS"
 diag "Script completed successfully"
 echo ""
 echo "Diagnostic log: ${DIAG_LOG}"
+echo "=== SCRIPT END (success) ===" >&2
 exit 0
