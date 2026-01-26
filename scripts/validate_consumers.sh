@@ -8,6 +8,63 @@ set -euo pipefail
 # Kill background jobs on Ctrl-C or termination
 trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 
+# ============================================================================
+# Diagnostic logging functions
+# ============================================================================
+DIAG_LOG=""
+SCRIPT_START_TIME=$(date +%s%3N 2>/dev/null || date +%s)
+
+diag_init() {
+    local logs_dir="$1"
+    DIAG_LOG="${logs_dir}/diagnostics.log"
+    echo "=== DIAGNOSTIC LOG ===" > "${DIAG_LOG}"
+    echo "Started: $(date '+%Y-%m-%d %H:%M:%S')" >> "${DIAG_LOG}"
+    echo "" >> "${DIAG_LOG}"
+}
+
+diag() {
+    local msg="$1"
+    local now
+    now=$(date +%s%3N 2>/dev/null || date +%s)
+    local elapsed=$((now - SCRIPT_START_TIME))
+    local timestamp
+    timestamp=$(date '+%H:%M:%S')
+    echo "[${timestamp}] [+${elapsed}ms] ${msg}" | tee -a "${DIAG_LOG}" >&2
+}
+
+diag_env() {
+    echo "" >> "${DIAG_LOG}"
+    echo "=== ENVIRONMENT ===" >> "${DIAG_LOG}"
+    echo "USER: ${USER:-unknown}" >> "${DIAG_LOG}"
+    echo "SHELL: ${SHELL:-unknown}" >> "${DIAG_LOG}"
+    echo "PWD: ${PWD}" >> "${DIAG_LOG}"
+    echo "" >> "${DIAG_LOG}"
+
+    echo "=== LLM-RELATED ENV VARS ===" >> "${DIAG_LOG}"
+    env | grep -iE "^(ANTHROPIC|CLAUDE|LLM|OPENAI|NODE_)" >> "${DIAG_LOG}" 2>/dev/null || echo "(none found)" >> "${DIAG_LOG}"
+    echo "" >> "${DIAG_LOG}"
+
+    echo "=== CLAUDE CLI INFO ===" >> "${DIAG_LOG}"
+    if command -v claude &>/dev/null; then
+        echo "claude path: $(which claude)" >> "${DIAG_LOG}"
+        claude --version >> "${DIAG_LOG}" 2>&1 || echo "version check failed" >> "${DIAG_LOG}"
+    else
+        echo "claude: not found in PATH" >> "${DIAG_LOG}"
+    fi
+    echo "" >> "${DIAG_LOG}"
+}
+
+diag_section() {
+    local section="$1"
+    echo "" >> "${DIAG_LOG}"
+    echo "=== ${section} ===" >> "${DIAG_LOG}"
+    diag ">>> ${section}"
+}
+
+# ============================================================================
+# Main script
+# ============================================================================
+
 # Fix Node.js DNS resolution issue (IPv6 causes "Invalid DNS result order" errors)
 export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4first"
 
@@ -23,40 +80,81 @@ run_llm_with_dns_retry() {
     local attempt=1
     local delay=2
 
+    diag "run_llm_with_dns_retry: repo=${repo_dir}, cli=${cli}, model=${model}"
+
     cd "${repo_dir}" || return 1
 
     while [ ${attempt} -le ${max_attempts} ]; do
         # Run CLI and capture to temp file for DNS error detection
         local temp_output
         temp_output=$(mktemp)
+        local cmd_start
+        cmd_start=$(date +%s%3N 2>/dev/null || date +%s)
+
+        diag "LLM attempt ${attempt}/${max_attempts} starting..."
 
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
             # Use PTY wrapper to prevent Bun AVX hang when stdout is not a TTY
-            timeout 300 python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>&1 || true
+            diag "Invoking: timeout 300 python claude_pty_wrapper.py <prompt> ${model}"
+            diag "ANTHROPIC_API_KEY set: $([ -n \"${ANTHROPIC_API_KEY:-}\" ] && echo 'yes' || echo 'no')"
+            diag "LLM_PROVIDER_KEY set: $([ -n \"${LLM_PROVIDER_KEY:-}\" ] && echo 'yes' || echo 'no')"
+
+            # Capture stderr separately for diagnostics
+            local stderr_file
+            stderr_file=$(mktemp)
+            timeout 300 python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>"${stderr_file}" || true
+
+            local cmd_end
+            cmd_end=$(date +%s%3N 2>/dev/null || date +%s)
+            local cmd_elapsed=$((cmd_end - cmd_start))
+            diag "LLM command completed in ${cmd_elapsed}ms"
+
+            # Log stderr if non-empty
+            if [ -s "${stderr_file}" ]; then
+                diag "LLM stderr output:"
+                cat "${stderr_file}" >> "${DIAG_LOG}"
+                cat "${stderr_file}" >&2
+            fi
+            rm -f "${stderr_file}"
         else
+            diag "Invoking: timeout 300 codex exec ... -m ${model}"
             timeout 300 codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
+
+            local cmd_end
+            cmd_end=$(date +%s%3N 2>/dev/null || date +%s)
+            local cmd_elapsed=$((cmd_end - cmd_start))
+            diag "LLM command completed in ${cmd_elapsed}ms"
         fi
 
         local output_size
         output_size=$(wc -c < "${temp_output}" 2>/dev/null || echo 0)
-        echo "  [DEBUG] ${cli} output: ${output_size} bytes" >&2
+        diag "LLM output size: ${output_size} bytes"
 
-        # Check for DNS error
+        # Check for specific error patterns
         if grep -q "Invalid DNS result order" "${temp_output}"; then
+            diag "DNS error detected, will retry"
             echo "  [RETRY] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
             rm -f "${temp_output}"
             sleep ${delay}
             ((attempt++))
             delay=$((delay * 2))
+        elif grep -q "Pre-flight check" "${temp_output}"; then
+            diag "Pre-flight check message detected in output"
+            cat "${temp_output}" >> "${DIAG_LOG}"
+            cat "${temp_output}" | tee "${output_log}"
+            rm -f "${temp_output}"
+            return 0
         else
             # Success or non-DNS error - output and exit
+            diag "LLM completed successfully"
             cat "${temp_output}" | tee "${output_log}"
             rm -f "${temp_output}"
             return 0
         fi
     done
 
+    diag "ERROR: DNS errors persisted after ${max_attempts} attempts"
     echo "  [ERROR] DNS errors persisted after ${max_attempts} attempts"
     return 1
 }
@@ -268,7 +366,10 @@ attempt_auto_fixes() {
     echo "Attempting auto-fix for ${#fail_repos[@]} failed repo(s)..."
     echo ""
 
+    diag "attempt_auto_fixes: ${#fail_repos[@]} repos to fix"
+
     for repo_name in "${fail_repos[@]}"; do
+        diag "Processing repo: ${repo_name}"
         local repo_dir
         repo_dir=$(get_repo_dir "${repo_name}")
 
@@ -309,6 +410,8 @@ PROMPT_EOF
         start_time=$(date +%s)
         echo "━━━ LLM OUTPUT (started $(date '+%H:%M:%S')) ━━━━━━━━━━━━━━━━━━"
 
+        diag "LLM invocation starting for ${repo_name}"
+
         # Run LLM CLI with timeout (5 minutes max), retry on DNS errors
         local llm_output_log="${LOGS_DIR}/${repo_name}.llm_output.log"
         # Protect subshell so failures don't exit the main script
@@ -317,6 +420,8 @@ PROMPT_EOF
         ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
         local elapsed=$(( $(date +%s) - start_time ))
         echo "━━━ END LLM OUTPUT (${elapsed}s elapsed) ━━━━━━━━━━━━━━━━━━━━━"
+
+        diag "LLM invocation completed for ${repo_name} in ${elapsed}s"
 
         rm -f "${prompt_file}"
         echo "  [DONE] ${repo_name}"
@@ -372,8 +477,26 @@ display_results() {
 # Main execution
 # ============================================================================
 
+# Initialize diagnostic logging early (before LOGS_DIR is created, use temp)
+TEMP_DIAG_LOG=$(mktemp)
+DIAG_LOG="${TEMP_DIAG_LOG}"
+
+diag "Script starting"
+diag "PROJECT_ROOT: ${PROJECT_ROOT}"
+diag "LLM_CLI: ${LLM_CLI}, LLM_MODEL: ${LLM_MODEL}"
+diag "PARALLEL_JOBS: ${PARALLEL_JOBS}, NUM_CORES: ${NUM_CORES}"
+
 echo "Validating ${PARALLEL_JOBS} consuming repos in parallel (${NUM_CORES} cores available)"
 echo ""
+
+# Now initialize proper diagnostic log in LOGS_DIR
+diag_init "${LOGS_DIR}"
+# Copy temp log contents
+cat "${TEMP_DIAG_LOG}" >> "${DIAG_LOG}"
+rm -f "${TEMP_DIAG_LOG}"
+
+diag_env
+diag_section "CONFIG SYNC"
 
 echo "Pushing config to consuming repositories..."
 
@@ -381,8 +504,13 @@ echo "Pushing config to consuming repositories..."
 if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
     if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}"; then
         echo "⚠️  Config sync encountered issues (see above)" >&2
+        diag "Config sync failed"
+    else
+        diag "Config sync completed"
     fi
 fi
+
+diag_section "VALIDATION RUN"
 
 # Initial validation run
 run_validation
@@ -391,9 +519,20 @@ display_results
 
 # Auto-fix failed repos (single pass, then exit)
 if [ "${fail_count}" -gt 0 ]; then
+    diag_section "AUTO-FIX PHASE"
+    diag "Starting auto-fix for ${fail_count} failed repo(s): ${fail_repos[*]}"
     attempt_auto_fixes
     display_results
+
+    diag_section "FINAL STATUS"
+    diag "Script completed with failures"
+    echo ""
+    echo "Diagnostic log: ${DIAG_LOG}"
     exit 1
 fi
 
+diag_section "FINAL STATUS"
+diag "Script completed successfully"
+echo ""
+echo "Diagnostic log: ${DIAG_LOG}"
 exit 0

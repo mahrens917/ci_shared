@@ -14,9 +14,20 @@ import select
 import signal
 import subprocess
 import sys
+import time
 
 CLAUDE_BIN = os.path.expanduser("~/.local/bin/claude")
 MAX_PROMPT_SIZE = 100000
+DIAG_ENABLED = os.environ.get("VALIDATE_DIAG", "1") == "1"
+START_TIME = time.time()
+
+
+def diag(msg: str) -> None:
+    """Write diagnostic message to stderr."""
+    if DIAG_ENABLED:
+        elapsed = int((time.time() - START_TIME) * 1000)
+        sys.stderr.write(f"[PTY +{elapsed}ms] {msg}\n")
+        sys.stderr.flush()
 
 
 def sanitize_prompt(text: str) -> str:
@@ -28,6 +39,8 @@ def sanitize_prompt(text: str) -> str:
 
 
 def main() -> int:
+    diag("claude_pty_wrapper starting")
+
     if len(sys.argv) != 3:
         sys.stderr.write(f"Usage: {sys.argv[0]} <prompt_file> <model>\n")
         return 1
@@ -35,16 +48,33 @@ def main() -> int:
     prompt_file = sys.argv[1]
     model = sys.argv[2]
 
+    diag(f"prompt_file={prompt_file}, model={model}")
+    diag(f"CLAUDE_BIN={CLAUDE_BIN}, exists={os.path.exists(CLAUDE_BIN)}")
+
+    # Log relevant env vars
+    for key in ["ANTHROPIC_API_KEY", "LLM_PROVIDER_KEY", "NODE_OPTIONS", "CLAUDE_BASH_NO_LOGIN"]:
+        val = os.environ.get(key)
+        if val:
+            # Mask API keys
+            if "KEY" in key and len(val) > 10:
+                val = val[:4] + "..." + val[-4:]
+            diag(f"ENV {key}={val}")
+
     with open(prompt_file, encoding="utf-8", errors="replace") as f:
         prompt = f.read()
+
+    diag(f"prompt loaded: {len(prompt)} chars")
 
     prompt = sanitize_prompt(prompt)
 
     if len(prompt) > MAX_PROMPT_SIZE:
         prompt = prompt[:MAX_PROMPT_SIZE] + "\n\n[... truncated ...]"
+        diag(f"prompt truncated to {MAX_PROMPT_SIZE} chars")
 
     # Create PTY
+    diag("creating PTY")
     master_fd, slave_fd = pty.openpty()
+    diag("PTY created")
 
     # Track if we should keep running
     running = True
@@ -58,15 +88,22 @@ def main() -> int:
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
+        cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"]
+        diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions")
+
         proc = subprocess.Popen(
-            [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"],
+            cmd,
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
             close_fds=True,
         )
+        diag(f"process spawned, PID={proc.pid}")
         os.close(slave_fd)
         slave_fd = -1
+
+        first_output = True
+        total_bytes = 0
 
         # Read output until process exits or we're killed
         while running:
@@ -76,11 +113,17 @@ def main() -> int:
                 try:
                     data = os.read(master_fd, 4096)
                     if data:
+                        if first_output:
+                            diag("first output received from Claude")
+                            first_output = False
+                        total_bytes += len(data)
                         sys.stdout.buffer.write(data)
                         sys.stdout.buffer.flush()
                     else:
+                        diag("EOF received")
                         break  # EOF
-                except OSError:
+                except OSError as e:
+                    diag(f"OSError reading: {e}")
                     break
 
             # Check if process finished
@@ -101,9 +144,11 @@ def main() -> int:
                         break
                 break
 
+        diag(f"process exited, returncode={proc.returncode}, total_bytes={total_bytes}")
         return proc.returncode if proc.returncode is not None else 1
 
     except Exception as e:
+        diag(f"Exception: {e}")
         sys.stderr.write(f"Error: {e}\n")
         return 1
 
