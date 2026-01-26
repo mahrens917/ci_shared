@@ -88,8 +88,8 @@ def main() -> int:
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
-        cmd = [CLAUDE_BIN, "--model", model, "--dangerously-skip-permissions", "-p", prompt]
-        diag(f"spawning: {CLAUDE_BIN} --model {model} --dangerously-skip-permissions -p <prompt>")
+        cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"]
+        diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions")
 
         # Create clean environment without ANTHROPIC_API_KEY to prevent Claude CLI
         # from prompting about rejected API keys (which causes hangs in non-interactive mode)
@@ -111,6 +111,8 @@ def main() -> int:
 
         first_output = True
         total_bytes = 0
+        last_heartbeat = time.time()
+        heartbeat_interval = 5  # Print dot every 5 seconds
 
         # Read output until process exits or we're killed
         while running:
@@ -126,12 +128,20 @@ def main() -> int:
                         total_bytes += len(data)
                         sys.stdout.buffer.write(data)
                         sys.stdout.buffer.flush()
+                        last_heartbeat = time.time()  # Reset heartbeat on output
                     else:
                         diag("EOF received")
                         break  # EOF
                 except OSError as e:
                     diag(f"OSError reading: {e}")
                     break
+            else:
+                # No data ready - print heartbeat if enough time passed
+                now = time.time()
+                if now - last_heartbeat >= heartbeat_interval:
+                    sys.stderr.write(".")
+                    sys.stderr.flush()
+                    last_heartbeat = now
 
             # Check if process finished
             if proc.poll() is not None:

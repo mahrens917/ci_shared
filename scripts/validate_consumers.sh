@@ -404,9 +404,10 @@ attempt_auto_fixes() {
         local prompt_file
         prompt_file=$(mktemp)
 
-        # Extract error-related lines from log, max 500 lines
+        # Extract error-related lines from log, max 100 lines to keep prompt manageable
+        # Filter out PASSED lines (test names like test_aiohttp_error match "error" pattern)
         local log_content
-        log_content=$(grep -iE "(error|fail|exception|traceback|assert|FAILED|✗|warning:|fatal)" "${log_file}" 2>/dev/null | head -500)
+        log_content=$(grep -iE "(error|fail|exception|traceback|assert|FAILED|✗|warning:|fatal)" "${log_file}" 2>/dev/null | grep -v "PASSED" | head -100)
         if [ -z "${log_content}" ]; then
             # If no errors found, send last 100 lines as context
             log_content=$(tail -100 "${log_file}")
@@ -425,7 +426,7 @@ Rules:
 - Do NOT add fallbacks or backwards-compatibility shims
 - Fix the actual code issues directly
 
-=== CI LOG (errors/failures, max 500 lines) ===
+=== CI LOG (errors/failures, max 100 lines) ===
 ${log_content}
 === END CI LOG ===
 PROMPT_EOF
