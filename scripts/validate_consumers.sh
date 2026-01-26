@@ -372,12 +372,16 @@ get_repo_dir() {
 # Attempt to auto-fix failed repos using Claude
 attempt_auto_fixes() {
     echo ""
+    echo "=== DEBUG: attempt_auto_fixes called ===" >&2
+    echo "=== DEBUG: fail_repos count: ${#fail_repos[@]} ===" >&2
+    echo "=== DEBUG: fail_repos: ${fail_repos[*]:-EMPTY} ===" >&2
     echo "Attempting auto-fix for ${#fail_repos[@]} failed repo(s)..."
     echo ""
 
     diag "attempt_auto_fixes: ${#fail_repos[@]} repos to fix"
 
     for repo_name in "${fail_repos[@]}"; do
+        echo "=== DEBUG: Processing ${repo_name} ===" >&2
         diag "Processing repo: ${repo_name}"
         local repo_dir
         repo_dir=$(get_repo_dir "${repo_name}")
@@ -527,9 +531,12 @@ run_validation
 display_results
 
 # Auto-fix failed repos (single pass, then exit)
+echo "=== DEBUG: fail_count=${fail_count} ===" >&2
 if [ "${fail_count}" -gt 0 ]; then
+    echo "=== DEBUG: Entering auto-fix phase ===" >&2
     diag_section "AUTO-FIX PHASE"
     diag "Starting auto-fix for ${fail_count} failed repo(s): ${fail_repos[*]}"
+    echo "=== DEBUG: About to call attempt_auto_fixes ===" >&2
     attempt_auto_fixes
     display_results
 
