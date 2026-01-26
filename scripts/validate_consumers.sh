@@ -13,10 +13,12 @@ trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 # ============================================================================
 DIAG_LOG=""
 SCRIPT_START_TIME=$(date +%s%3N 2>/dev/null || date +%s)
+export SCRIPT_START_TIME  # Export for subshells
 
 diag_init() {
     local logs_dir="$1"
     DIAG_LOG="${logs_dir}/diagnostics.log"
+    export DIAG_LOG  # Export for subshells
     echo "=== DIAGNOSTIC LOG ===" > "${DIAG_LOG}"
     echo "Started: $(date '+%Y-%m-%d %H:%M:%S')" >> "${DIAG_LOG}"
     echo "" >> "${DIAG_LOG}"
