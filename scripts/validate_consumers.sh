@@ -112,7 +112,7 @@ run_llm_with_dns_retry() {
             # Capture stderr separately for diagnostics
             local stderr_file
             stderr_file=$(mktemp)
-            python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>"${stderr_file}" || true
+            python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" 2>"${stderr_file}" | tee "${temp_output}" || true
 
             local cmd_end
             cmd_end=$(date +%s)
@@ -430,14 +430,17 @@ ${log_content}
 === END CI LOG ===
 PROMPT_EOF
 
-        # Display summary of what's being sent (not the full log)
+        # Display the prompt being sent (instructions + errors)
         echo ""
         local prompt_size
         prompt_size=$(wc -c < "${prompt_file}")
-        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}, ${prompt_size} bytes) ━━━━━━━━━━━━━━━━"
         local error_lines
         error_lines=$(echo "${log_content}" | wc -l | tr -d ' ')
-        echo "Prompt: Fix CI errors for ${repo_name} (extracted ${error_lines} error lines from $(wc -l < "${log_file}" | tr -d ' ') total)"
+        local total_lines
+        total_lines=$(wc -l < "${log_file}" | tr -d ' ')
+        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}, ${prompt_size} bytes, ${error_lines} error lines from ${total_lines} total) ━━━"
+        cat "${prompt_file}"
+        echo ""
         echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         local start_time
