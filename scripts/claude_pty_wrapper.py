@@ -91,12 +91,19 @@ def main() -> int:
         cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"]
         diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions")
 
+        # Create clean environment without ANTHROPIC_API_KEY to prevent Claude CLI
+        # from prompting about rejected API keys (which causes hangs in non-interactive mode)
+        clean_env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+        if "ANTHROPIC_API_KEY" in os.environ:
+            diag("Removed ANTHROPIC_API_KEY from subprocess environment")
+
         proc = subprocess.Popen(
             cmd,
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
             close_fds=True,
+            env=clean_env,
         )
         diag(f"process spawned, PID={proc.pid}")
         os.close(slave_fd)

@@ -105,6 +105,10 @@ run_llm_with_dns_retry() {
 
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
+            # Unset ANTHROPIC_API_KEY to prevent Claude CLI from prompting about rejected keys
+            # (The key suffix may be in ~/.claude.json's rejected list, causing interactive prompts)
+            unset ANTHROPIC_API_KEY
+
             # Use PTY wrapper to prevent Bun AVX hang when stdout is not a TTY
             diag "Invoking: timeout 300 python claude_pty_wrapper.py <prompt> ${model}"
             diag "ANTHROPIC_API_KEY set: $([ -n \"${ANTHROPIC_API_KEY:-}\" ] && echo 'yes' || echo 'no')"
@@ -532,12 +536,9 @@ run_validation
 display_results
 
 # Auto-fix failed repos (single pass, then exit)
-echo "=== DEBUG: fail_count=${fail_count} ===" >&2
 if [ "${fail_count}" -gt 0 ]; then
-    echo "=== DEBUG: Entering auto-fix phase ===" >&2
     diag_section "AUTO-FIX PHASE"
     diag "Starting auto-fix for ${fail_count} failed repo(s): ${fail_repos[*]}"
-    echo "=== DEBUG: About to call attempt_auto_fixes ===" >&2
     attempt_auto_fixes
     display_results
 
