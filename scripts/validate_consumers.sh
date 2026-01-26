@@ -105,14 +105,9 @@ run_llm_with_dns_retry() {
 
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
-            # Unset ANTHROPIC_API_KEY to prevent Claude CLI from prompting about rejected keys
-            # (The key suffix may be in ~/.claude.json's rejected list, causing interactive prompts)
-            unset ANTHROPIC_API_KEY
-
             # Use PTY wrapper to prevent Bun AVX hang when stdout is not a TTY
+            # Note: claude_pty_wrapper.py filters out ANTHROPIC_API_KEY to prevent prompts about rejected keys
             diag "Invoking: timeout 300 python claude_pty_wrapper.py <prompt> ${model}"
-            diag "ANTHROPIC_API_KEY set: $([ -n \"${ANTHROPIC_API_KEY:-}\" ] && echo 'yes' || echo 'no')"
-            diag "LLM_PROVIDER_KEY set: $([ -n \"${LLM_PROVIDER_KEY:-}\" ] && echo 'yes' || echo 'no')"
 
             # Capture stderr separately for diagnostics
             local stderr_file
@@ -404,24 +399,45 @@ attempt_auto_fixes() {
 
         echo "  [FIXING] ${repo_name}..."
 
-        # Create a temp file with the prompt - tell Claude to read the log file itself
+        # Create a temp file with the prompt - include log content directly
+        # (Claude --print mode hangs when using tools like Read)
         local prompt_file
         prompt_file=$(mktemp)
+
+        # Extract error-related lines from log, max 500 lines
+        local log_content
+        log_content=$(grep -iE "(error|fail|exception|traceback|assert|FAILED|✗|warning:|fatal)" "${log_file}" 2>/dev/null | head -500)
+        if [ -z "${log_content}" ]; then
+            # If no errors found, send last 100 lines as context
+            log_content=$(tail -100 "${log_file}")
+        fi
+
         cat > "${prompt_file}" << PROMPT_EOF
-Implement fixes for all CI errors. The CI log is at: ${log_file}
-Read that file to understand what failed, then fix the code.
+Fix all CI errors. The CI log output is below.
+
+Identify failures and fix them immediately. Do not ask questions or request confirmation - just fix the code.
+
+If CI passed (no code errors), respond with only: "CI passed. No fixes needed."
 
 Rules:
 - Do NOT modify CI config, Makefiles, or pyproject.toml
 - Do NOT add noqa, pylint:disable, type:ignore, or similar bypass comments
 - Do NOT add fallbacks or backwards-compatibility shims
-- Focus on fixing the actual code issues
+- Fix the actual code issues directly
+
+=== CI LOG (errors/failures, max 500 lines) ===
+${log_content}
+=== END CI LOG ===
 PROMPT_EOF
 
-        # Display the prompt being sent to the LLM
+        # Display summary of what's being sent (not the full log)
         echo ""
-        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}) ━━━━━━━━━━━━━━━━━━━━━━"
-        cat "${prompt_file}"
+        local prompt_size
+        prompt_size=$(wc -c < "${prompt_file}")
+        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}, ${prompt_size} bytes) ━━━━━━━━━━━━━━━━"
+        local error_lines
+        error_lines=$(echo "${log_content}" | wc -l | tr -d ' ')
+        echo "Prompt: Fix CI errors for ${repo_name} (extracted ${error_lines} error lines from $(wc -l < "${log_file}" | tr -d ' ') total)"
         echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         local start_time
