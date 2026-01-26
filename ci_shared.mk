@@ -72,6 +72,7 @@ SHARED_PYTEST_LOG_OPTIONS ?= --log-level=ERROR
 PYLINT_ARGS ?=
 BANDIT_BASELINE ?=
 BANDIT_EXCLUDE ?= artifacts,trash,models,logs,htmlcov,data
+PIP_AUDIT_IGNORE_VULNS ?=
 BLACK_LINE_LENGTH ?= 140
 GITLEAKS_SOURCE_DIRS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy ci_shared.mk shared-tool-config.toml pyproject.toml Makefile README.md SECURITY.md)
 SHARED_CLEANUP_ROOTS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy)
@@ -147,7 +148,11 @@ shared-checks:
 	\
 	if [ -z "$(CI_AUTOMATION)" ]; then \
 		echo "→ Running pip-audit..."; \
-		$(PYTHON) -m pip_audit --fix || echo "⚠️  pip-audit failed"; \
+		PIP_AUDIT_IGNORE_FLAGS=""; \
+		for CVE in $(PIP_AUDIT_IGNORE_VULNS); do \
+			PIP_AUDIT_IGNORE_FLAGS="$$PIP_AUDIT_IGNORE_FLAGS --ignore-vuln $$CVE"; \
+		done; \
+		$(PYTHON) -m pip_audit --fix $$PIP_AUDIT_IGNORE_FLAGS || echo "⚠️  pip-audit failed"; \
 	fi; \
 	\
 	echo "→ Running policy_guard..."; \

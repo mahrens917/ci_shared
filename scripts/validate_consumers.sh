@@ -107,12 +107,12 @@ run_llm_with_dns_retry() {
         if [[ "${cli}" == "claude" ]]; then
             # Use PTY wrapper to prevent Bun AVX hang when stdout is not a TTY
             # Note: claude_pty_wrapper.py filters out ANTHROPIC_API_KEY to prevent prompts about rejected keys
-            diag "Invoking: timeout 300 python claude_pty_wrapper.py <prompt> ${model}"
+            diag "Invoking: python claude_pty_wrapper.py <prompt> ${model}"
 
             # Capture stderr separately for diagnostics
             local stderr_file
             stderr_file=$(mktemp)
-            timeout 300 python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>"${stderr_file}" || true
+            python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>"${stderr_file}" || true
 
             local cmd_end
             cmd_end=$(date +%s)
@@ -127,8 +127,8 @@ run_llm_with_dns_retry() {
             fi
             rm -f "${stderr_file}"
         else
-            diag "Invoking: timeout 300 codex exec ... -m ${model}"
-            timeout 300 codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
+            diag "Invoking: codex exec ... -m ${model}"
+            codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
 
             local cmd_end
             cmd_end=$(date +%s)
