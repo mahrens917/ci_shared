@@ -88,8 +88,8 @@ def main() -> int:
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
-        cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions"]
-        diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions")
+        cmd = [CLAUDE_BIN, "--model", model, "--dangerously-skip-permissions", "-p", prompt]
+        diag(f"spawning: {CLAUDE_BIN} --model {model} --dangerously-skip-permissions -p <prompt>")
 
         # Create clean environment without ANTHROPIC_API_KEY to prevent Claude CLI
         # from prompting about rejected API keys (which causes hangs in non-interactive mode)
