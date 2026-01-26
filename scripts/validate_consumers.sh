@@ -19,6 +19,8 @@ diag_init() {
     local logs_dir="$1"
     DIAG_LOG="${logs_dir}/diagnostics.log"
     export DIAG_LOG  # Export for subshells
+    export SCRIPT_START_TIME  # Ensure available in subshells
+    export -f diag  # Export function for subshells
     echo "=== DIAGNOSTIC LOG ===" > "${DIAG_LOG}"
     echo "Started: $(date '+%Y-%m-%d %H:%M:%S')" >> "${DIAG_LOG}"
     echo "" >> "${DIAG_LOG}"
@@ -31,7 +33,12 @@ diag() {
     local elapsed=$((now - SCRIPT_START_TIME))
     local timestamp
     timestamp=$(date '+%H:%M:%S')
-    echo "[${timestamp}] [+${elapsed}ms] ${msg}" | tee -a "${DIAG_LOG}" >&2
+    local line="[${timestamp}] [+${elapsed}ms] ${msg}"
+    echo "${line}" >&2
+    # Append to log file if it exists
+    if [[ -n "${DIAG_LOG:-}" && -f "${DIAG_LOG}" ]]; then
+        echo "${line}" >> "${DIAG_LOG}"
+    fi
 }
 
 diag_env() {
