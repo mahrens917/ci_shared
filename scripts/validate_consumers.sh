@@ -99,7 +99,7 @@ run_llm_with_dns_retry() {
         local temp_output
         temp_output=$(mktemp)
         local cmd_start
-        cmd_start=$(date +%s%3N 2>/dev/null || date +%s)
+        cmd_start=$(date +%s)
 
         diag "LLM attempt ${attempt}/${max_attempts} starting..."
 
@@ -116,7 +116,7 @@ run_llm_with_dns_retry() {
             timeout 300 python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>"${stderr_file}" || true
 
             local cmd_end
-            cmd_end=$(date +%s%3N 2>/dev/null || date +%s)
+            cmd_end=$(date +%s)
             local cmd_elapsed=$((cmd_end - cmd_start))
             diag "LLM command completed in ${cmd_elapsed}ms"
 
@@ -132,7 +132,7 @@ run_llm_with_dns_retry() {
             timeout 300 codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox > "${temp_output}" 2>&1 || true
 
             local cmd_end
-            cmd_end=$(date +%s%3N 2>/dev/null || date +%s)
+            cmd_end=$(date +%s)
             local cmd_elapsed=$((cmd_end - cmd_start))
             diag "LLM command completed in ${cmd_elapsed}ms"
         fi
