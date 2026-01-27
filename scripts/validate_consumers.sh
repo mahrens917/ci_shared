@@ -5,12 +5,21 @@
 
 set -euo pipefail
 
+# Auto-capture all output (including background jobs) to a log file
+# Re-exec under 'script' command if not already wrapped
+if [ -z "${_SCRIPT_WRAPPED:-}" ]; then
+    export _SCRIPT_WRAPPED=1
+    # Create logs dir early for the log file
+    _LOGS_DIR="${0%/*}/../logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "${_LOGS_DIR}"
+    _LOG_FILE="${_LOGS_DIR}/run.log"
+    echo "Logging to: ${_LOG_FILE}"
+    # macOS script syntax: script -q file command
+    exec script -q "${_LOG_FILE}" "$0" "$@"
+fi
+
 # Kill background jobs on Ctrl-C or termination
-cleanup() {
-    kill "${TAIL_PID:-}" 2>/dev/null || true
-    kill $(jobs -p) 2>/dev/null || true
-}
-trap 'cleanup; exit 130' INT TERM
+trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 
 # ============================================================================
 # Diagnostic logging functions
@@ -197,19 +206,6 @@ LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
 export LOGS_DIR
 mkdir -p "${LOGS_DIR}"
 
-# Logging setup: background jobs write to a shared file, tail displays it
-SCRIPT_LOG="${LOGS_DIR}/run.log"
-BG_OUTPUT="${LOGS_DIR}/bg_output.log"
-touch "${BG_OUTPUT}"
-export BG_OUTPUT
-
-# Start tail to display background job output in real-time and log it
-tail -f "${BG_OUTPUT}" | tee -a "${SCRIPT_LOG}" &
-TAIL_PID=$!
-
-# Capture main script output to log file while still showing on screen
-exec > >(tee -a "${SCRIPT_LOG}") 2>&1
-
 # Load consuming repos (ci_shared first, then consumers from config)
 CONSUMER_DIRS=("${PROJECT_ROOT}")
 if CONSUMER_OUTPUT=$(python "${PROJECT_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
@@ -236,7 +232,6 @@ fail_count=0
 missing_count=0
 
 # Run CI for a single repo
-# Writes status to BG_OUTPUT which is tailed by main process
 run_repo_wrapper() {
     local repo_dir="$1"
     local logs_dir="$2"
@@ -244,17 +239,17 @@ run_repo_wrapper() {
     local log_file="${logs_dir}/${repo_name}.log"
     local status_file="${logs_dir}/${repo_name}.status"
 
-    echo "  [TESTING] ${repo_name}..." >> "${BG_OUTPUT}"
+    echo "  [TESTING] ${repo_name}..."
 
     if [ ! -d "${repo_dir}" ]; then
         echo "MISSING" > "${status_file}"
-        echo "  [MISSING] ${repo_name}" >> "${BG_OUTPUT}"
+        echo "  [MISSING] ${repo_name}"
         return 2
     fi
 
     if ! cd "${repo_dir}"; then
         echo "MISSING" > "${status_file}"
-        echo "  [MISSING] ${repo_name}" >> "${BG_OUTPUT}"
+        echo "  [MISSING] ${repo_name}"
         return 2
     fi
 
@@ -262,15 +257,15 @@ run_repo_wrapper() {
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
-            echo "  [SKIP] ${repo_name} (no changes)" >> "${BG_OUTPUT}"
+            echo "  [SKIP] ${repo_name} (no changes)"
         else
             echo "PASS" > "${status_file}"
-            echo "  [PASS] ${repo_name} ✓" >> "${BG_OUTPUT}"
+            echo "  [PASS] ${repo_name} ✓"
         fi
         return 0
     else
         echo "FAIL" > "${status_file}"
-        echo "  [FAIL] ${repo_name} ✗" >> "${BG_OUTPUT}"
+        echo "  [FAIL] ${repo_name} ✗"
         return 1
     fi
 }
@@ -422,10 +417,9 @@ attempt_auto_fixes() {
         local prompt_file
         prompt_file=$(mktemp)
 
-        # Extract error-related lines from log, max 100 lines to keep prompt manageable
-        # Filter out PASSED lines (test names like test_aiohttp_error match "error" pattern)
+        # Extract error-related lines from log, max 500 lines
         local log_content
-        log_content=$(grep -iE "(error|fail|exception|traceback|assert|FAILED|✗|warning:|fatal)" "${log_file}" 2>/dev/null | grep -v "PASSED" | head -100)
+        log_content=$(grep -iE "(error|fail|exception|traceback|assert|FAILED|✗|warning:|fatal)" "${log_file}" 2>/dev/null | head -500)
         if [ -z "${log_content}" ]; then
             # If no errors found, send last 100 lines as context
             log_content=$(tail -100 "${log_file}")
@@ -444,7 +438,7 @@ Rules:
 - Do NOT add fallbacks or backwards-compatibility shims
 - Fix the actual code issues directly
 
-=== CI LOG (errors/failures, max 100 lines) ===
+=== CI LOG (errors/failures, max 500 lines) ===
 ${log_content}
 === END CI LOG ===
 PROMPT_EOF
@@ -584,9 +578,7 @@ if [ "${fail_count}" -gt 0 ]; then
     diag "Script completed with failures"
     echo ""
     echo "Diagnostic log: ${DIAG_LOG}"
-    echo "Run log: ${SCRIPT_LOG}"
     echo "=== SCRIPT END (with failures) ===" >&2
-    kill "${TAIL_PID}" 2>/dev/null || true
     exit 1
 fi
 
@@ -594,7 +586,5 @@ diag_section "FINAL STATUS"
 diag "Script completed successfully"
 echo ""
 echo "Diagnostic log: ${DIAG_LOG}"
-echo "Run log: ${SCRIPT_LOG}"
 echo "=== SCRIPT END (success) ===" >&2
-kill "${TAIL_PID}" 2>/dev/null || true
 exit 0
