@@ -1,10 +1,10 @@
-[07:51:16] [+0s] Script starting
-[07:51:16] [+0s] PROJECT_ROOT: /Users/mahrens917/projects/ci_shared
-[07:51:16] [+0s] LLM_CLI: claude, LLM_MODEL: opus
-[07:51:16] [+0s] PARALLEL_JOBS: 4, NUM_CORES: 8
+[17:33:35] [+1s] Script starting
+[17:33:35] [+1s] PROJECT_ROOT: /Users/mahrens917/projects/ci_shared
+[17:33:35] [+1s] LLM_CLI: claude, LLM_MODEL: opus
+[17:33:35] [+1s] PARALLEL_JOBS: 4, NUM_CORES: 8
 Validating 4 consuming repos in parallel (8 cores available)
 
-[07:51:19] [+3s] >>> CONFIG SYNC
+[17:33:38] [+4s] >>> CONFIG SYNC
 Pushing config to consuming repositories...
 
 Sync results:
@@ -83,11 +83,15 @@ Sync results:
   [poly] shared-tool-config.toml: up-to-date
   [poly/ci_tools] __init__.py: up-to-date
   [poly/scripts] ci.sh: up-to-date
-[07:51:19] [+3s] Config sync completed
-[07:51:19] [+3s] >>> VALIDATION RUN
+[17:33:39] [+5s] Config sync completed
+[17:33:39] [+5s] >>> VALIDATION RUN
 Running CI in 15 repositories (4 at a time)...
 
   [TESTING] ci_shared...
   [TESTING] api...
   [TESTING] zeus...
   [TESTING] monitor...
+  [SKIP] api (no changes)
+  [TESTING] aws...
+  [SKIP] aws (no changes)
+  [TESTING] common...
