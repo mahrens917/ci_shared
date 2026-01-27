@@ -114,6 +114,18 @@ def main() -> int:
         last_heartbeat = time.time()
         heartbeat_interval = 5  # Print dot every 5 seconds
 
+        def has_visible_content(raw: bytes) -> bool:
+            """Check if data contains substantial visible content (not just control chars)."""
+            # Decode and strip ANSI escape sequences
+            try:
+                text = raw.decode("utf-8", errors="replace")
+            except Exception:
+                return len(raw) > 20  # If decode fails, use size heuristic
+            text = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", text)
+            # Count printable non-whitespace characters
+            printable = sum(1 for c in text if c.isprintable() and not c.isspace())
+            return printable >= 10
+
         # Read output until process exits or we're killed
         while running:
             # Check if there's data to read
@@ -128,7 +140,9 @@ def main() -> int:
                         total_bytes += len(data)
                         sys.stdout.buffer.write(data)
                         sys.stdout.buffer.flush()
-                        last_heartbeat = time.time()  # Reset heartbeat on output
+                        # Only reset heartbeat on substantial visible output
+                        if has_visible_content(data):
+                            last_heartbeat = time.time()
                     else:
                         diag("EOF received")
                         break  # EOF
