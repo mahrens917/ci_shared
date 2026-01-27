@@ -6,7 +6,21 @@
 set -euo pipefail
 
 # Kill background jobs on Ctrl-C or termination
-trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
+cleanup_and_exit() {
+    local exit_code="${1:-130}"
+    # Close FIFO write end if open
+    exec 3>&- 2>/dev/null || true
+    # Kill FIFO reader if running
+    if [[ -n "${FIFO_READER_PID:-}" ]]; then
+        kill "${FIFO_READER_PID}" 2>/dev/null || true
+    fi
+    # Remove FIFO if exists
+    rm -f "${OUTPUT_FIFO:-}" 2>/dev/null || true
+    # Kill other background jobs
+    kill $(jobs -p) 2>/dev/null || true
+    exit "${exit_code}"
+}
+trap 'cleanup_and_exit 130' INT TERM
 
 # ============================================================================
 # Diagnostic logging functions
@@ -193,6 +207,20 @@ LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
 export LOGS_DIR
 mkdir -p "${LOGS_DIR}"
 
+# Create FIFO for background job output collection
+# This ensures background job output goes through the main process stdout
+# so it can be captured by external tee/redirection
+OUTPUT_FIFO="${LOGS_DIR}/output.fifo"
+mkfifo "${OUTPUT_FIFO}"
+export OUTPUT_FIFO
+
+# Start background reader that copies FIFO content to stdout
+cat "${OUTPUT_FIFO}" &
+FIFO_READER_PID=$!
+
+# Keep write end open in parent to prevent reader EOF when no active writers
+exec 3>"${OUTPUT_FIFO}"
+
 # Load consuming repos (ci_shared first, then consumers from config)
 CONSUMER_DIRS=("${PROJECT_ROOT}")
 if CONSUMER_OUTPUT=$(python "${PROJECT_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
@@ -219,6 +247,7 @@ fail_count=0
 missing_count=0
 
 # Run CI for a single repo
+# Writes status messages to OUTPUT_FIFO so they're captured by main process stdout
 run_repo_wrapper() {
     local repo_dir="$1"
     local logs_dir="$2"
@@ -226,17 +255,17 @@ run_repo_wrapper() {
     local log_file="${logs_dir}/${repo_name}.log"
     local status_file="${logs_dir}/${repo_name}.status"
 
-    echo "  [TESTING] ${repo_name}..."
+    echo "  [TESTING] ${repo_name}..." > "${OUTPUT_FIFO}"
 
     if [ ! -d "${repo_dir}" ]; then
         echo "MISSING" > "${status_file}"
-        echo "  [MISSING] ${repo_name}"
+        echo "  [MISSING] ${repo_name}" > "${OUTPUT_FIFO}"
         return 2
     fi
 
     if ! cd "${repo_dir}"; then
         echo "MISSING" > "${status_file}"
-        echo "  [MISSING] ${repo_name}"
+        echo "  [MISSING] ${repo_name}" > "${OUTPUT_FIFO}"
         return 2
     fi
 
@@ -244,15 +273,15 @@ run_repo_wrapper() {
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
-            echo "  [SKIP] ${repo_name} (no changes)"
+            echo "  [SKIP] ${repo_name} (no changes)" > "${OUTPUT_FIFO}"
         else
             echo "PASS" > "${status_file}"
-            echo "  [PASS] ${repo_name} ✓"
+            echo "  [PASS] ${repo_name} ✓" > "${OUTPUT_FIFO}"
         fi
         return 0
     else
         echo "FAIL" > "${status_file}"
-        echo "  [FAIL] ${repo_name} ✗"
+        echo "  [FAIL] ${repo_name} ✗" > "${OUTPUT_FIFO}"
         return 1
     fi
 }
@@ -567,6 +596,12 @@ if [ "${fail_count}" -gt 0 ]; then
     echo ""
     echo "Diagnostic log: ${DIAG_LOG}"
     echo "=== SCRIPT END (with failures) ===" >&2
+
+    # Clean up FIFO
+    exec 3>&- 2>/dev/null || true
+    wait "${FIFO_READER_PID}" 2>/dev/null || true
+    rm -f "${OUTPUT_FIFO}" 2>/dev/null || true
+
     exit 1
 fi
 
@@ -575,4 +610,10 @@ diag "Script completed successfully"
 echo ""
 echo "Diagnostic log: ${DIAG_LOG}"
 echo "=== SCRIPT END (success) ===" >&2
+
+# Clean up FIFO
+exec 3>&- 2>/dev/null || true
+wait "${FIFO_READER_PID}" 2>/dev/null || true
+rm -f "${OUTPUT_FIFO}" 2>/dev/null || true
+
 exit 0
