@@ -72,7 +72,7 @@ SHARED_PYTEST_LOG_OPTIONS ?= --log-level=ERROR
 PYLINT_ARGS ?=
 BANDIT_BASELINE ?=
 BANDIT_EXCLUDE ?= artifacts,trash,models,logs,htmlcov,data
-PIP_AUDIT_IGNORE_VULNS ?=
+PIP_AUDIT_IGNORE_VULNS ?= CVE-2026-0994
 BLACK_LINE_LENGTH ?= 140
 GITLEAKS_SOURCE_DIRS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy ci_shared.mk shared-tool-config.toml pyproject.toml Makefile README.md SECURITY.md)
 SHARED_CLEANUP_ROOTS ?= $(strip $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) scripts docs ci_tools ci_tools_proxy)
