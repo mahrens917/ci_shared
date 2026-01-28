@@ -3,6 +3,29 @@
 # Runs `scripts/ci.sh` in each consuming repo in parallel with live status reporting.
 # If validation fails, automatically invokes LLM CLI (configured in xci.config.json) to fix issues, then exits.
 
+# Kill any existing instances and orphaned processes from previous runs
+cleanup_previous_runs() {
+    local my_pid=$$
+    local pids
+
+    # Kill other validate_consumers.sh processes (exclude self and parent)
+    pids=$(pgrep -f "validate_consumers.sh" 2>/dev/null || true)
+    for pid in $pids; do
+        if [ "$pid" != "$my_pid" ] && [ "$pid" != "$PPID" ]; then
+            kill -9 "$pid" 2>/dev/null && echo "Killed previous validate_consumers.sh (PID $pid)" || true
+        fi
+    done
+
+    # Kill orphaned CI tool processes
+    pkill -9 -f "scripts/ci\.sh" 2>/dev/null && echo "Killed orphaned ci.sh processes" || true
+    pkill -9 -f "pytest.*--cov" 2>/dev/null && echo "Killed orphaned pytest processes" || true
+    pkill -9 -f "pyright.*src" 2>/dev/null && echo "Killed orphaned pyright processes" || true
+    pkill -9 -f "pylint.*src" 2>/dev/null && echo "Killed orphaned pylint processes" || true
+    pkill -9 -f "ruff check" 2>/dev/null && echo "Killed orphaned ruff processes" || true
+}
+
+cleanup_previous_runs
+
 set -euo pipefail
 
 # Auto-capture all output (including background jobs) to a log file
@@ -253,7 +276,7 @@ run_repo_wrapper() {
         return 2
     fi
 
-    if bash scripts/ci.sh > "${log_file}" 2>&1; then
+    if bash scripts/ci.sh 2>&1 | tee "${log_file}"; then
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
