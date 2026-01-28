@@ -226,9 +226,13 @@ run_validation() {
     done
 
     # Wait for all remaining jobs
-    echo "Waiting for all jobs to complete..."
-    for pid in "${job_pids[@]}"; do
+    echo "Waiting for ${#job_pids[@]} jobs: ${job_names[*]}"
+    for i in "${!job_pids[@]}"; do
+        pid="${job_pids[$i]}"
+        name="${job_names[$i]}"
+        echo "  Waiting for ${name} (PID ${pid})..."
         wait "$pid" 2>/dev/null || true
+        echo "  ${name} done."
     done
     echo "All jobs completed."
 
