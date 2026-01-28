@@ -276,7 +276,7 @@ run_repo_wrapper() {
         return 2
     fi
 
-    if bash scripts/ci.sh 2>&1 | tee "${log_file}"; then
+    if bash scripts/ci.sh > "${log_file}" 2>&1; then
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
