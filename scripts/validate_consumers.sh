@@ -128,10 +128,12 @@ fi
 declare -a pass_repos
 declare -a skip_repos
 declare -a fail_repos
+declare -a timeout_repos
 declare -a missing_repos
 pass_count=0
 skip_count=0
 fail_count=0
+timeout_count=0
 missing_count=0
 
 # Run CI for a single repo
@@ -156,7 +158,8 @@ run_repo_wrapper() {
         return 2
     fi
 
-    if bash scripts/ci.sh > "${log_file}" 2>&1; then
+    # Run CI with 10-minute timeout per repo
+    if timeout 600 bash scripts/ci.sh > "${log_file}" 2>&1; then
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
@@ -167,8 +170,14 @@ run_repo_wrapper() {
         fi
         return 0
     else
-        echo "FAIL" > "${status_file}"
-        echo "  [FAIL] ${repo_name} ✗"
+        exit_code=$?
+        if [ ${exit_code} -eq 124 ]; then
+            echo "TIMEOUT" > "${status_file}"
+            echo "  [TIMEOUT] ${repo_name} (CI hung after 10 min)"
+        else
+            echo "FAIL" > "${status_file}"
+            echo "  [FAIL] ${repo_name} ✗"
+        fi
         return 1
     fi
 }
@@ -221,7 +230,9 @@ run_validation() {
 
         # Start new job
         run_repo_wrapper "${repo_dir}" "${LOGS_DIR}" "${repo_name}" &
-        job_pids+=($!)
+        new_pid=$!
+        echo "  Started ${repo_name} as PID ${new_pid}"
+        job_pids+=("${new_pid}")
         job_names+=("${repo_name}")
     done
 
@@ -240,10 +251,12 @@ run_validation() {
     pass_repos=()
     skip_repos=()
     fail_repos=()
+    timeout_repos=()
     missing_repos=()
     pass_count=0
     skip_count=0
     fail_count=0
+    timeout_count=0
     missing_count=0
 
     # Collect results
@@ -270,6 +283,10 @@ run_validation() {
             FAIL)
                 fail_repos+=("${repo_name}")
                 ((fail_count++)) || true
+                ;;
+            TIMEOUT)
+                timeout_repos+=("${repo_name}")
+                ((timeout_count++)) || true
                 ;;
             MISSING)
                 missing_repos+=("${repo_name}")
@@ -370,6 +387,87 @@ PROMPT_EOF
     done
 }
 
+# Attempt to fix timeout (hanging) repos using Claude
+attempt_fix_timeouts() {
+    echo ""
+    echo "============================================"
+    echo "FIX TIMEOUTS: ${#timeout_repos[@]} hung repo(s)"
+    echo "============================================"
+    echo ""
+
+    for repo_name in "${timeout_repos[@]}"; do
+        local repo_dir
+        repo_dir=$(get_repo_dir "${repo_name}")
+
+        if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
+            echo "  [SKIP] ${repo_name} - directory not found"
+            continue
+        fi
+
+        echo "  [FIXING HANG] ${repo_name}..."
+
+        local log_file="${LOGS_DIR}/${repo_name}.log"
+        local log_content=""
+        if [ -f "${log_file}" ]; then
+            log_content=$(tail -200 "${log_file}")
+        fi
+
+        # Create a temp file with the prompt focused on fixing hangs
+        local prompt_file
+        prompt_file=$(mktemp)
+        cat > "${prompt_file}" << 'PROMPT_EOF'
+CRITICAL: This repository's CI/tests are HANGING (timing out after 10 minutes). Fix the hang issue FIRST.
+
+Common causes of CI hangs:
+1. Asyncio event loops not being closed properly in test fixtures
+2. Redis/database connections not being cleaned up after tests
+3. Background threads/processes started by tests that don't exit
+4. pytest fixtures with scope="session" that hang during teardown
+5. Mocks that intercept asyncio.Event.wait() or similar blocking calls incorrectly
+
+Focus on:
+- tests/conftest.py - look for session-scoped fixtures and cleanup code
+- Any fixture that creates event loops, Redis connections, or spawns processes
+- Ensure all async resources are properly closed with timeouts
+
+The partial CI log (before timeout) is below. Look for clues about what was running when it hung.
+
+Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation. Edit the files immediately.
+
+Rules:
+- Do NOT modify CI config, Makefiles, or pyproject.toml
+- Focus on fixing the HANG issue in test fixtures/conftest
+- Add timeouts to cleanup code if needed
+- Ensure event loops and connections are forcibly closed
+
+PROMPT_EOF
+        echo "=== PARTIAL CI LOG (before timeout) ===" >> "${prompt_file}"
+        echo "${log_content}" >> "${prompt_file}"
+        echo "=== END LOG ===" >> "${prompt_file}"
+
+        # Display the prompt being sent to the LLM
+        echo ""
+        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}) ━━━━━━━━━━━━━━━━━━━━━━"
+        cat "${prompt_file}"
+        echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        local start_time
+        start_time=$(date +%s)
+        echo "━━━ LLM OUTPUT (started $(date '+%H:%M:%S')) ━━━━━━━━━━━━━━━━━━"
+
+        # Run LLM CLI
+        local llm_output_log="${LOGS_DIR}/${repo_name}.llm_timeout_fix.log"
+        (
+            run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
+        ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
+        local elapsed=$(( $(date +%s) - start_time ))
+        echo "━━━ END LLM OUTPUT (${elapsed}s elapsed) ━━━━━━━━━━━━━━━━━━━━━"
+
+        rm -f "${prompt_file}"
+        echo "  [DONE] ${repo_name}"
+    done
+}
+
 # Display results summary
 display_results() {
     echo ""
@@ -389,28 +487,38 @@ display_results() {
         echo "  ✗ ${repo}"
     done
 
+    for repo in "${timeout_repos[@]}"; do
+        echo "  ⏱ ${repo} (hung)"
+    done
+
     for repo in "${missing_repos[@]}"; do
         echo "  ? ${repo}"
     done
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    local total=$((pass_count + skip_count + fail_count + missing_count))
+    local total=$((pass_count + skip_count + fail_count + timeout_count + missing_count))
     echo "Summary: ${pass_count}/${total} passed, ${skip_count} skipped"
     if [ "${fail_count}" -gt 0 ]; then
         echo "         ${fail_count} failed"
+    fi
+    if [ "${timeout_count}" -gt 0 ]; then
+        echo "         ${timeout_count} timed out (hung)"
     fi
     if [ "${missing_count}" -gt 0 ]; then
         echo "         ${missing_count} missing"
     fi
 
-    if [ "${fail_count}" -gt 0 ]; then
+    if [ "${fail_count}" -gt 0 ] || [ "${timeout_count}" -gt 0 ]; then
         echo ""
-        echo "Failed repo logs:"
+        echo "Problem repo logs:"
         local logs_relative
         logs_relative=$(echo "${LOGS_DIR}" | sed "s|${PROJECT_ROOT}/||")
         for repo in "${fail_repos[@]}"; do
             echo "  ${repo}: ${logs_relative}/${repo}.log"
+        done
+        for repo in "${timeout_repos[@]}"; do
+            echo "  ${repo}: ${logs_relative}/${repo}.log (TIMEOUT)"
         done
     fi
 }
@@ -437,9 +545,18 @@ run_validation
 
 display_results
 
-# Auto-fix failed repos (single pass, then exit)
+# Fix timeout (hanging) repos FIRST - these are higher priority
+if [ "${timeout_count}" -gt 0 ]; then
+    attempt_fix_timeouts
+fi
+
+# Then fix failed repos
 if [ "${fail_count}" -gt 0 ]; then
     attempt_auto_fixes
+fi
+
+# Show final results if there were any problems
+if [ "${timeout_count}" -gt 0 ] || [ "${fail_count}" -gt 0 ]; then
     display_results
     exit 1
 fi
