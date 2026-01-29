@@ -333,19 +333,9 @@ attempt_auto_fixes() {
 
         echo "  [FIXING] ${repo_name}..."
 
-        # Extract actual errors, filtering out coverage table noise
+        # Extract only error/warning lines from the log
         local errors
-        local filtered_log
-        filtered_log=$(grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|PASSED' "${log_file}" || true)
-        local head_part
-        head_part=$(printf '%s\n' "${filtered_log}" | head -50 || true)
-        local tail_part
-        tail_part=$(printf '%s\n' "${filtered_log}" | tail -300 || true)
-        errors="${head_part}
-
-[... middle of log omitted ...]
-
-${tail_part}"
+        errors=$(grep -i -E '(error|warning|failed|failure|exception|traceback|^\s*E\s+|^FAILED|:\s*[0-9]+:\s*[0-9]+:)' "${log_file}" | grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%' || true)
 
         # Create a temp file with the prompt to avoid escaping issues
         local prompt_file
@@ -409,7 +399,8 @@ attempt_fix_timeouts() {
         local log_file="${LOGS_DIR}/${repo_name}.log"
         local log_content=""
         if [ -f "${log_file}" ]; then
-            log_content=$(tail -200 "${log_file}")
+            # Extract only error/warning lines from the log
+            log_content=$(grep -i -E '(error|warning|failed|failure|exception|traceback|^\s*E\s+|^FAILED|:\s*[0-9]+:\s*[0-9]+:)' "${log_file}" || true)
         fi
 
         # Create a temp file with the prompt focused on fixing hangs
