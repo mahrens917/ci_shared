@@ -335,7 +335,7 @@ attempt_auto_fixes() {
 
         # Filter out progress/noise lines from the log
         local errors
-        errors=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]' "${log_file}" || true)
+        errors=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
 
         # Create a temp file with the prompt to avoid escaping issues
         local prompt_file
@@ -400,7 +400,7 @@ attempt_fix_timeouts() {
         local log_content=""
         if [ -f "${log_file}" ]; then
             # Filter out progress/noise lines from the log
-            log_content=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]' "${log_file}" || true)
+            log_content=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
         fi
 
         # Create a temp file with the prompt focused on fixing hangs
