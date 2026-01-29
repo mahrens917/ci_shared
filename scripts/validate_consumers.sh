@@ -333,9 +333,9 @@ attempt_auto_fixes() {
 
         echo "  [FIXING] ${repo_name}..."
 
-        # Extract only error/warning lines from the log
+        # Filter out progress/noise lines from the log
         local errors
-        errors=$(grep -i -E '(error|warning|failed|failure|exception|traceback|^\s*E\s+|^FAILED|:\s*[0-9]+:\s*[0-9]+:)' "${log_file}" | grep -v -E '^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|PASSED' || true)
+        errors=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]' "${log_file}" || true)
 
         # Create a temp file with the prompt to avoid escaping issues
         local prompt_file
@@ -399,8 +399,8 @@ attempt_fix_timeouts() {
         local log_file="${LOGS_DIR}/${repo_name}.log"
         local log_content=""
         if [ -f "${log_file}" ]; then
-            # Extract only error/warning lines from the log
-            log_content=$(grep -i -E '(error|warning|failed|failure|exception|traceback|^\s*E\s+|^FAILED|:\s*[0-9]+:\s*[0-9]+:)' "${log_file}" | grep -v 'PASSED' || true)
+            # Filter out progress/noise lines from the log
+            log_content=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]' "${log_file}" || true)
         fi
 
         # Create a temp file with the prompt focused on fixing hangs
