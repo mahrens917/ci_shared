@@ -32,6 +32,11 @@ trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 # Fix Node.js DNS resolution issue (IPv6 causes "Invalid DNS result order" errors)
 export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4first"
 
+# Safety backstop: absolute max wall-clock time for a single LLM invocation.
+# The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 300s).
+# This backstop is a last resort in case idle detection fails.
+LLM_BACKSTOP_TIMEOUT=1200  # 20 min absolute ceiling
+
 # Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
 # Args: repo_dir prompt_file output_log cli model
 run_llm_with_dns_retry() {
@@ -55,7 +60,7 @@ run_llm_with_dns_retry() {
         if [[ "${cli}" == "claude" ]]; then
             # Use PTY wrapper to avoid Bun hanging without a terminal (AVX issue)
             echo "  Running: python claude_pty_wrapper.py ..."
-            python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" 2>&1 | tee "${temp_output}" || true
+            timeout "${LLM_BACKSTOP_TIMEOUT}" python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" 2>&1 | tee "${temp_output}" || true
         else
             echo "  Running: codex exec ..."
             codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox 2>&1 | tee "${temp_output}" || true

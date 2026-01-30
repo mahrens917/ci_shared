@@ -121,7 +121,7 @@ omit = [
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
-    "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/ui_core/**/*.py",  # Exclude ui_core subsystem (hard to unit test)
     "*/textual_ui/**/*.py",  # Exclude textual_ui TUI subsystem (hard to unit test)
     "src/web.py",        # Exclude web entrypoint script
     "*/web/routes/*.py", # Exclude FastAPI routes (integration-tested, not unit-tested)
@@ -142,7 +142,7 @@ omit = [
     "*/_module_references.py", # Exclude module reference files (prevent circular imports)
     "*/_path_init.py",   # Exclude path initialization modules (side-effect imports at load time)
     "*/ui.py",           # Exclude UI entrypoint scripts
-    "*/peak_ui/**/*.py",  # Exclude peak_ui curses subsystem (hard to unit test)
+    "*/ui_core/**/*.py",  # Exclude ui_core subsystem (hard to unit test)
     "*/textual_ui/**/*.py",  # Exclude textual_ui TUI subsystem (hard to unit test)
     "src/web.py",        # Exclude web entrypoint script
     "*/web/routes/*.py", # Exclude FastAPI routes (integration-tested, not unit-tested)
