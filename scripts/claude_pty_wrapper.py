@@ -18,7 +18,7 @@ import time
 
 CLAUDE_BIN = os.path.expanduser("~/.local/bin/claude")
 MAX_PROMPT_SIZE = 100000
-IDLE_TIMEOUT_SECONDS = int(os.environ.get("LLM_IDLE_TIMEOUT", "300"))  # 5 min
+IDLE_TIMEOUT_SECONDS = int(os.environ.get("LLM_IDLE_TIMEOUT", "1800"))  # 30 min
 DIAG_ENABLED = os.environ.get("VALIDATE_DIAG", "1") == "1"
 START_TIME = time.time()
 

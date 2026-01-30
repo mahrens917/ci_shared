@@ -33,9 +33,9 @@ trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4first"
 
 # Safety backstop: absolute max wall-clock time for a single LLM invocation.
-# The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 300s).
+# The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 1800s).
 # This backstop is a last resort in case idle detection fails.
-LLM_BACKSTOP_TIMEOUT=1200  # 20 min absolute ceiling
+LLM_BACKSTOP_TIMEOUT=2400  # 40 min absolute ceiling
 
 # Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
 # Args: repo_dir prompt_file output_log cli model
