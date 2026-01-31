@@ -26,6 +26,14 @@ cleanup_previous_runs
 
 set -euo pipefail
 
+# Parse flags
+LOOP_MODE=false
+for arg in "$@"; do
+    if [[ "${arg}" == "--loop" ]]; then
+        LOOP_MODE=true
+    fi
+done
+
 # Kill background jobs on Ctrl-C or termination
 trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
 
@@ -527,34 +535,135 @@ echo "Validating ${#CONSUMER_DIRS[@]} repos in parallel (${PARALLEL_JOBS} jobs, 
 echo "Logs: ${LOGS_DIR}"
 echo ""
 
+if [ "${LOOP_MODE}" = true ]; then
+    echo "Loop mode enabled (5-minute interval when green)"
+    echo ""
+fi
+
 echo "Pushing config to consuming repositories..."
 
-# Push config to all repos
+# Push config to all repos (once, before loop)
 if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
     if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}"; then
         echo "⚠️  Config sync encountered issues (see above)" >&2
     fi
 fi
 
-# Initial validation run
-run_validation
+# Consecutive LLM fix attempt tracking per repo
+declare -A repo_fix_counts
+MAX_FIX_ATTEMPTS=3
+LOOP_SLEEP=300
 
-display_results
+loop_iteration=0
 
-# Fix timeout (hanging) repos FIRST - these are higher priority
-if [ "${timeout_count}" -gt 0 ]; then
-    attempt_fix_timeouts
-fi
+while true; do
+    ((loop_iteration++)) || true
 
-# Then fix failed repos
-if [ "${fail_count}" -gt 0 ]; then
-    attempt_auto_fixes
-fi
+    # Fresh logs directory for each iteration after the first
+    if [ "${loop_iteration}" -gt 1 ]; then
+        LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
+        export LOGS_DIR
+        mkdir -p "${LOGS_DIR}"
+    fi
 
-# Show final results if there were any problems
-if [ "${timeout_count}" -gt 0 ] || [ "${fail_count}" -gt 0 ]; then
+    # Run validation across all repos
+    if [ "${loop_iteration}" -eq 1 ]; then
+        run_validation
+    else
+        run_validation "Loop iteration ${loop_iteration}"
+    fi
+
     display_results
-    exit 1
-fi
 
-exit 0
+    # Reset fix counts for repos that passed or were skipped
+    for repo in "${pass_repos[@]}"; do
+        repo_fix_counts["${repo}"]=0
+    done
+    for repo in "${skip_repos[@]}"; do
+        repo_fix_counts["${repo}"]=0
+    done
+
+    # All green — sleep or exit
+    if [ "${fail_count}" -eq 0 ] && [ "${timeout_count}" -eq 0 ]; then
+        if [ "${LOOP_MODE}" = true ]; then
+            echo ""
+            echo "All repos green. Sleeping ${LOOP_SLEEP}s..."
+            sleep "${LOOP_SLEEP}"
+            continue
+        else
+            exit 0
+        fi
+    fi
+
+    # Determine which failing repos are still eligible for LLM fixes
+    fixable_timeout_repos=()
+    fixable_fail_repos=()
+    exhausted_repos=()
+
+    for repo in "${timeout_repos[@]}"; do
+        count="${repo_fix_counts["${repo}"]:-0}"
+        if [ "${count}" -lt "${MAX_FIX_ATTEMPTS}" ]; then
+            fixable_timeout_repos+=("${repo}")
+        else
+            exhausted_repos+=("${repo}")
+        fi
+    done
+
+    for repo in "${fail_repos[@]}"; do
+        count="${repo_fix_counts["${repo}"]:-0}"
+        if [ "${count}" -lt "${MAX_FIX_ATTEMPTS}" ]; then
+            fixable_fail_repos+=("${repo}")
+        else
+            exhausted_repos+=("${repo}")
+        fi
+    done
+
+    if [ "${#exhausted_repos[@]}" -gt 0 ]; then
+        echo ""
+        echo "Repos at max LLM fix attempts (${MAX_FIX_ATTEMPTS}):"
+        for repo in "${exhausted_repos[@]}"; do
+            echo "  ⊘ ${repo} (${repo_fix_counts["${repo}"]} attempts)"
+        done
+    fi
+
+    # Swap in only fixable repos for fix functions
+    saved_fail_repos=("${fail_repos[@]}")
+    saved_timeout_repos=("${timeout_repos[@]}")
+    timeout_repos=("${fixable_timeout_repos[@]}")
+    fail_repos=("${fixable_fail_repos[@]}")
+
+    # Fix timeout (hanging) repos first — higher priority
+    if [ "${#timeout_repos[@]}" -gt 0 ]; then
+        attempt_fix_timeouts
+    fi
+
+    # Then fix failed repos
+    if [ "${#fail_repos[@]}" -gt 0 ]; then
+        attempt_auto_fixes
+    fi
+
+    # Increment fix counts for repos we just attempted
+    for repo in "${timeout_repos[@]}"; do
+        repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+    done
+    for repo in "${fail_repos[@]}"; do
+        repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+    done
+
+    # Restore original arrays
+    fail_repos=("${saved_fail_repos[@]}")
+    timeout_repos=("${saved_timeout_repos[@]}")
+
+    if [ "${LOOP_MODE}" = true ]; then
+        # If no repos are fixable by LLM, sleep before next check
+        if [ "${#fixable_fail_repos[@]}" -eq 0 ] && [ "${#fixable_timeout_repos[@]}" -eq 0 ]; then
+            echo ""
+            echo "All failing repos exhausted LLM fix attempts. Sleeping ${LOOP_SLEEP}s..."
+            sleep "${LOOP_SLEEP}"
+        fi
+        continue
+    else
+        display_results
+        exit 1
+    fi
+done
