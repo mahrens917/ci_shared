@@ -54,6 +54,43 @@ if missing:
         print(result.stdout)
 PY
 
+# Ensure the current project is installed in editable mode so source
+# changes are picked up immediately without a manual reinstall.
+python - <<'PY'
+import json
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+pyproject = Path.cwd() / "pyproject.toml"
+if not pyproject.exists():
+    sys.exit(0)
+
+with open(pyproject, "rb") as f:
+    name = tomllib.load(f).get("project", {}).get("name", "")
+if not name:
+    sys.exit(0)
+
+result = subprocess.run(
+    [sys.executable, "-m", "pip", "list", "--editable", "--format=json"],
+    capture_output=True, text=True,
+)
+editable_names = {
+    pkg["name"].lower().replace("-", "_")
+    for pkg in json.loads(result.stdout)
+}
+
+if name.lower().replace("-", "_") not in editable_names:
+    print(f"Package '{name}' is not installed in editable mode; reinstalling with -e ...")
+    cmd = [sys.executable, "-m", "pip", "install", "--no-deps", "-e", "."]
+    sub = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if sub.returncode != 0:
+        print("Failed to install in editable mode:\n" + sub.stdout, file=sys.stderr)
+        sys.exit(sub.returncode)
+    print(sub.stdout)
+PY
+
 echo "Syncing pyproject.toml tool configuration with shared template..."
 if ! python -m ci_tools.scripts.tool_config_guard --repo-root "${PROJECT_ROOT}" --sync; then
   echo "tool_config_guard --sync failed; aborting." >&2
