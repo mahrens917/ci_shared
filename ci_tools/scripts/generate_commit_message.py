@@ -275,19 +275,31 @@ def _request_with_chunking(
     chunk_summaries: list[tuple[str, list[str]]] = []
 
     for index, chunk in enumerate(chunks, start=1):
+        chunk_lines = chunk.count("\n") + 1
         print(
-            f"[ci_shared] Requesting commit summary for chunk {index}/{total_chunks}...",
+            f"[ci_shared] Requesting commit summary for chunk {index}/{total_chunks} ({chunk_lines} lines)...",
             file=sys.stderr,
         )
         extra_context = (
             f"This prompt contains chunk {index}/{total_chunks} of the staged diff. Summarize only the changes visible in this chunk."
         )
-        summary, body_lines = request_commit_message(
-            model=model,
-            reasoning_effort=reasoning_effort,
-            staged_diff=chunk,
-            extra_context=extra_context,
-            detailed=False,
+        try:
+            summary, body_lines = request_commit_message(
+                model=model,
+                reasoning_effort=reasoning_effort,
+                staged_diff=chunk,
+                extra_context=extra_context,
+                detailed=False,
+            )
+        except Exception as exc:
+            print(
+                f"[ci_shared] Chunk {index}/{total_chunks} FAILED: {exc}",
+                file=sys.stderr,
+            )
+            raise
+        print(
+            f"[ci_shared] Chunk {index}/{total_chunks} succeeded.",
+            file=sys.stderr,
         )
         chunk_summaries.append(
             (
@@ -302,13 +314,26 @@ def _request_with_chunking(
         "of the original staged changes. Produce a single cohesive commit message that "
         "covers the entire change-set."
     )
-    return request_commit_message(
-        model=model,
-        reasoning_effort=reasoning_effort,
-        staged_diff=synthesized_diff,
-        extra_context=aggregate_context,
-        detailed=detailed,
+    print(
+        f"[ci_shared] Requesting final synthesis from {total_chunks} chunk summaries...",
+        file=sys.stderr,
     )
+    try:
+        result = request_commit_message(
+            model=model,
+            reasoning_effort=reasoning_effort,
+            staged_diff=synthesized_diff,
+            extra_context=aggregate_context,
+            detailed=detailed,
+        )
+    except Exception as exc:
+        print(
+            f"[ci_shared] Final synthesis FAILED: {exc}",
+            file=sys.stderr,
+        )
+        raise
+    print("[ci_shared] Final synthesis succeeded.", file=sys.stderr)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
