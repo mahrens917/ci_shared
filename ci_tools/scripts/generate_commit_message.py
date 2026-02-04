@@ -42,15 +42,18 @@ def _load_config_from_root(root: Path) -> dict[str, Any] | None:
 
 
 def get_commit_config() -> dict[str, Any]:
-    """Get the commit_message section from config."""
-    for root in _config_search_roots():
+    """Get the commit_message section, merging ci_shared defaults with repo overrides."""
+    merged: dict[str, Any] = {}
+    for root in reversed(list(_config_search_roots())):
         config = _load_config_from_root(root)
         if not config:
             continue
         section = config.get("commit_message")
         if isinstance(section, dict):
-            return section
-    raise KeyError("commit_message section required in ci_shared.config.json")
+            merged.update(section)
+    if not merged:
+        raise KeyError("commit_message section required in ci_shared.config.json")
+    return merged
 
 
 def _resolve_model_arg(cli_arg: str | None, config: dict[str, Any]) -> str | None:
@@ -113,7 +116,7 @@ def _print_payload_to_stdout(payload: str) -> int:
     return 0
 
 
-def _write_payload(payload: str, output_path: Path | None) -> int | None:
+def _write_payload(payload: str, output_path: Path | None) -> int:
     if not output_path:
         return _print_payload_to_stdout(payload)
     try:
@@ -202,8 +205,6 @@ def _chunk_by_lines(diff_text: str, chunk_count: int) -> list[str]:
         chunk_lines = lines[start : start + chunk_size]
         if chunk_lines:
             chunks.append("\n".join(chunk_lines).strip("\n"))
-    if not chunks:
-        return [diff_text]
     return chunks
 
 
@@ -221,8 +222,8 @@ def _chunk_diff(
 
     sections = _split_diff_sections(diff_text)
     if not sections:
-        sections = [diff_text]
-
+        # This handles edge case of whitespace-only diff that passed the early return
+        return [diff_text]
     chunks = _chunk_by_sections(sections, sanitized_max_lines, sanitized_max_chunks)
     if len(chunks) == 1 and total_lines > sanitized_max_lines:
         chunk_target = min(
@@ -230,8 +231,6 @@ def _chunk_diff(
             max(2, math.ceil(total_lines / sanitized_max_lines)),
         )
         chunks = _chunk_by_lines(diff_text, chunk_target)
-    if not chunks:
-        return [diff_text]
     return chunks
 
 
@@ -384,10 +383,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     payload = _prepare_payload(summary, body_lines)
-    result = _write_payload(payload, args.output)
-    if result is not None:
-        return result
-    return 0
+    return _write_payload(payload, args.output)
 
 
 def _generate_commit_message(

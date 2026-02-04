@@ -64,7 +64,7 @@ def _write_config(path: Path, data: dict[str, object]) -> None:
     path.write_text(json.dumps(data), encoding="utf-8")
 
 
-def testget_commit_config_prefers_repo(monkeypatch, tmp_path):
+def test_get_commit_config_prefers_repo(monkeypatch, tmp_path):
     """Repo root config should win when commit_message is present."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -84,7 +84,7 @@ def testget_commit_config_prefers_repo(monkeypatch, tmp_path):
     assert commit_message_module.get_commit_config()["model"] == "repo"
 
 
-def testget_commit_config_falls_back_to_shared(monkeypatch, tmp_path):
+def test_get_commit_config_falls_back_to_shared(monkeypatch, tmp_path):
     """Fallback to shared config when repo config lacks commit_message."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -539,3 +539,330 @@ def test_request_with_chunking_combines_results(mock_request):
     assert "chunk 1/2" in first_call_kwargs["extra_context"]
     final_call_kwargs = mock_request.call_args_list[-1].kwargs
     assert "synthesized summary" in final_call_kwargs["extra_context"]
+
+
+@patch("ci_tools.scripts.generate_commit_message.request_commit_message")
+def test_request_with_chunking_reraises_chunk_exception(mock_request):
+    """Exception during chunk processing is re-raised."""
+    mock_request.side_effect = Exception("API failure")
+    with pytest.raises(Exception, match="API failure"):
+        _request_with_chunking(
+            chunks=["diff --git a/a b/a\n+1"],
+            model="gpt-5-codex",
+            reasoning_effort="medium",
+            detailed=False,
+        )
+
+
+@patch("ci_tools.scripts.generate_commit_message.request_commit_message")
+def test_request_with_chunking_reraises_synthesis_exception(mock_request):
+    """Exception during final synthesis is re-raised."""
+    mock_request.side_effect = [
+        ("Chunk1 summary", []),
+        Exception("Synthesis failed"),
+    ]
+    with pytest.raises(Exception, match="Synthesis failed"):
+        _request_with_chunking(
+            chunks=["diff --git a/a b/a\n+1"],
+            model="gpt-5-codex",
+            reasoning_effort="medium",
+            detailed=False,
+        )
+
+
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
+def test_main_missing_model(mock_get_config, capsys):
+    """Test main exits with error when model not specified anywhere."""
+    mock_get_config.return_value = {
+        "reasoning": "medium",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
+    result = main([])
+    assert result == 1
+    captured = capsys.readouterr()
+    assert "Model must be specified" in captured.err
+
+
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
+def test_main_missing_reasoning(mock_get_config, capsys):
+    """Test main exits with error when reasoning not specified anywhere."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "chunk_line_limit": 1000,
+        "max_chunks": 5,
+    }
+    result = main([])
+    assert result == 1
+    captured = capsys.readouterr()
+    assert "Reasoning must be specified" in captured.err
+
+
+def test_split_diff_sections_empty_input():
+    """Empty or whitespace-only diff returns empty list."""
+    assert _split_diff_sections("") == []
+    assert _split_diff_sections("   \n\n   ") == []
+
+
+def test_chunk_by_sections_empty_returns_empty():
+    """Empty sections list returns empty chunks."""
+    assert _chunk_by_sections([], max_lines=10, max_chunks=5) == []
+
+
+def test_chunk_by_sections_single_chunk_when_max_is_one():
+    """Returns single combined chunk when max_chunks is 1."""
+    sections = ["diff --git a/a b/a\n+1", "diff --git a/b b/b\n+2"]
+    chunks = _chunk_by_sections(sections, max_lines=1, max_chunks=1)
+    assert len(chunks) == 1
+    assert "+1" in chunks[0] and "+2" in chunks[0]
+
+
+def test_chunk_by_lines_empty_returns_empty():
+    """Empty diff returns empty list."""
+    assert _chunk_by_lines("", chunk_count=3) == []
+
+
+def test_chunk_diff_returns_original_when_small():
+    """Small diff that fits under limits returns as single chunk."""
+    diff_text = "diff --git a/a b/a\n+1\n+2"
+    chunks = _chunk_diff(diff_text, max_chunk_lines=100, max_chunks=5)
+    assert chunks == [diff_text]
+
+
+def test_chunk_diff_returns_original_when_max_lines_zero():
+    """When max_chunk_lines is 0, return original diff."""
+    diff_text = "diff --git a/a b/a\n" + "\n".join(f"+line{i}" for i in range(50))
+    chunks = _chunk_diff(diff_text, max_chunk_lines=0, max_chunks=5)
+    assert chunks == [diff_text]
+
+
+def test_chunk_diff_returns_original_when_max_chunks_one():
+    """When max_chunks is 1, return original diff."""
+    diff_text = "diff --git a/a b/a\n" + "\n".join(f"+line{i}" for i in range(50))
+    chunks = _chunk_diff(diff_text, max_chunk_lines=10, max_chunks=1)
+    assert chunks == [diff_text]
+
+
+def test_chunk_diff_falls_back_to_line_chunking():
+    """Test chunking falls back to line-based when sections produce one chunk."""
+    # Create a single large section that exceeds max_lines
+    diff_text = "diff --git a/a b/a\n" + "\n".join(f"+line{i}" for i in range(20))
+    chunks = _chunk_diff(diff_text, max_chunk_lines=5, max_chunks=10)
+    assert len(chunks) > 1
+
+
+def test_build_chunk_summary_diff_empty_summary():
+    """Empty summary still produces valid placeholder output."""
+    result = _build_chunk_summary_diff([("", []), ("", [])])
+    assert "chunk_1" in result
+    assert "chunk_2" in result
+
+
+def test_build_chunk_summary_diff_all_empty_returns_placeholder():
+    """When all summaries and bodies empty, returns placeholder."""
+    # Create truly empty input that produces no content
+    result = _build_chunk_summary_diff([])
+    assert result == "+ chunk summary unavailable"
+
+
+def test_get_commit_config_merges_shared_and_repo(monkeypatch, tmp_path):
+    """Test that shared and repo configs are merged properly."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    repo_config = repo_root / "ci_shared.config.json"
+    _write_config(repo_config, {"commit_message": {"model": "repo-model", "extra_key": "repo"}})
+
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+    shared_config = shared_root / "ci_shared.config.json"
+    _write_config(
+        shared_config,
+        {"commit_message": {"model": "shared-model", "reasoning": "high"}},
+    )
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(commit_message_module, "detect_repo_root", lambda: repo_root)
+
+    config = commit_message_module.get_commit_config()
+    # repo overrides shared for model
+    assert config["model"] == "repo-model"
+    # shared provides reasoning
+    assert config["reasoning"] == "high"
+    # repo provides extra_key
+    assert config["extra_key"] == "repo"
+
+
+def test_get_commit_config_raises_when_missing(monkeypatch, tmp_path):
+    """Test get_commit_config raises KeyError when no commit_message found."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    _write_config(repo_root / "ci_shared.config.json", {"other_section": {}})
+
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+    _write_config(shared_root / "ci_shared.config.json", {"other_section": {}})
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(commit_message_module, "detect_repo_root", lambda: repo_root)
+
+    with pytest.raises(KeyError, match="commit_message section required"):
+        commit_message_module.get_commit_config()
+
+
+def test_config_search_roots_yields_both_when_different(monkeypatch, tmp_path):
+    """Test _config_search_roots yields both repo and shared roots."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(commit_message_module, "detect_repo_root", lambda: repo_root)
+
+    roots = list(commit_message_module._config_search_roots())
+    assert repo_root in roots
+    assert shared_root in roots
+
+
+def test_config_search_roots_yields_one_when_same(monkeypatch, tmp_path):
+    """Test _config_search_roots yields single root when repo == shared."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", repo_root)
+    monkeypatch.setattr(commit_message_module, "detect_repo_root", lambda: repo_root)
+
+    roots = list(commit_message_module._config_search_roots())
+    assert roots == [repo_root]
+
+
+def test_load_config_from_root_returns_none_when_no_config(tmp_path):
+    """Test _load_config_from_root returns None when no config file exists."""
+    result = commit_message_module._load_config_from_root(tmp_path)
+    assert result is None
+
+
+def test_load_config_from_root_loads_first_candidate(tmp_path):
+    """Test _load_config_from_root loads the first matching candidate."""
+    config_path = tmp_path / "ci_shared.config.json"
+    _write_config(config_path, {"key": "value"})
+    result = commit_message_module._load_config_from_root(tmp_path)
+    assert result == {"key": "value"}
+
+
+def test_resolve_model_arg_cli_takes_precedence():
+    """CLI arg takes precedence over env and config."""
+    from ci_tools.scripts.generate_commit_message import _resolve_model_arg
+
+    result = _resolve_model_arg("cli-model", {"model": "config-model"})
+    assert result == "cli-model"
+
+
+def test_resolve_model_arg_returns_config_when_no_cli_or_env(monkeypatch):
+    """Config value used when no CLI arg or env var."""
+    from ci_tools.scripts.generate_commit_message import _resolve_model_arg
+
+    monkeypatch.delenv("CI_COMMIT_MODEL", raising=False)
+    result = _resolve_model_arg(None, {"model": "config-model"})
+    assert result == "config-model"
+
+
+def test_resolve_reasoning_arg_cli_takes_precedence():
+    """CLI arg takes precedence over env and config."""
+    from ci_tools.scripts.generate_commit_message import _resolve_reasoning_arg
+
+    result = _resolve_reasoning_arg("cli-reasoning", {"reasoning": "config-reasoning"})
+    assert result == "cli-reasoning"
+
+
+def test_resolve_reasoning_arg_returns_config_when_no_cli_or_env(monkeypatch):
+    """Config value used when no CLI arg or env var."""
+    from ci_tools.scripts.generate_commit_message import _resolve_reasoning_arg
+
+    monkeypatch.delenv("CI_COMMIT_REASONING", raising=False)
+    result = _resolve_reasoning_arg(None, {"reasoning": "config-reasoning"})
+    assert result == "config-reasoning"
+
+
+def test_get_commit_config_skips_missing_config_file(monkeypatch, tmp_path):
+    """Test get_commit_config skips roots without config files."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    # No config file in repo_root
+
+    shared_root = tmp_path / "shared"
+    shared_root.mkdir()
+    _write_config(
+        shared_root / "ci_shared.config.json",
+        {"commit_message": {"model": "shared-model"}},
+    )
+
+    monkeypatch.setattr(commit_message_module, "CI_SHARED_ROOT", shared_root)
+    monkeypatch.setattr(commit_message_module, "detect_repo_root", lambda: repo_root)
+
+    # Should skip repo_root (no config) and use shared_root
+    config = commit_message_module.get_commit_config()
+    assert config["model"] == "shared-model"
+
+
+def test_chunk_diff_non_standard_diff_format():
+    """Test _chunk_diff handles text without diff --git headers."""
+    # Text that doesn't have "diff --git" headers - like a raw patch or malformed diff
+    non_standard_diff = "\n".join([f"+line{i}" for i in range(20)])
+    chunks = _chunk_diff(non_standard_diff, max_chunk_lines=5, max_chunks=10)
+    # Should fall back to line-based chunking
+    assert len(chunks) > 1
+    combined = "\n".join(chunks)
+    assert "+line0" in combined
+    assert "+line19" in combined
+
+
+def test_chunk_diff_whitespace_only_diff():
+    """Test _chunk_diff handles whitespace-only diff that passes the line count check."""
+    # Whitespace-only diff with multiple "lines" - edge case
+    whitespace_diff = "   \n   \n   \n   \n   "
+    chunks = _chunk_diff(whitespace_diff, max_chunk_lines=2, max_chunks=10)
+    # Should return the original whitespace diff as a single chunk
+    assert chunks == [whitespace_diff]
+
+
+@patch("ci_tools.scripts.generate_commit_message.get_commit_config")
+@patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
+@patch("ci_tools.scripts.generate_commit_message.request_commit_message")
+@patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
+@patch("ci_tools.scripts.generate_commit_message.resolve_reasoning_choice")
+def test_main_with_multiple_chunks(
+    mock_resolve_reasoning,
+    mock_resolve_model,
+    mock_request_commit,
+    mock_gather_diff,
+    mock_get_config,
+    capsys,
+):
+    """Test main uses chunking when diff exceeds limits."""
+    mock_get_config.return_value = {
+        "model": "gpt-5-codex",
+        "reasoning": "medium",
+        "chunk_line_limit": 5,
+        "max_chunks": 10,
+    }
+    # Create a diff large enough to be chunked (10 sections, 3 lines each = 30 lines)
+    large_diff = "\n".join(f"diff --git a/file{i}.py b/file{i}.py\n+line{i}" for i in range(10))
+    mock_gather_diff.return_value = large_diff
+    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_reasoning.return_value = "medium"
+    # Return for each of 5 chunks + final synthesis (6 calls total)
+    mock_request_commit.side_effect = [
+        ("Chunk1 summary", []),
+        ("Chunk2 summary", []),
+        ("Chunk3 summary", []),
+        ("Chunk4 summary", []),
+        ("Chunk5 summary", []),
+        ("Final summary", ["body"]),
+    ]
+
+    result = main([])
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Final summary" in captured.out
+    assert "Large staged diff detected" in captured.err
