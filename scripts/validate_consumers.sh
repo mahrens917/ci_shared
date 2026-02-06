@@ -103,14 +103,12 @@ export CI_SHARED_ROOT="${PROJECT_ROOT}"
 
 # Read LLM CLI configuration from xci.config.json
 XCI_CONFIG="${PROJECT_ROOT}/xci.config.json"
-if [[ -f "${XCI_CONFIG}" ]]; then
-    LLM_CLI=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['codex_cli'])")
-    LLM_MODEL=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['model'])")
-else
-    echo "Warning: xci.config.json not found, using defaults" >&2
-    LLM_CLI="claude"
-    LLM_MODEL="sonnet"
+if [[ ! -f "${XCI_CONFIG}" ]]; then
+    echo "ERROR: xci.config.json not found at ${XCI_CONFIG}" >&2
+    exit 1
 fi
+LLM_CLI=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['codex_cli'])")
+LLM_MODEL=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['model'])")
 
 # Calculate parallelism: 50% of available cores, minimum 1
 NUM_CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
