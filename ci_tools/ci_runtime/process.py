@@ -260,8 +260,9 @@ def get_commit_message(ref: str = "HEAD", cwd: Optional[Path] = None) -> str:
 
 
 def log_codex_interaction(kind: str, prompt: str, response: str) -> None:
-    """Append the interaction to logs/codex_ci.log for later auditing."""
-    log_dir = Path("logs")
+    """Append the interaction to ci_shared/logs/codex_ci.log for later auditing."""
+    ci_shared_root = Path(__file__).resolve().parents[2]
+    log_dir = ci_shared_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "codex_ci.log"
     with log_path.open("a", encoding="utf-8") as handle:

@@ -353,21 +353,24 @@ class TestGatherFileDiff:
 class TestLogCodexInteraction:
     """Tests for log_codex_interaction function."""
 
-    def test_creates_log_directory(self):
+    @staticmethod
+    def _fake_file(tmp_path):
+        """Create a fake module path so logs go under tmp_path."""
+        fake_dir = tmp_path / "ci_tools" / "ci_runtime"
+        fake_dir.mkdir(parents=True)
+        fake_file = fake_dir / "process.py"
+        fake_file.touch()
+        return str(fake_file)
+
+    def test_creates_log_directory(self, tmp_path, monkeypatch):
         """Test creates logs directory if it doesn't exist."""
-        with patch("ci_tools.ci_runtime.process.Path") as mock_path:
-            mock_log_dir = MagicMock()
-            mock_log_file = MagicMock()
-            mock_path.return_value = mock_log_dir
-            mock_log_dir.__truediv__ = MagicMock(return_value=mock_log_file)
-
-            log_codex_interaction("test", "prompt text", "response text")
-
-            mock_log_dir.mkdir.assert_called_once_with(parents=True, exist_ok=True)
+        monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
+        log_codex_interaction("test", "prompt text", "response text")
+        assert (tmp_path / "logs").is_dir()
 
     def test_appends_interaction_to_log(self, tmp_path, monkeypatch):
         """Test appends interaction to log file."""
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
         log_path = tmp_path / "logs" / "codex_ci.log"
 
         log_codex_interaction("patch request", "fix this", "here's the patch")
@@ -382,7 +385,7 @@ class TestLogCodexInteraction:
 
     def test_strips_whitespace_from_content(self, tmp_path, monkeypatch):
         """Test strips leading/trailing whitespace from logged content."""
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
         log_path = tmp_path / "logs" / "codex_ci.log"
 
         log_codex_interaction("test", "  prompt  \n", "  response  \n")
@@ -393,7 +396,7 @@ class TestLogCodexInteraction:
 
     def test_multiple_interactions_appended(self, tmp_path, monkeypatch):
         """Test multiple interactions are appended to same file."""
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
         log_path = tmp_path / "logs" / "codex_ci.log"
 
         log_codex_interaction("first", "prompt1", "response1")
@@ -407,7 +410,7 @@ class TestLogCodexInteraction:
 
     def test_handles_empty_strings(self, tmp_path, monkeypatch):
         """Test handles empty prompt or response strings."""
-        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
         log_path = tmp_path / "logs" / "codex_ci.log"
 
         log_codex_interaction("empty", "", "")
