@@ -14,7 +14,7 @@ def test_parse_args_defaults():
     """Test argument parsing with defaults."""
     guard = ModuleGuard()
     args = guard.parse_args([])
-    assert args.root == Path("src")
+    assert args.root is None
     assert args.max_module_lines == 600
     assert args.exclude == []
 
@@ -25,7 +25,7 @@ def test_parse_args_custom_values():
     args = guard.parse_args(
         ["--root", "custom", "--max-module-lines", "400", "--exclude", "tests"]
     )
-    assert args.root == Path("custom")
+    assert args.root == [Path("custom")]
     assert args.max_module_lines == 400
     assert args.exclude == [Path("tests")]
 

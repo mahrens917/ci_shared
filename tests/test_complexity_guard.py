@@ -125,3 +125,45 @@ def test_main_succeeds_without_violations(
     assert code == 0
     captured = capsys.readouterr()
     assert "All functions meet complexity limits" in captured.out
+
+
+def test_main_scans_multiple_roots(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that main scans files from multiple roots."""
+    src = tmp_path / "src"
+    scripts = tmp_path / "scripts"
+    src.mkdir()
+    scripts.mkdir()
+    write_module(
+        src / "ok.py",
+        """
+        def ok() -> int:
+            return 1
+        """,
+    )
+    write_module(
+        scripts / "also_ok.py",
+        """
+        def also_ok() -> int:
+            return 2
+        """,
+    )
+    code = run_main(monkeypatch, ["--root", str(src), "--root", str(scripts)])
+    assert code == 0
+    captured = capsys.readouterr()
+    assert "All functions meet complexity limits" in captured.out
+
+
+def test_build_parser_root_default_is_none() -> None:
+    """Test that build_parser --root defaults to None."""
+    parser = complexity_guard.build_parser()
+    args = parser.parse_args([])
+    assert args.root is None
+
+
+def test_build_parser_multiple_roots() -> None:
+    """Test that build_parser accepts multiple --root flags."""
+    parser = complexity_guard.build_parser()
+    args = parser.parse_args(["--root", "src", "--root", "scripts"])
+    assert args.root == [Path("src"), Path("scripts")]

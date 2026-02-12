@@ -14,7 +14,7 @@ def test_parse_args_defaults():
     """Test argument parsing with defaults."""
     guard = MethodCountGuard()
     args = guard.parse_args([])
-    assert args.root == Path("src")
+    assert args.root is None
     assert args.max_public_methods == 15
     assert args.max_total_methods == 25
     assert args.exclude == []
@@ -35,7 +35,7 @@ def test_parse_args_custom_values():
             "tests",
         ]
     )
-    assert args.root == Path("custom")
+    assert args.root == [Path("custom")]
     assert args.max_public_methods == 10
     assert args.max_total_methods == 20
     assert args.exclude == [Path("tests")]

@@ -165,12 +165,14 @@ def create_guard_parser(description: str, default_root: Path = Path("src")) -> a
     Returns:
         ArgumentParser with --root and --exclude arguments pre-configured
     """
+    _ = default_root  # Preserved for signature compatibility; default applied in GuardRunner.run()
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--root",
         type=Path,
-        default=default_root,
-        help=f"Directory to scan for Python files (default: {default_root}).",
+        action="append",
+        default=None,
+        help="Directory to scan (may be passed multiple times).",
     )
     parser.add_argument(
         "--exclude",
@@ -237,17 +239,25 @@ class GuardRunner(ABC):
         self.setup_parser(parser)
         return parser.parse_args(list(argv) if argv is not None else None)
 
+    def _resolve_roots(self, args: argparse.Namespace) -> Optional[List[Path]]:
+        """Resolve and validate root directories from parsed args."""
+        roots = args.root if args.root else [self.default_root]
+        roots = [r.resolve() for r in roots]
+        for root in roots:
+            if not root.exists():
+                print(f"{self.name}: failed to traverse {root}: path does not exist: {root}", file=sys.stderr)
+                return None
+        return roots
+
     def run(self, argv: Optional[Iterable[str]] = None) -> int:
         """Run guard script. Returns 0 if no violations, 1 otherwise."""
         args = self.parse_args(argv)
-        root, exclusions = args.root.resolve(), [p.resolve() for p in args.exclude]
-        violations: List[str] = []
-        try:
-            file_iter = list(iter_python_files(root))
-        except OSError as exc:
-            print(f"{self.name}: failed to traverse {root}: {exc}", file=sys.stderr)
+        roots = self._resolve_roots(args)
+        if roots is None:
             return 1
-        for file_path in file_iter:
+        exclusions = [p.resolve() for p in args.exclude]
+        violations: List[str] = []
+        for file_path in iter_python_files(roots):
             resolved = file_path.resolve()
             if is_excluded(resolved, exclusions):
                 continue

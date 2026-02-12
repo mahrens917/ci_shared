@@ -14,7 +14,7 @@ def test_parse_args_defaults():
     """Test argument parsing with defaults."""
     guard = StructureGuard()
     args = guard.parse_args([])
-    assert args.root == Path("src")
+    assert args.root is None
     assert args.max_class_lines == 100
     assert args.exclude == []
 
@@ -25,7 +25,7 @@ def test_parse_args_custom_values():
     args = guard.parse_args(
         ["--root", "custom", "--max-class-lines", "50", "--exclude", "tests"]
     )
-    assert args.root == Path("custom")
+    assert args.root == [Path("custom")]
     assert args.max_class_lines == 50
     assert args.exclude == [Path("tests")]
 

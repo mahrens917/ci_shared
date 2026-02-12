@@ -167,7 +167,7 @@ def check_file_complexity(file_path: Path, max_cyclomatic: int, max_cognitive: i
 def build_parser() -> argparse.ArgumentParser:
     """Create and configure the CLI argument parser."""
     parser = argparse.ArgumentParser(description="Enforce complexity limits (cyclomatic ≤10, cognitive ≤15)")
-    parser.add_argument("--root", type=Path, required=True, help="Root directory to scan")
+    parser.add_argument("--root", type=Path, action="append", default=None, help="Directory to scan (may be passed multiple times)")
     parser.add_argument(
         "--max-cyclomatic",
         type=int,
@@ -190,24 +190,32 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def resolve_root(root: Path) -> Path:
-    """Validate and resolve the root directory."""
-    if not root.exists():
-        print(f"Error: Directory {root} does not exist", file=sys.stderr)
-        sys.exit(1)
-    return root.resolve()
+def resolve_roots(roots: list[Path]) -> list[Path]:
+    """Validate and resolve root directories."""
+    resolved: list[Path] = []
+    for root in roots:
+        if not root.exists():
+            print(f"Error: Directory {root} does not exist", file=sys.stderr)
+            sys.exit(1)
+        resolved.append(root.resolve())
+    return resolved
 
 
-def resolve_excludes(root_path: Path, excludes: list[str]) -> list[Path]:
-    """Convert user provided excludes to resolved Paths."""
-    return [(root_path / Path(exclude_path)).resolve() for exclude_path in excludes]
+def resolve_excludes(root_paths: list[Path], excludes: list[str]) -> list[Path]:
+    """Convert user provided excludes to resolved Paths against each root."""
+    result: list[Path] = []
+    for root_path in root_paths:
+        result.extend((root_path / Path(exclude_path)).resolve() for exclude_path in excludes)
+    return result
 
 
-def gather_python_files(root_path: Path, exclude_paths: list[Path]) -> list[Path]:
-    """Return all python files under root that are not excluded."""
-    python_files = [path for path in root_path.rglob("*.py") if not is_excluded(path, exclude_paths)]
+def gather_python_files(root_paths: list[Path], exclude_paths: list[Path]) -> list[Path]:
+    """Return all python files under roots that are not excluded."""
+    python_files: list[Path] = []
+    for root_path in root_paths:
+        python_files.extend(path for path in root_path.rglob("*.py") if not is_excluded(path, exclude_paths))
     if not python_files:
-        print(f"No Python files found in {root_path}", file=sys.stderr)
+        print(f"No Python files found in {root_paths}", file=sys.stderr)
         sys.exit(1)
     return python_files
 
@@ -244,9 +252,10 @@ def report_violations(violations: list[ComplexityViolation], max_cyclomatic: int
 def main():
     """Main entry point for complexity guard."""
     args = build_parser().parse_args()
-    root_path = resolve_root(args.root)
-    exclude_paths = resolve_excludes(root_path, args.exclude)
-    python_files = gather_python_files(root_path, exclude_paths)
+    roots = args.root if args.root else [Path("src")]
+    root_paths = resolve_roots(roots)
+    exclude_paths = resolve_excludes(root_paths, args.exclude)
+    python_files = gather_python_files(root_paths, exclude_paths)
 
     all_violations = []
     for file_path in python_files:

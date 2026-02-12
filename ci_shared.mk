@@ -40,28 +40,32 @@ DEPENDENCY_MAX_INSTANTIATIONS := 5
 # REPOSITORY STRUCTURE (can be overridden for flat layouts)
 # ============================================================================
 SHARED_SOURCE_ROOT ?= src
+SHARED_EXTRA_SOURCE_ROOTS ?= scripts
+SHARED_GUARD_ROOTS := $(strip $(foreach dir,$(SHARED_SOURCE_ROOT) $(SHARED_EXTRA_SOURCE_ROOTS),$(wildcard $(dir))))
+GUARD_ROOT_FLAGS := $(foreach dir,$(SHARED_GUARD_ROOTS),--root $(dir))
 SHARED_TEST_ROOT ?= tests
 SHARED_DOC_ROOT ?= .
 
 # ============================================================================
 # CHECK TARGETS - ALL CODE MUST PASS (source + tests)
 # ============================================================================
-FORMAT_TARGETS ?= $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT)
-SHARED_PYRIGHT_TARGETS := $(SHARED_SOURCE_ROOT)
-SHARED_PYLINT_TARGETS := $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT)
+FORMAT_TARGETS ?= $(SHARED_GUARD_ROOTS) $(SHARED_TEST_ROOT)
+SHARED_PYRIGHT_TARGETS := $(SHARED_GUARD_ROOTS)
+SHARED_PYLINT_TARGETS := $(SHARED_GUARD_ROOTS) $(SHARED_TEST_ROOT)
 SHARED_PYTEST_TARGET := $(SHARED_TEST_ROOT)
-SHARED_PYTEST_COV_TARGET := $(SHARED_SOURCE_ROOT)
+SHARED_PYTEST_COV_FLAGS := $(foreach dir,$(SHARED_GUARD_ROOTS),--cov=$(dir))
 
 # ============================================================================
 # GUARD ARGUMENTS (strict standards applied - uses constants above)
 # ============================================================================
-STRUCTURE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-class-lines $(STRUCTURE_MAX_CLASS_LINES)
-COMPLEXITY_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-cyclomatic $(COMPLEXITY_MAX_CYCLOMATIC) --max-cognitive $(COMPLEXITY_MAX_COGNITIVE)
-MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-module-lines $(MODULE_MAX_LINES)
-FUNCTION_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-function-lines $(FUNCTION_MAX_LINES)
-METHOD_COUNT_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-public-methods $(METHOD_MAX_PUBLIC) --max-total-methods $(METHOD_MAX_TOTAL)
+STRUCTURE_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-class-lines $(STRUCTURE_MAX_CLASS_LINES)
+COMPLEXITY_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-cyclomatic $(COMPLEXITY_MAX_CYCLOMATIC) --max-cognitive $(COMPLEXITY_MAX_COGNITIVE)
+MODULE_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-module-lines $(MODULE_MAX_LINES)
+FUNCTION_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-function-lines $(FUNCTION_MAX_LINES)
+METHOD_COUNT_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-public-methods $(METHOD_MAX_PUBLIC) --max-total-methods $(METHOD_MAX_TOTAL)
 UNUSED_MODULE_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --exclude tests conftest.py __init__.py
-DEPENDENCY_GUARD_ARGS := --root $(SHARED_SOURCE_ROOT) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS) --exclude src/modeling/temporal/models
+INHERITANCE_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-depth $(INHERITANCE_MAX_DEPTH)
+DEPENDENCY_GUARD_ARGS := $(GUARD_ROOT_FLAGS) --max-instantiations $(DEPENDENCY_MAX_INSTANTIATIONS) --exclude src/modeling/temporal/models
 
 # ============================================================================
 # ALLOWED OVERRIDES (minimal - only for special cases)
@@ -174,7 +178,7 @@ shared-checks:
 	$(PYTHON) -m ci_tools.scripts.function_size_guard $(FUNCTION_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running inheritance_guard..."; \
-	$(PYTHON) -m ci_tools.scripts.inheritance_guard --root $(SHARED_SOURCE_ROOT) --max-depth $(INHERITANCE_MAX_DEPTH) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	$(PYTHON) -m ci_tools.scripts.inheritance_guard $(INHERITANCE_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running method_count_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.method_count_guard $(METHOD_COUNT_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
@@ -189,7 +193,7 @@ shared-checks:
 	$(PYTHON) -m ci_tools.scripts.documentation_guard --root $(SHARED_DOC_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running ruff..."; \
-	ruff check --target-version=py310 --fix $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	ruff check --target-version=py310 --fix $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running pyright..."; \
 	pyright --warnings $(SHARED_PYRIGHT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
@@ -210,13 +214,13 @@ shared-checks:
 	done; \
 	\
 	echo "→ Running pytest..."; \
-	pytest $(SHARED_PYTEST_TARGET) --cov=$(SHARED_PYTEST_COV_TARGET) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) --cov-report=term --strict-markers -W error $(SHARED_PYTEST_LOG_OPTIONS) $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	pytest $(SHARED_PYTEST_TARGET) $(SHARED_PYTEST_COV_FLAGS) --cov-fail-under=$(SHARED_PYTEST_THRESHOLD) --cov-report=term --strict-markers -W error $(SHARED_PYTEST_LOG_OPTIONS) $(SHARED_PYTEST_EXTRA) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running coverage_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.coverage_guard --threshold $(COVERAGE_GUARD_THRESHOLD) --data-file "$(CURDIR)/.coverage" || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running compileall..."; \
-	$(PYTHON) -m compileall -q $(SHARED_SOURCE_ROOT) $(SHARED_TEST_ROOT) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	$(PYTHON) -m compileall -q $(FORMAT_TARGETS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo ""; \
 	if [ $$FAILED_CHECKS -eq 0 ]; then \

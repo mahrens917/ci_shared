@@ -18,7 +18,7 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import List, Sequence
 
 from ci_tools.utils.consumers import load_consuming_repos
 
@@ -46,7 +46,7 @@ class SyncResult:
     message: str = ""
 
 
-def parse_args(argv: Iterable[str]) -> argparse.Namespace:
+def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Copy shared CI configs into multiple project directories.")
     parser.add_argument(
         "projects",
@@ -179,21 +179,62 @@ def sync_proxy_files(
     return results
 
 
-def main(argv: Iterable[str]) -> int:
-    args = parse_args(argv)
-    source_root = args.source_root.resolve()
-    files = args.files or DEFAULT_FILES
+def resolve_subdirs(args: argparse.Namespace) -> List[str]:
+    """Build the list of subdirectories to sync into each project."""
     subdirs: List[str] = []
     if not args.skip_default_subdirs:
         subdirs.extend(DEFAULT_SUBDIRS)
     if args.subdirs:
         subdirs.extend(args.subdirs)
+    return subdirs
+
+
+def sync_project(
+    project_root: Path,
+    source_root: Path,
+    files: List[str],
+    subdirs: List[str],
+    dry_run: bool,
+    backup_suffix: str,
+) -> List[SyncResult]:
+    """Sync all config files into a single project and its subdirectories."""
+    results: List[SyncResult] = []
+    results.extend(sync_target_root(project_root, project_root, source_root, files, dry_run, backup_suffix))
+    results.extend(sync_proxy_files(project_root, source_root, dry_run, backup_suffix))
+    for subdir in subdirs:
+        target_root = project_root / subdir
+        if target_root.exists():
+            results.extend(sync_target_root(project_root, target_root, source_root, files, dry_run, backup_suffix))
+    return results
+
+
+def print_summary(summary: List[SyncResult]) -> None:
+    """Print the sync results summary to stdout."""
+    print("\nSync results:")
+    for result in summary:
+        try:
+            rel_target = result.target_root.relative_to(result.project)
+            project_label = result.project.name if rel_target == Path(".") else f"{result.project.name}/{rel_target}"
+        except ValueError:
+            project_label = result.target_root.as_posix()
+        try:
+            destination = result.file.relative_to(result.target_root)
+        except ValueError:
+            destination = result.file
+        note = f" ({result.message})" if result.message else ""
+        print(f"  [{project_label}] {destination}: {result.action}{note}")
+
+
+def main(argv: Sequence[str]) -> int:
+    args = parse_args(argv)
+    source_root = args.source_root.resolve()
+    files = args.files or DEFAULT_FILES
+    subdirs = resolve_subdirs(args)
 
     if not source_root.exists():
         print(f"[error] Source root {source_root} does not exist", file=sys.stderr)
         return 2
 
-    summary: List[SyncResult] = []
     projects = args.projects
     if not projects:
         projects = [repo.path for repo in load_consuming_repos(source_root)]
@@ -202,51 +243,15 @@ def main(argv: Iterable[str]) -> int:
         print("[warning] No consuming repositories configured; nothing to sync.")
         return 0
 
+    summary: List[SyncResult] = []
     for project in projects:
         project_root = Path(project).expanduser().resolve()
         if not project_root.exists():
             summary.append(SyncResult(project_root, project_root, Path("."), "skipped", "project missing"))
             continue
+        summary.extend(sync_project(project_root, source_root, files, subdirs, args.dry_run, args.backup_suffix))
 
-        summary.extend(
-            sync_target_root(
-                project_root,
-                project_root,
-                source_root,
-                files,
-                args.dry_run,
-                args.backup_suffix,
-            )
-        )
-        summary.extend(sync_proxy_files(project_root, source_root, args.dry_run, args.backup_suffix))
-
-        for subdir in subdirs:
-            target_root = project_root / subdir
-            if not target_root.exists():
-                continue
-            summary.extend(
-                sync_target_root(
-                    project_root,
-                    target_root,
-                    source_root,
-                    files,
-                    args.dry_run,
-                    args.backup_suffix,
-                )
-            )
-
-    print("\nSync results:")
-    for result in summary:
-        try:
-            rel_target = result.target_root.relative_to(result.project)
-            project_label = result.project.name if rel_target == Path(".") else f"{result.project.name}/{rel_target}"
-        except ValueError:
-            project_label = result.target_root.as_posix()
-
-        destination = result.file.relative_to(result.target_root)
-        note = f" ({result.message})" if result.message else ""
-        print(f"  [{project_label}] {destination}: {result.action}{note}")
-
+    print_summary(summary)
     return 0
 
 

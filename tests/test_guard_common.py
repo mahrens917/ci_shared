@@ -9,8 +9,10 @@ from pathlib import Path
 import pytest
 
 from ci_tools.scripts.guard_common import (
+    GuardRunner,
     count_ast_node_lines,
     count_class_methods,
+    create_guard_parser,
     get_class_line_span,
     is_excluded,
     iter_python_files,
@@ -183,3 +185,89 @@ class TestParsePythonAst:
         py_file.write_text("def foo(")
         with pytest.raises(RuntimeError):
             parse_python_ast(py_file)
+
+
+class TestCreateGuardParserMultiRoot:
+    """Tests for multi-root support in create_guard_parser."""
+
+    def test_default_root_is_none(self):
+        """Test that --root defaults to None when not specified."""
+        parser = create_guard_parser("test guard")
+        args = parser.parse_args([])
+        assert args.root is None
+
+    def test_single_root(self):
+        """Test passing a single --root."""
+        parser = create_guard_parser("test guard")
+        args = parser.parse_args(["--root", "src"])
+        assert args.root == [Path("src")]
+
+    def test_multiple_roots(self):
+        """Test passing multiple --root flags."""
+        parser = create_guard_parser("test guard")
+        args = parser.parse_args(["--root", "src", "--root", "scripts"])
+        assert args.root == [Path("src"), Path("scripts")]
+
+
+class TestGuardRunnerMultiRoot:
+    """Tests for multi-root support in GuardRunner."""
+
+    def test_run_scans_multiple_roots(self, tmp_path: Path):
+        """Test that GuardRunner.run scans files from multiple roots."""
+        src = tmp_path / "src"
+        scripts = tmp_path / "scripts"
+        src.mkdir()
+        scripts.mkdir()
+        (src / "a.py").write_text("x = 1\n")
+        (scripts / "b.py").write_text("y = 2\n")
+
+        scanned_files: list[Path] = []
+
+        class _Recorder(GuardRunner):
+            def __init__(self):
+                super().__init__(name="recorder", description="test", default_root=Path("src"))
+
+            def setup_parser(self, parser):
+                pass
+
+            def scan_file(self, path, args):
+                scanned_files.append(path)
+                return []
+
+            def get_violations_header(self, args):
+                return ""
+
+        guard = _Recorder()
+        result = guard.run(["--root", str(src), "--root", str(scripts)])
+        assert result == 0
+        basenames = sorted(p.name for p in scanned_files)
+        assert basenames == ["a.py", "b.py"]
+
+    def test_run_uses_default_root_when_none_given(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """Test that GuardRunner falls back to default_root."""
+        monkeypatch.chdir(tmp_path)
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "a.py").write_text("x = 1\n")
+
+        scanned_files: list[Path] = []
+
+        class _Recorder(GuardRunner):
+            def __init__(self):
+                super().__init__(name="recorder", description="test", default_root=Path("src"))
+
+            def setup_parser(self, parser):
+                pass
+
+            def scan_file(self, path, args):
+                scanned_files.append(path)
+                return []
+
+            def get_violations_header(self, args):
+                return ""
+
+        guard = _Recorder()
+        result = guard.run([])
+        assert result == 0
+        assert len(scanned_files) == 1
+        assert scanned_files[0].name == "a.py"

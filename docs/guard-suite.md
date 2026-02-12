@@ -57,6 +57,22 @@ MAX_CLASS_LINES := 160
 include ci_shared.mk
 ```
 
+### Multi-Root Scanning
+
+Guards that use `--root` accept the flag multiple times to scan several
+directories in a single invocation:
+
+```bash
+python -m ci_tools.scripts.structure_guard --root src --root scripts --max-class-lines 100
+python -m ci_tools.scripts.complexity_guard --root src --root scripts
+```
+
+When no `--root` is provided, each guard defaults to its configured
+`default_root` (usually `src`). In `ci_shared.mk`, the variable
+`GUARD_ROOT_FLAGS` expands to `--root <dir>` for every directory in
+`SHARED_GUARD_ROOTS`, which is built from `SHARED_SOURCE_ROOT` +
+`SHARED_EXTRA_SOURCE_ROOTS`.
+
 ## Handling Large Artifacts
 
 Secret scanning and workspace cleanup both intentionally avoid massive runtime

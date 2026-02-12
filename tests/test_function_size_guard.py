@@ -18,7 +18,7 @@ def test_parse_args_defaults():
     """Test argument parsing with defaults."""
     guard = function_size_guard.FunctionSizeGuard()
     args = guard.parse_args([])
-    assert args.root == Path("src")
+    assert args.root is None
     assert args.max_function_lines == 80
     assert args.exclude == []
 
@@ -29,7 +29,7 @@ def test_parse_args_custom_values():
     args = guard.parse_args(
         ["--root", "custom", "--max-function-lines", "50", "--exclude", "tests"]
     )
-    assert args.root == Path("custom")
+    assert args.root == [Path("custom")]
     assert args.max_function_lines == 50
     assert args.exclude == [Path("tests")]
 

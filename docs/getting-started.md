@@ -90,6 +90,54 @@ The `shared-checks` target runs formatters, static analyzers, the guard suite,
 and pytest with coverage. Customize high-level knobs such as `FORMAT_TARGETS` or
 `PYTEST_NODES` by overriding the variables before including the file.
 
+### Scanning Additional Source Roots
+
+By default, guards scan only `$(SHARED_SOURCE_ROOT)` (typically `src`). Repos
+with standalone CLI scripts or other top-level Python directories can opt in to
+guard coverage by setting `SHARED_EXTRA_SOURCE_ROOTS` before the include:
+
+```make
+SHARED_EXTRA_SOURCE_ROOTS = scripts
+include ci_shared.mk
+
+.PHONY: check
+check: shared-checks
+```
+
+This extends the following tools to cover `scripts/` alongside `src/`:
+
+- **Guards**: structure, complexity, module, function_size, method_count,
+  inheritance, and dependency guards all scan every root listed in
+  `SHARED_GUARD_ROOTS` (= `SHARED_SOURCE_ROOT` + `SHARED_EXTRA_SOURCE_ROOTS`).
+- **Linters**: ruff, pyright, pylint, and compileall run against all roots.
+- **Coverage**: pytest `--cov` flags are generated per root so coverage reports
+  include the extra directories.
+
+Guards that intentionally remain single-root:
+
+| Guard | Reason |
+| ----- | ------ |
+| `unused_module_guard` | Scripts are standalone CLIs, not imported modules; scanning them would produce false positives. |
+| `policy_guard` / `data_guard` | Target library code (`src`, `tests`); subprocess/sleep bans do not apply to CLI scripts. |
+| `documentation_guard` | `--root` refers to the repo root (`.`), not a source root. |
+
+#### Consumer Repos with `scripts/` Directories
+
+The following repos have `scripts/` directories containing Python that should be
+checked. Rollout order is smallest-first to minimize fix-up effort:
+
+| Repo | Files | Approx. Lines |
+| ---- | ----: | ------------: |
+| tracker | 1 | 74 |
+| weather | 3 | 348 |
+| common | 2 | 616 |
+| analytics | 6 | 3,215 |
+| monitor | 57 | 13,655 |
+| zeus | 60 | 27,154 |
+
+For each repo: add `SHARED_EXTRA_SOURCE_ROOTS = scripts` to its `Makefile`,
+run `make check`, and fix any violations before merging.
+
 ## Verify the Installation
 1. `python -m ci_tools.ci --dry-run --command "echo ok"` – ensures CLI wiring
 2. `make shared-checks` – validates the guard scripts can be imported and run

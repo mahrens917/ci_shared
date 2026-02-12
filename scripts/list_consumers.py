@@ -7,14 +7,19 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure ci_shared is in path and CI_SHARED_ROOT is set
-ci_shared_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ci_shared_root))
-os.environ.setdefault("CI_SHARED_ROOT", str(ci_shared_root))
-
 from ci_tools.utils.consumers import load_consuming_repos
 
-repo_root = Path(sys.argv[1]) if len(sys.argv) > 1 else ci_shared_root
+CI_SHARED_ROOT = Path(__file__).resolve().parent.parent
 
-for repo in load_consuming_repos(repo_root):
-    print(repo.path)
+
+def main(argv: list[str]) -> int:
+    """Print consuming repository paths."""
+    os.environ.setdefault("CI_SHARED_ROOT", str(CI_SHARED_ROOT))
+    repo_root = Path(argv[0]) if argv else CI_SHARED_ROOT
+    for repo in load_consuming_repos(repo_root):
+        print(repo.path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
