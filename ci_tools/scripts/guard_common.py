@@ -255,7 +255,9 @@ class GuardRunner(ABC):
         roots = self._resolve_roots(args)
         if roots is None:
             return 1
-        exclusions = [p.resolve() for p in args.exclude]
+        exclusions: list[Path] = []
+        for root in roots:
+            exclusions.extend((root / p).resolve() for p in args.exclude)
         violations: List[str] = []
         for file_path in iter_python_files(roots):
             resolved = file_path.resolve()

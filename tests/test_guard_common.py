@@ -271,3 +271,42 @@ class TestGuardRunnerMultiRoot:
         assert result == 0
         assert len(scanned_files) == 1
         assert scanned_files[0].name == "a.py"
+
+    def test_exclude_resolves_relative_to_each_root(self, tmp_path: Path):
+        """Test that --exclude resolves relative to each root, not CWD."""
+        src = tmp_path / "src"
+        scripts = tmp_path / "scripts"
+        src.mkdir()
+        scripts.mkdir()
+        # File to keep in each root
+        (src / "keep.py").write_text("x = 1\n")
+        (scripts / "keep.py").write_text("y = 2\n")
+        # File to exclude — same relative name under both roots
+        (src / "generated.py").write_text("z = 3\n")
+        (scripts / "generated.py").write_text("w = 4\n")
+
+        scanned_files: list[Path] = []
+
+        class _Recorder(GuardRunner):
+            def __init__(self):
+                super().__init__(name="recorder", description="test", default_root=Path("src"))
+
+            def setup_parser(self, parser):
+                pass
+
+            def scan_file(self, path, args):
+                scanned_files.append(path)
+                return []
+
+            def get_violations_header(self, args):
+                return ""
+
+        guard = _Recorder()
+        result = guard.run([
+            "--root", str(src),
+            "--root", str(scripts),
+            "--exclude", "generated.py",
+        ])
+        assert result == 0
+        basenames = sorted(p.name for p in scanned_files)
+        assert basenames == ["keep.py", "keep.py"]
