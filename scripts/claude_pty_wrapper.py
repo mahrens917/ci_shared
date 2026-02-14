@@ -216,7 +216,9 @@ def spawn_claude(prompt: str, model: str, slave_fd: int) -> subprocess.Popen:
     """Spawn the Claude CLI process attached to the given PTY slave."""
     cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions", "--no-session-persistence"]
     diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions --no-session-persistence")
-    proc = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True)
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    diag("ANTHROPIC_API_KEY stripped from subprocess env (using Max plan auth)")
+    proc = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True, env=env)
     diag(f"process spawned, PID={proc.pid}")
     return proc
 
