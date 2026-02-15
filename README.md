@@ -1,6 +1,6 @@
 # codex-ci-tools
 
-Shared continuous-integration toolkit used across Zeus, Kalshi, AWS, API, and TicTacToe repositories. This package provides:
+Shared continuous-integration toolkit used across all trading system repositories (api, zeus, monitor, aws, common, signals, analytics, cfb, deribit, kalshi, pdf, tracker, weather, poly). This package provides:
 - **Automated CI repair loops** powered by Codex that fix failing checks
 - **Comprehensive guard suite** enforcing code quality, security, and complexity standards
 - **Shared CI pipeline** with consistent tooling across all consuming repositories
@@ -17,7 +17,7 @@ Shared continuous-integration toolkit used across Zeus, Kalshi, AWS, API, and Ti
 
 ## Installation
 
-### For Consuming Repositories (Zeus, Kalshi, AWS, API, TicTacToe)
+### For Consuming Repositories
 
 From your repository root:
 
@@ -145,7 +145,7 @@ When you push changes to `ci_shared`:
 ## Configuration
 - `ci_shared.config.json` supplies repository context, protected path prefixes,
   coverage thresholds, **and the `consuming_repositories` list** that drives
-  config sync + propagation into API, Zeus, Kalshi, AWS, etc.
+  config sync + propagation into all consuming repositories.
 - Environment variables such as `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, and
   `GIT_REMOTE` customize Codex behavior and push targets.
 
