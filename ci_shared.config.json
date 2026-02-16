@@ -62,6 +62,10 @@
     {
       "name": "poly",
       "path": "~/projects/poly"
+    },
+    {
+      "name": "textual-term",
+      "path": "~/projects/textual-term"
     }
   ],
   "commit_message": {
