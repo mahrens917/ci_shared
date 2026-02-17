@@ -13,6 +13,8 @@ from .config import RISKY_PATTERNS
 from .models import CodexCliError, PatchPrompt
 from .process import log_codex_interaction, stream_pipe
 
+CODEX_TIMEOUT_SECONDS = 120
+
 
 def _detect_cli_type(model: str) -> str:
     """Detect which CLI to use based on environment or model name."""
@@ -63,7 +65,11 @@ def _feed_prompt(process: subprocess.Popen[str], prompt: str) -> None:
         process.stdin.close()
 
 
-def _stream_output(process: subprocess.Popen[str]) -> tuple[list[str], list[str]]:
+def _stream_output(
+    process: subprocess.Popen[str],
+    *,
+    timeout: Optional[float] = None,
+) -> tuple[list[str], list[str]]:
     """Read stdout and stderr from the Codex subprocess concurrently.
 
     Delegates to the canonical stream_pipe implementation in process.py.
@@ -80,7 +86,7 @@ def _stream_output(process: subprocess.Popen[str]) -> tuple[list[str], list[str]
         threads[-1].start()
 
     for thread in threads:
-        thread.join()
+        thread.join(timeout=timeout)
     return stdout_lines, stderr_lines
 
 
@@ -90,8 +96,10 @@ def invoke_codex(
     model: str,
     description: str,
     reasoning_effort: Optional[str],
+    timeout: Optional[float] = None,
 ) -> str:
     """Execute the Codex CLI and return the assistant's response text."""
+    effective_timeout = timeout if timeout is not None else CODEX_TIMEOUT_SECONDS
     command = build_codex_command(model, reasoning_effort)
     with subprocess.Popen(
         command,
@@ -103,8 +111,18 @@ def invoke_codex(
     ) as process:
         feeder = threading.Thread(target=_feed_prompt, args=(process, prompt), daemon=True)
         feeder.start()
-        feeder.join()
-        stdout_lines, stderr_lines = _stream_output(process)
+        feeder.join(timeout=30)
+        stdout_lines, stderr_lines = _stream_output(process, timeout=effective_timeout)
+
+        # Check if output threads are still alive (timed out)
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+            raise CodexCliError.exit_status(
+                returncode=1,
+                output=f"Codex CLI timed out after {effective_timeout}s",
+            )
+
         returncode = process.wait()
     stdout = "".join(stdout_lines).strip()
     stderr = "".join(stderr_lines).strip()

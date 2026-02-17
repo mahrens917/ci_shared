@@ -169,8 +169,8 @@ run_repo_wrapper() {
         return 2
     fi
 
-    # Run CI with 10-minute timeout per repo
-    if timeout 600 bash scripts/ci.sh > "${log_file}" 2>&1; then
+    # Run CI with 30-minute timeout per repo
+    if timeout 1800 bash scripts/ci.sh > "${log_file}" 2>&1; then
         # Check if CI was skipped (no changes since last run)
         if grep -q "^SKIPPED:" "${log_file}"; then
             echo "SKIP" > "${status_file}"
@@ -184,7 +184,7 @@ run_repo_wrapper() {
         exit_code=$?
         if [ ${exit_code} -eq 124 ]; then
             echo "TIMEOUT" > "${status_file}"
-            echo "  [TIMEOUT] ${repo_name} (CI hung after 10 min)"
+            echo "  [TIMEOUT] ${repo_name} (CI hung after 30 min)"
         else
             echo "FAIL" > "${status_file}"
             echo "  [FAIL] ${repo_name} ✗"
@@ -418,7 +418,7 @@ attempt_fix_timeouts() {
         local prompt_file
         prompt_file=$(mktemp)
         cat > "${prompt_file}" << 'PROMPT_EOF'
-CRITICAL: This repository's CI/tests are HANGING (timing out after 10 minutes). Fix the hang issue FIRST.
+CRITICAL: This repository's CI/tests are HANGING (timing out after 30 minutes). Fix the hang issue FIRST.
 
 Common causes of CI hangs:
 1. Asyncio event loops not being closed properly in test fixtures

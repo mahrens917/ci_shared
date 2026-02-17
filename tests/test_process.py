@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from ci_tools.ci_runtime.process import (
+    _create_pipe_thread,
+    _handle_streaming_timeout,
     _run_command_buffered,
     _run_command_streaming,
-    stream_pipe,
-    run_command,
-    tail_text,
-    gather_git_diff,
-    gather_git_status,
     gather_file_diff,
+    gather_git_diff,
+    gather_git_diff_limited,
+    gather_git_status,
+    get_commit_message,
+    get_current_branch,
     log_codex_interaction,
+    run_command,
+    stream_pipe,
+    tail_text,
 )
 from ci_tools.ci_runtime.models import CommandResult
 
@@ -37,6 +43,7 @@ class TestRunCommandBuffered:
                 check=False,
                 env={},
                 cwd=None,
+                timeout=None,
             )
             assert isinstance(result, CommandResult)
             assert result.returncode == 0
@@ -56,6 +63,7 @@ class TestRunCommandBuffered:
                 check=False,
                 env={},
                 cwd=None,
+                timeout=None,
             )
             assert result.returncode == 1
             assert result.stderr == "error message"
@@ -75,6 +83,7 @@ class TestRunCommandBuffered:
                     check=True,
                     env={},
                     cwd=None,
+                    timeout=None,
                 )
             assert exc_info.value.returncode == 127
 
@@ -91,6 +100,7 @@ class TestRunCommandBuffered:
                 check=False,
                 env={"KEY": "value"},
                 cwd=None,
+                timeout=None,
             )
             assert result.stdout == "standard output"
             assert result.stderr == "standard error"
@@ -145,6 +155,7 @@ class TestRunCommandStreaming:
                 check=False,
                 env={},
                 cwd=None,
+                timeout=None,
             )
 
             assert result.returncode == 0
@@ -169,6 +180,7 @@ class TestRunCommandStreaming:
                     check=True,
                     env={},
                     cwd=None,
+                    timeout=None,
                 )
             assert exc_info.value.returncode == 1
 
@@ -186,6 +198,7 @@ class TestRunCommandStreaming:
                 check=False,
                 env={},
                 cwd=None,
+                timeout=None,
             )
 
             assert result.returncode == 0
@@ -418,6 +431,199 @@ class TestLogCodexInteraction:
         assert log_path.exists()
         content = log_path.read_text(encoding="utf-8")
         assert "--- empty ---" in content
+
+
+class TestBufferedTimeout:
+    """Tests for _run_command_buffered timeout handling."""
+
+    def test_timeout_with_check_false_returns_result(self):
+        """Test timeout without check returns CommandResult."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(["cmd"], 5)
+            result = _run_command_buffered(
+                ["cmd"],
+                check=False,
+                env={},
+                cwd=None,
+                timeout=5.0,
+            )
+            assert result.returncode == 1
+            assert result.stdout == ""
+            assert "timed out" in result.stderr
+
+    def test_timeout_with_check_true_raises(self):
+        """Test timeout with check raises CalledProcessError."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(["cmd"], 5)
+            with pytest.raises(subprocess.CalledProcessError):
+                _run_command_buffered(
+                    ["cmd"],
+                    check=True,
+                    env={},
+                    cwd=None,
+                    timeout=5.0,
+                )
+
+    def test_timeout_decodes_bytes_stdout(self):
+        """Test timeout with bytes stdout decodes correctly."""
+        with patch("subprocess.run") as mock_run:
+            exc = subprocess.TimeoutExpired(["cmd"], 5)
+            exc.stdout = b"partial output"
+            mock_run.side_effect = exc
+            result = _run_command_buffered(
+                ["cmd"],
+                check=False,
+                env={},
+                cwd=None,
+                timeout=5.0,
+            )
+            assert result.stdout == "partial output"
+
+    def test_timeout_handles_str_stdout(self):
+        """Test timeout with str stdout passes through."""
+        with patch("subprocess.run") as mock_run:
+            exc = subprocess.TimeoutExpired(["cmd"], 5)
+            exc.stdout = "string output"
+            mock_run.side_effect = exc
+            result = _run_command_buffered(
+                ["cmd"],
+                check=False,
+                env={},
+                cwd=None,
+                timeout=5.0,
+            )
+            assert result.stdout == "string output"
+
+
+class TestCreatePipeThread:
+    """Tests for _create_pipe_thread helper."""
+
+    def test_creates_daemon_thread(self):
+        """Test returns a daemon thread targeting stream_pipe."""
+        mock_pipe = MagicMock()
+        collector: list[str] = []
+        thread = _create_pipe_thread(mock_pipe, collector, None)
+        assert isinstance(thread, threading.Thread)
+        assert thread.daemon is True
+
+
+class TestHandleStreamingTimeout:
+    """Tests for _handle_streaming_timeout helper."""
+
+    def test_returns_result_without_check(self):
+        """Test returns CommandResult when check is False."""
+        mock_process = MagicMock()
+        result = _handle_streaming_timeout(
+            mock_process, ["cmd"], ["partial\n"], 5.0, check=False,
+        )
+        assert result.returncode == 1
+        assert result.stdout == "partial\n"
+        assert "timed out" in result.stderr
+        mock_process.kill.assert_called_once()
+
+    def test_raises_with_check(self):
+        """Test raises CalledProcessError when check is True."""
+        mock_process = MagicMock()
+        with pytest.raises(subprocess.CalledProcessError):
+            _handle_streaming_timeout(
+                mock_process, ["cmd"], [], 5.0, check=True,
+            )
+
+
+class TestStreamPipeNoTarget:
+    """Tests for stream_pipe when target is None."""
+
+    def test_collects_lines_without_forwarding(self):
+        """Test lines are collected but not forwarded when target is None."""
+        mock_pipe = MagicMock()
+        mock_pipe.readline.side_effect = ["line1\n", ""]
+        collector: list[str] = []
+        stream_pipe(mock_pipe, collector, None)
+        assert collector == ["line1\n"]
+        mock_pipe.close.assert_called_once()
+
+
+class TestGetCurrentBranch:
+    """Tests for get_current_branch function."""
+
+    def test_returns_branch_name(self):
+        """Test returns stripped branch name."""
+        with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+            mock_run.return_value = CommandResult(0, "main\n", "")
+            result = get_current_branch()
+            assert result == "main"
+            mock_run.assert_called_once_with(
+                ["git", "branch", "--show-current"], check=True, cwd=None,
+            )
+
+
+class TestGetCommitMessage:
+    """Tests for get_commit_message function."""
+
+    def test_returns_commit_subject(self):
+        """Test returns stripped commit message."""
+        with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+            mock_run.return_value = CommandResult(0, "Add feature\n", "")
+            result = get_commit_message()
+            assert result == "Add feature"
+            mock_run.assert_called_once_with(
+                ["git", "log", "-1", "--pretty=format:%s", "HEAD"],
+                check=True,
+                cwd=None,
+            )
+
+    def test_custom_ref(self):
+        """Test with custom git reference."""
+        with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+            mock_run.return_value = CommandResult(0, "Fix bug", "")
+            result = get_commit_message(ref="abc123")
+            assert result == "Fix bug"
+            call_args = mock_run.call_args[0][0]
+            assert "abc123" in call_args
+
+
+class TestGatherGitDiffLimited:
+    """Tests for gather_git_diff_limited function."""
+
+    def test_returns_full_diff_within_limits(self):
+        """Test returns full diff when within size limits."""
+        with patch("ci_tools.ci_runtime.process.gather_git_diff") as mock_diff:
+            mock_diff.return_value = "small diff"
+            result = gather_git_diff_limited()
+            assert result == "small diff"
+
+    def test_returns_summary_when_too_large(self):
+        """Test returns stat summary when diff exceeds limits."""
+        large_diff = "x" * 60000
+        with patch("ci_tools.ci_runtime.process.gather_git_diff") as mock_diff:
+            with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+                mock_diff.return_value = large_diff
+                mock_run.return_value = CommandResult(0, "3 files changed", "")
+                result = gather_git_diff_limited(max_chars=100)
+                assert "Diff too large" in result
+                assert "3 files changed" in result
+
+    def test_returns_summary_when_too_many_lines(self):
+        """Test returns summary when line count exceeds limit."""
+        many_lines = "\n".join(["line"] * 2000)
+        with patch("ci_tools.ci_runtime.process.gather_git_diff") as mock_diff:
+            with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+                mock_diff.return_value = many_lines
+                mock_run.return_value = CommandResult(0, "stat output", "")
+                result = gather_git_diff_limited(max_lines=5)
+                assert "Diff too large" in result
+
+    def test_staged_flag_forwarded(self):
+        """Test staged flag is forwarded to gather_git_diff and stat command."""
+        large_diff = "x" * 60000
+        with patch("ci_tools.ci_runtime.process.gather_git_diff") as mock_diff:
+            with patch("ci_tools.ci_runtime.process.run_command") as mock_run:
+                mock_diff.return_value = large_diff
+                mock_run.return_value = CommandResult(0, "stat", "")
+                gather_git_diff_limited(staged=True, max_chars=100)
+                mock_diff.assert_called_once_with(staged=True)
+                stat_args = mock_run.call_args[0][0]
+                assert "--cached" in stat_args
 
 
 class TestCommandResult:

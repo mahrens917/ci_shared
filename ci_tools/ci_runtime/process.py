@@ -18,17 +18,34 @@ def _run_command_buffered(
     check: bool,
     env: dict[str, str],
     cwd: Optional[Path],
+    timeout: Optional[float],
 ) -> CommandResult:
     """Run a subprocess and capture its output without streaming."""
-    process = subprocess.run(
-        args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-        cwd=str(cwd) if cwd else None,
-        check=False,
-    )
+    try:
+        process = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            cwd=str(cwd) if cwd else None,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        captured = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout if exc.stdout is not None else "")
+        if check:
+            raise subprocess.CalledProcessError(
+                1,
+                args,
+                output=captured,
+                stderr=f"Command timed out after {timeout}s",
+            ) from exc
+        return CommandResult(
+            returncode=1,
+            stdout=captured,
+            stderr=f"Command timed out after {timeout}s",
+        )
     if check and process.returncode != 0:
         raise subprocess.CalledProcessError(
             process.returncode,
@@ -64,12 +81,36 @@ def stream_pipe(pipe, collector: list[str], target=None) -> None:
         pipe.close()
 
 
+def _create_pipe_thread(pipe, collector: list[str], target) -> threading.Thread:
+    """Create a daemon thread that streams a pipe into a collector."""
+    return threading.Thread(target=stream_pipe, args=(pipe, collector, target), daemon=True)
+
+
+def _handle_streaming_timeout(
+    process: subprocess.Popen,
+    args: list[str],
+    stdout_lines: list[str],
+    timeout: Optional[float],
+    *,
+    check: bool,
+) -> CommandResult:
+    """Kill the process and return a timeout result."""
+    process.kill()
+    process.wait()
+    stdout_text = "".join(stdout_lines)
+    stderr_text = f"Command timed out after {timeout}s"
+    if check:
+        raise subprocess.CalledProcessError(1, args, output=stdout_text, stderr=stderr_text)
+    return CommandResult(returncode=1, stdout=stdout_text, stderr=stderr_text)
+
+
 def _run_command_streaming(
     args: list[str],
     *,
     check: bool,
     env: dict[str, str],
     cwd: Optional[Path],
+    timeout: Optional[float],
 ) -> CommandResult:
     """Stream stdout/stderr live while accumulating the full text."""
     stdout_lines: list[str] = []
@@ -84,28 +125,18 @@ def _run_command_streaming(
         cwd=str(cwd) if cwd else None,
     ) as process:
         threads: list[threading.Thread] = []
-
         if process.stdout:
-            threads.append(
-                threading.Thread(
-                    target=stream_pipe,
-                    args=(process.stdout, stdout_lines, sys.stdout),
-                    daemon=True,
-                )
-            )
+            threads.append(_create_pipe_thread(process.stdout, stdout_lines, sys.stdout))
         if process.stderr:
-            threads.append(
-                threading.Thread(
-                    target=stream_pipe,
-                    args=(process.stderr, stderr_lines, sys.stderr),
-                    daemon=True,
-                )
-            )
+            threads.append(_create_pipe_thread(process.stderr, stderr_lines, sys.stderr))
 
         for thread in threads:
             thread.start()
         for thread in threads:
-            thread.join()
+            thread.join(timeout=timeout)
+
+        if any(t.is_alive() for t in threads):
+            return _handle_streaming_timeout(process, args, stdout_lines, timeout, check=check)
 
         returncode = process.wait()
     stdout_text = "".join(stdout_lines)
@@ -128,6 +159,7 @@ def run_command(
     live: bool = False,
     env: Optional[dict[str, str]] = None,
     cwd: Optional[Path] = None,
+    timeout: Optional[float] = None,
 ) -> CommandResult:
     """Run a command, optionally streaming output while capturing it.
 
@@ -137,6 +169,7 @@ def run_command(
         live: If True, stream output to stdout/stderr while capturing
         env: Additional environment variables to merge with os.environ
         cwd: Working directory for the command (defaults to current directory)
+        timeout: Maximum seconds to wait before killing the process
 
     Returns:
         CommandResult with returncode, stdout, and stderr
@@ -151,6 +184,7 @@ def run_command(
         check=check,
         env=merged_env,
         cwd=cwd,
+        timeout=timeout,
     )
 
 

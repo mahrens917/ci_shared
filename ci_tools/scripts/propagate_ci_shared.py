@@ -140,6 +140,7 @@ def _reinstall_ci_shared(repo_path: Path, repo_name: str, source_root: Path) -> 
         [sys.executable, "-m", "pip", "install", "-e", str(source_root)],
         cwd=repo_path,
         check=False,
+        timeout=120,
     )
     if result.returncode != 0:
         print(f"⚠️  Failed to reinstall ci_shared in {repo_name}")
@@ -172,6 +173,9 @@ def _get_commit_message_fallback_model() -> str:
     return DEFAULT_CLAUDE_FALLBACK_MODEL
 
 
+COMMIT_MESSAGE_TIMEOUT_SECONDS = 180
+
+
 def _invoke_commit_message_generator(
     repo_path: Path,
     *,
@@ -190,6 +194,7 @@ def _invoke_commit_message_generator(
         cwd=repo_path,
         check=False,
         env=env_overrides,
+        timeout=COMMIT_MESSAGE_TIMEOUT_SECONDS,
     )
     if result.returncode != 0:
         print(f"⚠️  {label} commit message generation failed", file=sys.stderr)
