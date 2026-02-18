@@ -178,7 +178,7 @@ if [ -z "${COMMIT_MESSAGE}" ]; then
 
   if [ -n "${CLI_NAME}" ]; then
     if [ "${CI_CLI_TYPE}" = "claude" ]; then
-      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-claude-haiku-4-5-20251001}"
+      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-claude-sonnet-4-6}"
     else
       export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-gpt-5.1-codex-mini}"
     fi
