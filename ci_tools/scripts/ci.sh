@@ -83,7 +83,7 @@ editable_names = {
 
 if name.lower().replace("-", "_") not in editable_names:
     print(f"Package '{name}' is not installed in editable mode; reinstalling with -e ...")
-    cmd = [sys.executable, "-m", "pip", "install", "--no-deps", "-e", "."]
+    cmd = [sys.executable, "-m", "pip", "install", "--no-build-isolation", "--no-deps", "-e", "."]
     sub = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     if sub.returncode != 0:
         print("Failed to install in editable mode:\n" + sub.stdout, file=sys.stderr)
