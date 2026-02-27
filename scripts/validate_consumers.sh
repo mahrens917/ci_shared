@@ -26,13 +26,6 @@ cleanup_previous_runs
 
 set -euo pipefail
 
-# Parse flags
-LOOP_MODE=false
-for arg in "$@"; do
-    if [[ "${arg}" == "--loop" ]]; then
-        LOOP_MODE=true
-    fi
-done
 
 # Kill background jobs on Ctrl-C or termination
 trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
@@ -43,7 +36,7 @@ export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4fir
 # Safety backstop: absolute max wall-clock time for a single LLM invocation.
 # The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 1800s).
 # This backstop is a last resort in case idle detection fails.
-LLM_BACKSTOP_TIMEOUT=2400  # 40 min absolute ceiling
+LLM_BACKSTOP_TIMEOUT=3600  # 60 min absolute ceiling
 
 # Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
 # Args: repo_dir prompt_file output_log cli model
@@ -533,10 +526,6 @@ echo "Validating ${#CONSUMER_DIRS[@]} repos in parallel (${PARALLEL_JOBS} jobs, 
 echo "Logs: ${LOGS_DIR}"
 echo ""
 
-if [ "${LOOP_MODE}" = true ]; then
-    echo "Loop mode enabled (5-minute interval when green)"
-    echo ""
-fi
 
 echo "Pushing config to consuming repositories..."
 
@@ -581,16 +570,19 @@ while true; do
         repo_fix_counts["${repo}"]=0
     done
 
-    # All green — sleep or exit
+    # All repos skipped — nothing left to validate, stop
+    if [ "${skip_count}" -eq "${#CONSUMER_DIRS[@]}" ]; then
+        echo ""
+        echo "All repos skipped (no changes). Nothing to validate."
+        exit 0
+    fi
+
+    # All green — sleep and re-check
     if [ "${fail_count}" -eq 0 ] && [ "${timeout_count}" -eq 0 ]; then
-        if [ "${LOOP_MODE}" = true ]; then
-            echo ""
-            echo "All repos green. Sleeping ${LOOP_SLEEP}s..."
-            sleep "${LOOP_SLEEP}"
-            continue
-        else
-            exit 0
-        fi
+        echo ""
+        echo "All repos green. Sleeping ${LOOP_SLEEP}s..."
+        sleep "${LOOP_SLEEP}"
+        continue
     fi
 
     # Determine which failing repos are still eligible for LLM fixes
@@ -652,16 +644,11 @@ while true; do
     fail_repos=("${saved_fail_repos[@]}")
     timeout_repos=("${saved_timeout_repos[@]}")
 
-    if [ "${LOOP_MODE}" = true ]; then
-        # If no repos are fixable by LLM, sleep before next check
-        if [ "${#fixable_fail_repos[@]}" -eq 0 ] && [ "${#fixable_timeout_repos[@]}" -eq 0 ]; then
-            echo ""
-            echo "All failing repos exhausted LLM fix attempts. Sleeping ${LOOP_SLEEP}s..."
-            sleep "${LOOP_SLEEP}"
-        fi
-        continue
-    else
-        display_results
-        exit 1
+    # If no repos are fixable by LLM, sleep before next check
+    if [ "${#fixable_fail_repos[@]}" -eq 0 ] && [ "${#fixable_timeout_repos[@]}" -eq 0 ]; then
+        echo ""
+        echo "All failing repos exhausted LLM fix attempts. Sleeping ${LOOP_SLEEP}s..."
+        sleep "${LOOP_SLEEP}"
     fi
+    continue
 done
