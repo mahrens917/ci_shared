@@ -9,7 +9,7 @@ import pytest
 from ci_tools.ci_runtime.models import (
     CiAbort,
     CiError,
-    CodexCliError,
+    CliError,
     CommandConfig,
     CommandResult,
     CommitMessageError,
@@ -51,24 +51,24 @@ class TestCiError:
         assert isinstance(error, RuntimeError)
 
 
-class TestCodexCliError:
-    """Tests for CodexCliError exception."""
+class TestCliError:
+    """Tests for CliError exception."""
 
     def test_exit_status_with_output(self):
         """Test factory method with exit status and output."""
-        error = CodexCliError.exit_status(returncode=127, output="command not found")
+        error = CliError.exit_status(returncode=127, output="command not found")
         assert "exit status 127" in str(error)
         assert "command not found" in str(error)
 
     def test_exit_status_without_output(self):
         """Test factory method with no output."""
-        error = CodexCliError.exit_status(returncode=1, output=None)
+        error = CliError.exit_status(returncode=1, output=None)
         assert "exit status 1" in str(error)
         assert "(no output)" in str(error)
 
     def test_exit_status_empty_output(self):
         """Test factory method with empty string output."""
-        error = CodexCliError.exit_status(returncode=2, output="   ")
+        error = CliError.exit_status(returncode=2, output="   ")
         assert "exit status 2" in str(error)
         assert "(no output)" in str(error)
 
@@ -173,10 +173,10 @@ class TestModelSelectionAbort:
 
     def test_unsupported_model_factory(self):
         """Test unsupported_model factory method."""
-        abort = ModelSelectionAbort.unsupported_model(received="gpt-4", required="gpt-5-codex")
-        assert "gpt-5-codex" in str(abort)
+        abort = ModelSelectionAbort.unsupported_model(received="invalid-model", required="claude-sonnet-4-6")
+        assert "claude-sonnet-4-6" in str(abort)
 # pylint: disable=too-few-public-methods
-        assert "gpt-4" in str(abort)
+        assert "invalid-model" in str(abort)
 
 
 class TestReasoningEffortAbort:
@@ -255,7 +255,7 @@ class TestRuntimeOptions:
                 commit_message_enabled=True,
                 auto_push_enabled=False,
             ),
-            model=ModelConfig(name="gpt-5-codex", reasoning_effort="high"),
+            model=ModelConfig(name="claude-sonnet-4-6", reasoning_effort="high"),
         )
         assert options.command_tokens == ["make", "test"]
         assert options.command_env == {"FOO": "bar"}
@@ -264,7 +264,7 @@ class TestRuntimeOptions:
         assert options.auto_stage_enabled is False
         assert options.commit_message_enabled is True
         assert options.auto_push_enabled is False
-        assert options.model_name == "gpt-5-codex"
+        assert options.model_name == "claude-sonnet-4-6"
         assert options.reasoning_effort == "high"
 
 

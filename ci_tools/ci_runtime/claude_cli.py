@@ -1,4 +1,4 @@
-"""Codex/Claude CLI interaction helpers."""
+"""Claude CLI interaction helpers."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ import threading
 from typing import Optional
 
 from .config import RISKY_PATTERNS
-from .models import CodexCliError, PatchPrompt
-from .process import log_codex_interaction, stream_pipe
+from .models import CliError, PatchPrompt
+from .process import log_cli_interaction, stream_pipe
 
-CODEX_TIMEOUT_SECONDS = 120
+CLI_TIMEOUT_SECONDS = 120
 
 
 def _detect_cli_type(model: str) -> str:
@@ -21,35 +21,27 @@ def _detect_cli_type(model: str) -> str:
     cli_type_env = os.environ.get("CI_CLI_TYPE")
     if cli_type_env:
         cli_type = cli_type_env.lower()
-        if cli_type in ("claude", "codex"):
+        if cli_type == "claude":
             return cli_type
     if model.startswith("claude"):
         return "claude"
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "claude"
-    raise ValueError("CI_CLI_TYPE must be set to 'claude' or 'codex', or ANTHROPIC_API_KEY must be set")
+    raise ValueError("CI_CLI_TYPE must be set to 'claude', or ANTHROPIC_API_KEY must be set")
 
 
-def build_codex_command(model: str, reasoning_effort: Optional[str]) -> list[str]:
-    """Return the CLI invocation for the codex or claude binary."""
-    cli_type = _detect_cli_type(model)
-    if cli_type == "claude":
-        command = ["claude", "-p", "-"]
-        # Only pass --model if a Claude model is explicitly requested
-        # Skip passing non-Claude models (e.g., gpt-5-codex) - Claude CLI uses its default
-        if model and model.startswith("claude"):
-            command.insert(1, "--model")
-            command.insert(2, model)
-        return command
-    command = ["codex", "exec", "--model", model, "-"]
-    if reasoning_effort:
-        command.insert(-1, "-c")
-        command.insert(-1, f"model_reasoning_effort={reasoning_effort}")
+def build_claude_command(model: str, reasoning_effort: Optional[str]) -> list[str]:
+    """Return the CLI invocation for the claude binary."""
+    _detect_cli_type(model)
+    command = ["claude", "-p", "-"]
+    if model and model.startswith("claude"):
+        command.insert(1, "--model")
+        command.insert(2, model)
     return command
 
 
 def _feed_prompt(process: subprocess.Popen[str], prompt: str) -> None:
-    """Send the prompt to the Codex subprocess and close stdin.
+    """Send the prompt to the Claude subprocess and close stdin.
 
     BrokenPipeError is re-raised after closing stdin to signal the subprocess
     terminated before consuming the input.
@@ -70,7 +62,7 @@ def _stream_output(
     *,
     timeout: Optional[float] = None,
 ) -> tuple[list[str], list[str]]:
-    """Read stdout and stderr from the Codex subprocess concurrently.
+    """Read stdout and stderr from the Claude subprocess concurrently.
 
     Delegates to the canonical stream_pipe implementation in process.py.
     """
@@ -90,7 +82,7 @@ def _stream_output(
     return stdout_lines, stderr_lines
 
 
-def invoke_codex(
+def invoke_claude(
     prompt: str,
     *,
     model: str,
@@ -98,9 +90,9 @@ def invoke_codex(
     reasoning_effort: Optional[str],
     timeout: Optional[float] = None,
 ) -> str:
-    """Execute the Codex CLI and return the assistant's response text."""
-    effective_timeout = timeout if timeout is not None else CODEX_TIMEOUT_SECONDS
-    command = build_codex_command(model, reasoning_effort)
+    """Execute the Claude CLI and return the assistant's response text."""
+    effective_timeout = timeout if timeout is not None else CLI_TIMEOUT_SECONDS
+    command = build_claude_command(model, reasoning_effort)
     with subprocess.Popen(
         command,
         stdin=subprocess.PIPE,
@@ -118,20 +110,20 @@ def invoke_codex(
         if process.poll() is None:
             process.kill()
             process.wait()
-            raise CodexCliError.exit_status(
+            raise CliError.exit_status(
                 returncode=1,
-                output=f"Codex CLI timed out after {effective_timeout}s",
+                output=f"Claude CLI timed out after {effective_timeout}s",
             )
 
         returncode = process.wait()
     stdout = "".join(stdout_lines).strip()
     stderr = "".join(stderr_lines).strip()
 
-    log_codex_interaction(description, prompt, stdout or stderr)
+    log_cli_interaction(description, prompt, stdout or stderr)
 
     if returncode != 0:
         error_details = stderr or stdout
-        raise CodexCliError.exit_status(returncode=returncode, output=error_details)
+        raise CliError.exit_status(returncode=returncode, output=error_details)
 
     if stdout.startswith("assistant:"):
         stdout = stdout.partition("\n")[2].strip()
@@ -139,7 +131,7 @@ def invoke_codex(
 
 
 def truncate_error(error: Optional[str], limit: int = 2000) -> str:
-    """Shorten an error message for inclusion in Codex prompts."""
+    """Shorten an error message for inclusion in CLI prompts."""
     if not error:
         return "(none)"
     text = error.strip()
@@ -149,7 +141,7 @@ def truncate_error(error: Optional[str], limit: int = 2000) -> str:
 
 
 def extract_unified_diff(response_text: str) -> Optional[str]:
-    """Return the first diff block extracted from a Codex response."""
+    """Return the first diff block extracted from a Claude response."""
     if not response_text:
         return None
     if response_text.strip().upper() == "NOOP":
@@ -190,13 +182,13 @@ def _format_diff(diff: str, placeholder: str) -> str:
     return placeholder
 
 
-def request_codex_patch(
+def request_claude_patch(
     *,
     model: str,
     reasoning_effort: str,
     prompt: PatchPrompt,
 ) -> str:
-    """Ask Codex for a patch diff based on the supplied failure context."""
+    """Ask Claude for a patch diff based on the supplied failure context."""
     git_status_display = _format_git_status(prompt.git_status)
     summary_display = _format_summary(prompt.failure_context.summary)
     focused_diff_display = _format_diff(prompt.failure_context.focused_diff, "/* no focused diff */")
@@ -241,7 +233,7 @@ def request_codex_patch(
         - Do not modify automation scaffolding (ci.py, ci_tools/*, scripts/ci.sh).
         """
     )
-    return invoke_codex(
+    return invoke_claude(
         prompt_text,
         model=model,
         description="patch suggestion",
@@ -269,9 +261,9 @@ def risky_pattern_in_diff(diff_text: str) -> Optional[str]:
 
 
 __all__ = [
-    "build_codex_command",
-    "invoke_codex",
-    "request_codex_patch",
+    "build_claude_command",
+    "invoke_claude",
+    "request_claude_patch",
     "truncate_error",
     "extract_unified_diff",
     "has_unified_diff_header",

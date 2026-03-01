@@ -84,7 +84,7 @@ def perform_dry_run(args: argparse.Namespace, options: RuntimeOptions) -> Option
     """Run the CI command once when --dry-run is supplied."""
     if not args.dry_run:
         return None
-    print("[info] Dry run: executing CI command once without invoking Codex.")
+    print("[info] Dry run: executing CI command once without invoking Claude.")
     result = run_command(options.command_tokens, live=True, env=options.command_env)
     return result.returncode
 
@@ -121,7 +121,7 @@ def _maybe_request_commit_message(
     staged_diff: str,
     extra_context: str,
 ) -> tuple[Optional[str], list[str]]:
-    """Request a commit message from Codex when the mode is enabled."""
+    """Request a commit message from Claude when the mode is enabled."""
     if not options.commit_message_enabled:
         return None, []
     summary, body_lines = request_commit_message(
@@ -177,7 +177,7 @@ def finalize_worktree(args: argparse.Namespace, options: RuntimeOptions) -> int:
 
 
 def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> None:
-    """Loop CI execution and Codex interactions until the command succeeds."""
+    """Loop CI execution and Claude interactions until the command succeeds."""
     seen_patches: Set[str] = set()
     for iteration in range(1, args.max_iterations + 1):
         print(f"[loop] Iteration {iteration} — running `{args.command}`")
@@ -199,7 +199,7 @@ def run_repair_iterations(args: argparse.Namespace, options: RuntimeOptions) -> 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments for the workflow CLI."""
-    parser = argparse.ArgumentParser(description="Automate CI fixes via LLM (Codex or Claude).")
+    parser = argparse.ArgumentParser(description="Automate CI fixes via LLM (Claude).")
     parser.add_argument(
         "--command",
         help="Command to run for CI (initial: ./scripts/ci.sh)",

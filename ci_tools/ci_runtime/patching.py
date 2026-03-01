@@ -6,7 +6,7 @@ import os
 import subprocess
 from typing import Optional
 
-from .codex import risky_pattern_in_diff, truncate_diff_summary
+from .claude_cli import risky_pattern_in_diff, truncate_diff_summary
 from .config import PROTECTED_PATH_PREFIXES
 from .models import PatchApplyError
 
@@ -41,7 +41,7 @@ def _extract_diff_paths(patch_text: str) -> set[str]:
 
 
 def patch_looks_risky(patch_text: str, *, max_lines: int) -> tuple[bool, Optional[str]]:
-    """Evaluate a Codex patch suggestion for risky patterns or size limits."""
+    """Evaluate a Claude patch suggestion for risky patterns or size limits."""
     if not patch_text:
         msg = "Patch content was empty."
         return True, msg

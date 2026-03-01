@@ -24,31 +24,31 @@ from ci_tools.ci_runtime.models import (
 class TestObtainPatchDiff:
     """Tests for _obtain_patch_diff function."""
 
-    @patch("ci_tools.ci_runtime.patch_cycle.request_codex_patch")
+    @patch("ci_tools.ci_runtime.patch_cycle.request_claude_patch")
     @patch("ci_tools.ci_runtime.patch_cycle.extract_unified_diff")
     def test_returns_diff_text_on_success(self, mock_extract, mock_request):
-        """Test returning diff text when Codex responds with valid patch."""
+        """Test returning diff text when Claude responds with valid patch."""
         mock_request.return_value = "response with diff"
         mock_extract.return_value = "diff --git a/file.py b/file.py"
-        options = Mock(model_name="gpt-5-codex", reasoning_effort="high")
+        options = Mock(model_name="claude-sonnet-4-6", reasoning_effort="high")
         prompt = Mock()
 
         result = _obtain_patch_diff(options=options, prompt=prompt)
 
         assert result == "diff --git a/file.py b/file.py"
         mock_request.assert_called_once_with(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             prompt=prompt,
         )
 
-    @patch("ci_tools.ci_runtime.patch_cycle.request_codex_patch")
+    @patch("ci_tools.ci_runtime.patch_cycle.request_claude_patch")
     @patch("ci_tools.ci_runtime.patch_cycle.extract_unified_diff")
     def test_raises_when_no_diff_extracted(self, mock_extract, mock_request):
         """Test raising exception when no diff is extracted."""
         mock_request.return_value = "response without diff"
         mock_extract.return_value = None
-        options = Mock(model_name="gpt-5-codex", reasoning_effort="high")
+        options = Mock(model_name="claude-sonnet-4-6", reasoning_effort="high")
         prompt = Mock()
 
         with pytest.raises(PatchLifecycleAbort) as exc_info:
@@ -56,13 +56,13 @@ class TestObtainPatchDiff:
 
         assert "empty or NOOP patch" in str(exc_info.value)
 
-    @patch("ci_tools.ci_runtime.patch_cycle.request_codex_patch")
+    @patch("ci_tools.ci_runtime.patch_cycle.request_claude_patch")
     @patch("ci_tools.ci_runtime.patch_cycle.extract_unified_diff")
     def test_raises_when_empty_diff(self, mock_extract, mock_request):
         """Test raising exception when diff is empty string."""
         mock_request.return_value = "response"
         mock_extract.return_value = ""
-        options = Mock(model_name="gpt-5-codex", reasoning_effort="high")
+        options = Mock(model_name="claude-sonnet-4-6", reasoning_effort="high")
         prompt = Mock()
 
         with pytest.raises(PatchLifecycleAbort):
@@ -325,7 +325,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -373,7 +373,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -420,7 +420,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="prompt",
         )
@@ -468,7 +468,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -515,7 +515,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -564,7 +564,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -614,7 +614,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -663,7 +663,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -720,7 +720,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -756,7 +756,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="auto",
         )
@@ -794,7 +794,7 @@ class TestRequestAndApplyPatches:
             max_patch_lines=1500,
         )
         options = Mock(
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="prompt",
         )

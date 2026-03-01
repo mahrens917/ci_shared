@@ -54,13 +54,13 @@ class CiError(RuntimeError):
         super().__init__(message)
 
 
-class CodexCliError(CiError):
-    """Raised when invoking the Codex CLI returns a non-zero status."""
+class CliError(CiError):
+    """Raised when invoking the Claude CLI returns a non-zero status."""
 
-    default_message = "Codex CLI command failed"
+    default_message = "Claude CLI command failed"
 
     @classmethod
-    def exit_status(cls, *, returncode: int, output: Optional[str]) -> "CodexCliError":
+    def exit_status(cls, *, returncode: int, output: Optional[str]) -> "CliError":
         """Build an error containing the CLI exit status and captured output."""
         normalized = _normalize_output_with_placeholder(output)
         detail = f"exit status {returncode} ({normalized})"
@@ -74,12 +74,12 @@ class CommitMessageError(CiError):
 
     @classmethod
     def empty_response(cls) -> "CommitMessageError":
-        """Return an error signalling the Codex response was blank."""
+        """Return an error signalling the Claude response was blank."""
         return cls(detail="Commit message response was empty")
 
     @classmethod
     def invalid_response(cls, *, reason: str) -> "CommitMessageError":
-        """Return an error signalling the Codex response violated format expectations."""
+        """Return an error signalling the Claude response violated format expectations."""
         return cls(detail=reason)
 
 
@@ -167,13 +167,13 @@ class PatchLifecycleAbort(CiAbort):
 
     @classmethod
     def attempts_exhausted(cls) -> "PatchLifecycleAbort":
-        """Factory when Codex could not produce a valid patch in time."""
+        """Factory when Claude could not produce a valid patch in time."""
         return cls(detail="unable to obtain a valid patch after multiple attempts")
 
     @classmethod
     def missing_patch(cls) -> "PatchLifecycleAbort":
-        """Factory when Codex responded without a usable patch diff."""
-        return cls(detail="Codex returned an empty or NOOP patch response")
+        """Factory when Claude responded without a usable patch diff."""
+        return cls(detail="Claude returned an empty or NOOP patch response")
 
     @classmethod
     def user_declined(cls) -> "PatchLifecycleAbort":
@@ -183,7 +183,7 @@ class PatchLifecycleAbort(CiAbort):
     @classmethod
     def retries_exhausted(cls) -> "PatchLifecycleAbort":
         """Factory when patch retries were exhausted after repeated failures."""
-        return cls(detail="Codex patches failed after exhausting retries; manual review required")
+        return cls(detail="Claude patches failed after exhausting retries; manual review required")
 
 
 @dataclass
@@ -288,7 +288,7 @@ class RuntimeOptions:
 
 @dataclass
 class FailureContext:
-    """Summary of the most recent CI failure provided to Codex."""
+    """Summary of the most recent CI failure provided to Claude."""
 
     log_excerpt: str
     summary: str
@@ -299,7 +299,7 @@ class FailureContext:
 
 @dataclass
 class PatchAttemptState:
-    """Track Codex patch attempts and retry budget."""
+    """Track Claude patch attempts and retry budget."""
 
     max_attempts: int
     patch_attempt: int = 1
@@ -374,7 +374,7 @@ class CoverageCheckResult:
 
 @dataclass
 class PatchPrompt:
-    """Contextual information sent to Codex when requesting a patch."""
+    """Contextual information sent to Claude when requesting a patch."""
 
     command: str
     failure_context: FailureContext
@@ -388,7 +388,7 @@ class PatchPrompt:
 __all__ = [
     "display_value",
     "CiError",
-    "CodexCliError",
+    "CliError",
     "CommitMessageError",
     "CiAbort",
     "GitCommandAbort",

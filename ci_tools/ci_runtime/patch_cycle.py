@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Optional, Set
 
-from .codex import (
+from .claude_cli import (
     extract_unified_diff,
     has_unified_diff_header,
-    request_codex_patch,
+    request_claude_patch,
 )
 from .models import (
     FailureContext,
@@ -22,8 +22,8 @@ from .process import gather_git_diff_limited, gather_git_status
 
 
 def _obtain_patch_diff(*, options: RuntimeOptions, prompt: PatchPrompt) -> str:
-    """Request a patch from Codex and return its diff text."""
-    response = request_codex_patch(
+    """Request a patch from Claude and return its diff text."""
+    response = request_claude_patch(
         model=options.model_name,
         reasoning_effort=options.reasoning_effort,
         prompt=prompt,
@@ -81,7 +81,7 @@ def _should_apply_patch(
 ) -> bool:
     """Return True when the user (or automation) approves applying the patch."""
     if approval_mode == "auto":
-        print(f"[codex] Auto-approving patch attempt {attempt}.")
+        print(f"[claude] Auto-approving patch attempt {attempt}.")
         return True
     decision = input(f"[prompt] Apply patch attempt {attempt}? [y]es/[n]o/[q]uit: ").strip().lower()
     if decision in {"q", "quit"}:
@@ -101,7 +101,7 @@ def request_and_apply_patches(
     state = PatchAttemptState(max_attempts=args.patch_retries + 1)
     while True:
         state.ensure_budget()
-        print(f"[codex] Requesting patch attempt {state.patch_attempt}...")
+        print(f"[claude] Requesting patch attempt {state.patch_attempt}...")
         prompt = PatchPrompt(
             command=args.command,
             failure_context=failure_ctx,

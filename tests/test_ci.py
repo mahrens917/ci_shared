@@ -6,7 +6,7 @@ from __future__ import annotations
 from ci_tools.ci_runtime import (
     PatchPrompt,
     apply_patch,
-    build_codex_command,
+    build_claude_command,
     build_failure_context,
     commit_and_push,
     configure_runtime,
@@ -17,13 +17,13 @@ from ci_tools.ci_runtime import (
     gather_git_diff,
     gather_git_status,
     has_unified_diff_header,
-    invoke_codex,
-    log_codex_interaction,
+    invoke_claude,
+    log_cli_interaction,
     main,
     patch_looks_risky,
     perform_dry_run,
     request_and_apply_patches,
-    request_codex_patch,
+    request_claude_patch,
     request_commit_message,
     run_command,
     run_repair_iterations,
@@ -69,12 +69,12 @@ class TestCiRuntimeExports:
         assert callable(gather_git_status)
         assert callable(gather_file_diff)
 
-        # Verify Codex interaction functions
-        assert callable(invoke_codex)
-        assert callable(build_codex_command)
-        assert callable(request_codex_patch)
+        # Verify Claude interaction functions
+        assert callable(invoke_claude)
+        assert callable(build_claude_command)
+        assert callable(request_claude_patch)
         assert callable(request_commit_message)
-        assert callable(log_codex_interaction)
+        assert callable(log_cli_interaction)
 
         # Verify patch functions
         assert callable(apply_patch)
@@ -161,16 +161,16 @@ class TestCiModuleStructure:
         for func in git_functions:
             assert func in ci_module.__all__
 
-    def test_codex_functions_in_all(self):
-        """Test that Codex interaction functions are in __all__."""
-        codex_functions = [
-            "invoke_codex",
-            "build_codex_command",
-            "request_codex_patch",
+    def test_claude_functions_in_all(self):
+        """Test that Claude interaction functions are in __all__."""
+        claude_functions = [
+            "invoke_claude",
+            "build_claude_command",
+            "request_claude_patch",
             "request_commit_message",
-            "log_codex_interaction",
+            "log_cli_interaction",
         ]
-        for func in codex_functions:
+        for func in claude_functions:
             assert func in ci_module.__all__
 
     def test_patch_functions_in_all(self):

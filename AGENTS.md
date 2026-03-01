@@ -5,7 +5,7 @@
 
 ## Core Commands
 - `make check` runs `ci_tools/scripts/ci.sh`, which syncs tool configs, ensures test deps, then executes the guard + test pipeline.
-- `python -m ci_tools.ci --model gpt-5-codex` runs the automation loop (use `--command "<cmd>"` to override CI).
+- `python -m ci_tools.ci --model claude-sonnet-4-6` runs the automation loop (use `--command "<cmd>"` to override CI).
 - `python scripts/sync_project_configs.py <consumer...>` pushes updated shared assets into downstream repos.
 
 ## Code Hygiene

@@ -6,14 +6,14 @@ repository, and running the automation loop for the first time.
 ## Prerequisites
 - Python 3.10 or newer
 - `pip` and `virtualenv` (recommended for isolated installs)
-- Access to the [Codex CLI](https://github.com/kalshi-trading/codex-cli) with a
-  valid `OPENAI_API_KEY`
+- Access to the [Claude CLI](https://claude.ai/claude-code) with a
+  valid `ANTHROPIC_API_KEY`
 - Git repository with a `scripts/ci.sh` file
   - In consuming repos: Should delegate to `ci_tools/scripts/ci.sh` (installed via this package)
   - The shared CI script handles check execution, commit generation, and push
 
 ## Install the Package
-From the consuming repository root, install `codex-ci-tools` in editable mode so
+From the consuming repository root, install `claude-ci-tools` in editable mode so
 that the Python package and helper scripts resolve correctly:
 
 ```bash
@@ -61,17 +61,17 @@ CI_AUTOMATION=1 ./scripts/ci.sh  # Checks only, no git operations
 The `scripts/ci.sh` wrapper delegates to `ci_tools/scripts/ci.sh`, which:
 - Installs missing test dependencies
 - Runs `make check` to execute all guards and tests
-- Stages changes and generates Codex commit messages (unless `CI_AUTOMATION=1`)
+- Stages changes and generates Claude commit messages (unless `CI_AUTOMATION=1`)
 - Commits and pushes to remote (interactive mode only)
 
 ### Python Automation Interface (for repair loops)
 ```bash
-python -m ci_tools.ci --model gpt-5-codex --reasoning-effort high
+python -m ci_tools.ci --model claude-sonnet-4-6 --reasoning-effort high
 ```
 
 - Runs the configured CI command (default: `./scripts/ci.sh` with `CI_AUTOMATION=1`)
-- Streams logs to Codex when failures occur
-- Applies Codex patches while enforcing protected path rules
+- Streams logs to Claude when failures occur
+- Applies Claude patches while enforcing protected path rules
 - Generates a commit message when checks pass
 
 ## Integrate Shared Makefile Targets

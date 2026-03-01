@@ -4,7 +4,7 @@ Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for 
 
 ## Quick Commands
 - `make check` → runs `ci_tools/scripts/ci.sh` (syncs tool configs, ensures deps, then executes the guard + test pipeline).
-- `python -m ci_tools.ci --model gpt-5-codex` → automation loop (override with `--command "<cmd>"` if needed).
+- `python -m ci_tools.ci --model claude-sonnet-4-6` → automation loop (override with `--command "<cmd>"` if needed).
 - `python scripts/sync_project_configs.py <consumer...>` → push updated shared assets into consuming repos.
 
 ## Code Hygiene

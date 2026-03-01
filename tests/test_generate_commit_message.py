@@ -37,8 +37,8 @@ def test_parse_args_default():
 
 def test_parse_args_with_model():
     """Test parse_args with model specified."""
-    args = parse_args(["--model", "gpt-5-codex"])
-    assert args.model == "gpt-5-codex"
+    args = parse_args(["--model", "claude-sonnet-4-6"])
+    assert args.model == "claude-sonnet-4-6"
 
 
 def test_parse_args_with_reasoning():
@@ -183,13 +183,13 @@ def test_main_success(
 ):
     """Test main with successful commit message generation."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.return_value = ("Fix bug", [])
 
@@ -204,7 +204,7 @@ def test_main_success(
 def test_main_no_staged_diff(mock_gather_diff, mock_get_config):
     """Test main exits with error when no staged diff."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
@@ -228,13 +228,13 @@ def test_main_empty_summary(
 ):
     """Test main exits with error when commit message is empty."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.return_value = ("", [])
 
@@ -247,26 +247,26 @@ def test_main_empty_summary(
 @patch("ci_tools.scripts.generate_commit_message.request_commit_message")
 @patch("ci_tools.scripts.generate_commit_message.resolve_model_choice")
 @patch("ci_tools.scripts.generate_commit_message.resolve_reasoning_choice")
-def test_main_codex_exception(
+def test_main_cli_exception(
     mock_resolve_reasoning,
     mock_resolve_model,
     mock_request_commit,
     mock_gather_diff,
     mock_get_config,
 ):
-    """Test main propagates Codex exceptions."""
+    """Test main propagates CLI exceptions."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
-    mock_request_commit.side_effect = Exception("Codex failed")
+    mock_request_commit.side_effect = Exception("CLI failed")
 
-    with pytest.raises(Exception, match="Codex failed"):
+    with pytest.raises(Exception, match="CLI failed"):
         main([])
 
 
@@ -285,13 +285,13 @@ def test_main_with_detailed_flag(
 ):
     """Test main with detailed flag includes body."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.return_value = ("Fix bug", ["Detailed explanation"])
 
@@ -317,14 +317,14 @@ def test_main_with_output_file(
 ):
     """Test main writes to output file when specified."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
     output_file = tmp_path / "commit.txt"
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.return_value = ("Fix bug", [])
 
@@ -337,7 +337,7 @@ def test_main_with_output_file(
 @patch.dict(
     "os.environ",
     {
-        "CI_COMMIT_MODEL": "gpt-5-codex",
+        "CI_COMMIT_MODEL": "claude-sonnet-4-6",
         "CI_COMMIT_REASONING": "medium",
     },
 )
@@ -361,20 +361,20 @@ def test_main_uses_env_var_for_model(
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     mock_request_commit.return_value = ("Fix bug", [])
 
     result = main([])
     assert result == 0
     # Env var takes precedence over config
-    mock_resolve_model.assert_called_once_with("gpt-5-codex", validate=False)
+    mock_resolve_model.assert_called_once_with("claude-sonnet-4-6", validate=False)
 
 
 @patch.dict(
     "os.environ",
     {
-        "CI_COMMIT_MODEL": "gpt-5-codex",
+        "CI_COMMIT_MODEL": "claude-sonnet-4-6",
         "CI_COMMIT_REASONING": "high",
     },
 )
@@ -398,7 +398,7 @@ def test_main_uses_env_var_for_reasoning(
         "max_chunks": 5,
     }
     mock_gather_diff.return_value = "diff --git a/file.py b/file.py"
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "high"
     mock_request_commit.return_value = ("Fix bug", [])
 
@@ -528,7 +528,7 @@ def test_request_with_chunking_combines_results(mock_request):
     ]
     summary, body = _request_with_chunking(
         chunks=["diff --git a/a b/a\n+1", "diff --git a/b b/b\n+2"],
-        model="gpt-5-codex",
+        model="claude-sonnet-4-6",
         reasoning_effort="medium",
         detailed=True,
     )
@@ -548,7 +548,7 @@ def test_request_with_chunking_reraises_chunk_exception(mock_request):
     with pytest.raises(Exception, match="API failure"):
         _request_with_chunking(
             chunks=["diff --git a/a b/a\n+1"],
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="medium",
             detailed=False,
         )
@@ -564,7 +564,7 @@ def test_request_with_chunking_reraises_synthesis_exception(mock_request):
     with pytest.raises(Exception, match="Synthesis failed"):
         _request_with_chunking(
             chunks=["diff --git a/a b/a\n+1"],
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="medium",
             detailed=False,
         )
@@ -588,7 +588,7 @@ def test_main_missing_model(mock_get_config, capsys):
 def test_main_missing_reasoning(mock_get_config, capsys):
     """Test main exits with error when reasoning not specified anywhere."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "chunk_line_limit": 1000,
         "max_chunks": 5,
     }
@@ -841,7 +841,7 @@ def test_main_with_multiple_chunks(
 ):
     """Test main uses chunking when diff exceeds limits."""
     mock_get_config.return_value = {
-        "model": "gpt-5-codex",
+        "model": "claude-sonnet-4-6",
         "reasoning": "medium",
         "chunk_line_limit": 5,
         "max_chunks": 10,
@@ -849,7 +849,7 @@ def test_main_with_multiple_chunks(
     # Create a diff large enough to be chunked (10 sections, 3 lines each = 30 lines)
     large_diff = "\n".join(f"diff --git a/file{i}.py b/file{i}.py\n+line{i}" for i in range(10))
     mock_gather_diff.return_value = large_diff
-    mock_resolve_model.return_value = "gpt-5-codex"
+    mock_resolve_model.return_value = "claude-sonnet-4-6"
     mock_resolve_reasoning.return_value = "medium"
     # Return for each of 5 chunks + final synthesis (6 calls total)
     mock_request_commit.side_effect = [

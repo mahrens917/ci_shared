@@ -3,10 +3,10 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codex-ci-tools"
+name = "claude-ci-tools"
 version = "0.1.0"
 description = "Shared CI automation scripts for Zeus and Kalshi repositories"
-authors = [{name = "Codex Automation"}]
+authors = [{name = "CI Automation"}]
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [

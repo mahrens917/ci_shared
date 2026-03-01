@@ -163,7 +163,7 @@ def _load_commit_message_config() -> dict[str, Any]:
 
 
 def _get_commit_message_fallback_model() -> str:
-    """Return the configured fallback model when Codex isn't available."""
+    """Return the configured fallback model when Claude isn't available."""
     config = _load_commit_message_config()
     commit_section = config.get("commit_message")
     if isinstance(commit_section, dict):
@@ -217,12 +217,12 @@ def _invoke_commit_message_generator(
 
 
 def _request_commit_message(repo_path: Path, ci_shared_commit_msg: str) -> tuple[str, list[str]] | None:
-    """Generate a commit message, trying Codex first then falling back to Claude."""
-    commit_message = _invoke_commit_message_generator(repo_path, env_overrides=None, label="Codex")
+    """Generate a commit message, trying primary model first then falling back to Claude."""
+    commit_message = _invoke_commit_message_generator(repo_path, env_overrides=None, label="primary")
     if commit_message is None:
         fallback_model = _get_commit_message_fallback_model()
         print(
-            "⚠️  Codex commit message generation failed; falling back to Claude...",
+            "⚠️  Primary commit message generation failed; retrying with Claude...",
             file=sys.stderr,
         )
         fallback_env = {

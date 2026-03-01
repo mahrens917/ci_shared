@@ -1,4 +1,4 @@
-"""Unit tests for ci_tools.ci_runtime.codex module."""
+"""Unit tests for ci_tools.ci_runtime.claude_cli module."""
 
 from __future__ import annotations
 
@@ -6,75 +6,51 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from ci_tools.ci_runtime.codex import (
-    build_codex_command,
-    invoke_codex,
+from ci_tools.ci_runtime.claude_cli import (
+    build_claude_command,
+    invoke_claude,
     truncate_error,
     extract_unified_diff,
     has_unified_diff_header,
-    request_codex_patch,
+    request_claude_patch,
     truncate_diff_summary,
     risky_pattern_in_diff,
     _feed_prompt,
     _stream_output,
 )
 from ci_tools.ci_runtime.models import (
-    CodexCliError,
+    CliError,
     PatchPrompt,
     FailureContext,
 )
 
 
-class TestBuildCodexCommand:
-    """Tests for build_codex_command function."""
+class TestBuildClaudeCommand:
+    """Tests for build_claude_command function."""
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
     def test_basic_command_without_reasoning_effort(self):
         """Test command building without reasoning effort."""
-        result = build_codex_command("gpt-5-codex", None)
-        assert result == ["codex", "exec", "--model", "gpt-5-codex", "-"]
+        result = build_claude_command("claude-sonnet-4-6", None)
+        assert result == ["claude", "--model", "claude-sonnet-4-6", "-p", "-"]
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
     def test_command_with_reasoning_effort(self):
         """Test command building with reasoning effort."""
-        result = build_codex_command("gpt-5-codex", "high")
-        assert result == [
-            "codex",
-            "exec",
-            "--model",
-            "gpt-5-codex",
-            "-c",
-            "model_reasoning_effort=high",
-            "-",
-        ]
+        result = build_claude_command("claude-sonnet-4-6", "high")
+        assert result == ["claude", "--model", "claude-sonnet-4-6", "-p", "-"]
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    def test_command_with_low_reasoning_effort(self):
-        """Test command building with low reasoning effort."""
-        result = build_codex_command("gpt-5-codex", "low")
-        assert result == [
-            "codex",
-            "exec",
-            "--model",
-            "gpt-5-codex",
-            "-c",
-            "model_reasoning_effort=low",
-            "-",
-        ]
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    def test_command_ignores_low_reasoning_effort(self):
+        """Test command building ignores reasoning effort (Claude CLI)."""
+        result = build_claude_command("claude-sonnet-4-6", "low")
+        assert result == ["claude", "--model", "claude-sonnet-4-6", "-p", "-"]
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    def test_command_with_medium_reasoning_effort(self):
-        """Test command building with medium reasoning effort."""
-        result = build_codex_command("gpt-5-codex", "medium")
-        assert result == [
-            "codex",
-            "exec",
-            "--model",
-            "gpt-5-codex",
-            "-c",
-            "model_reasoning_effort=medium",
-            "-",
-        ]
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    def test_command_ignores_medium_reasoning_effort(self):
+        """Test command building ignores reasoning effort (Claude CLI)."""
+        result = build_claude_command("claude-sonnet-4-6", "medium")
+        assert result == ["claude", "--model", "claude-sonnet-4-6", "-p", "-"]
 
 
 class TestFeedPrompt:
@@ -172,14 +148,14 @@ class TestStreamOutput:
         assert not stderr_lines
 
 
-class TestInvokeCodex:
-    """Tests for invoke_codex function."""
+class TestInvokeClaude:
+    """Tests for invoke_claude function."""
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    @patch("ci_tools.ci_runtime.claude_cli.log_cli_interaction")
     @patch("subprocess.Popen")
     def test_successful_invocation(self, mock_popen, mock_log):
-        """Test successful Codex CLI invocation."""
+        """Test successful Claude CLI invocation."""
         mock_process = MagicMock()
         mock_process.wait.return_value = 0
         mock_process.stdout = Mock()
@@ -191,9 +167,9 @@ class TestInvokeCodex:
         mock_popen.return_value.__enter__ = Mock(return_value=mock_process)
         mock_popen.return_value.__exit__ = Mock(return_value=False)
 
-        result = invoke_codex(
+        result = invoke_claude(
             "test prompt",
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             description="test",
             reasoning_effort="high",
         )
@@ -201,8 +177,8 @@ class TestInvokeCodex:
         assert result == "response text"
         mock_log.assert_called_once()
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    @patch("ci_tools.ci_runtime.claude_cli.log_cli_interaction")
     @patch("subprocess.Popen")
     def test_invocation_without_assistant_prefix(self, mock_popen, _mock_log):
         """Test invocation when response doesn't have assistant prefix."""
@@ -217,20 +193,20 @@ class TestInvokeCodex:
         mock_popen.return_value.__enter__ = Mock(return_value=mock_process)
         mock_popen.return_value.__exit__ = Mock(return_value=False)
 
-        result = invoke_codex(
+        result = invoke_claude(
             "test prompt",
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             description="test",
             reasoning_effort=None,
         )
 
         assert result == "direct response"
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    @patch("ci_tools.ci_runtime.claude_cli.log_cli_interaction")
     @patch("subprocess.Popen")
     def test_invocation_with_error(self, mock_popen, _mock_log):
-        """Test invocation when Codex CLI returns error."""
+        """Test invocation when Claude CLI returns error."""
         mock_process = MagicMock()
         mock_process.wait.return_value = 1
         mock_process.stdout = Mock()
@@ -242,18 +218,18 @@ class TestInvokeCodex:
         mock_popen.return_value.__enter__ = Mock(return_value=mock_process)
         mock_popen.return_value.__exit__ = Mock(return_value=False)
 
-        with pytest.raises(CodexCliError) as exc_info:
-            invoke_codex(
+        with pytest.raises(CliError) as exc_info:
+            invoke_claude(
                 "test prompt",
-                model="gpt-5-codex",
+                model="claude-sonnet-4-6",
                 description="test",
                 reasoning_effort="low",
             )
 
         assert "exit status 1" in str(exc_info.value)
 
-    @patch.dict("os.environ", {"CI_CLI_TYPE": "codex"})
-    @patch("ci_tools.ci_runtime.codex.log_codex_interaction")
+    @patch.dict("os.environ", {"CI_CLI_TYPE": "claude"})
+    @patch("ci_tools.ci_runtime.claude_cli.log_cli_interaction")
     @patch("subprocess.Popen")
     def test_invocation_returns_stderr_when_no_stdout(self, mock_popen, _mock_log):
         """Test that stderr is returned when stdout is empty."""
@@ -268,9 +244,9 @@ class TestInvokeCodex:
         mock_popen.return_value.__enter__ = Mock(return_value=mock_process)
         mock_popen.return_value.__exit__ = Mock(return_value=False)
 
-        result = invoke_codex(
+        result = invoke_claude(
             "test prompt",
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             description="test",
             reasoning_effort="medium",
         )
@@ -438,10 +414,10 @@ class TestHasUnifiedDiffHeader:
         assert has_unified_diff_header(diff) is True
 
 
-class TestRequestCodexPatch:
-    """Tests for request_codex_patch function."""
+class TestRequestClaudePatch:
+    """Tests for request_claude_patch function."""
 
-    @patch("ci_tools.ci_runtime.codex.invoke_codex")
+    @patch("ci_tools.ci_runtime.claude_cli.invoke_claude")
     def test_builds_prompt_with_all_context(self, mock_invoke):
         """Test that prompt is built with all context fields."""
         mock_invoke.return_value = "diff response"
@@ -463,8 +439,8 @@ class TestRequestCodexPatch:
             attempt=1,
         )
 
-        result = request_codex_patch(
-            model="gpt-5-codex",
+        result = request_claude_patch(
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             prompt=prompt,
         )
@@ -480,7 +456,7 @@ class TestRequestCodexPatch:
         assert "test failed" in prompt_text
         assert "previous error" in prompt_text
 
-    @patch("ci_tools.ci_runtime.codex.invoke_codex")
+    @patch("ci_tools.ci_runtime.claude_cli.invoke_claude")
     def test_handles_empty_git_status(self, mock_invoke):
         """Test handling of empty git_status."""
         mock_invoke.return_value = "diff response"
@@ -502,8 +478,8 @@ class TestRequestCodexPatch:
             attempt=1,
         )
 
-        request_codex_patch(
-            model="gpt-5-codex",
+        request_claude_patch(
+            model="claude-sonnet-4-6",
             reasoning_effort="low",
             prompt=prompt,
         )
@@ -512,7 +488,7 @@ class TestRequestCodexPatch:
         prompt_text = call_args[0][0]
         assert "(clean)" in prompt_text
 
-    @patch("ci_tools.ci_runtime.codex.invoke_codex")
+    @patch("ci_tools.ci_runtime.claude_cli.invoke_claude")
     def test_truncates_patch_error(self, mock_invoke):
         """Test that patch error is truncated in prompt."""
         mock_invoke.return_value = "diff response"
@@ -535,8 +511,8 @@ class TestRequestCodexPatch:
             attempt=1,
         )
 
-        request_codex_patch(
-            model="gpt-5-codex",
+        request_claude_patch(
+            model="claude-sonnet-4-6",
             reasoning_effort="medium",
             prompt=prompt,
         )

@@ -23,7 +23,7 @@ RISKY_PATTERNS = (
     re.compile(r"rm\s+-rf"),
     re.compile(r"subprocess\.run\([^)]*['\"]rm['\"]"),
 )
-REQUIRED_MODEL = "gpt-5-codex"
+REQUIRED_MODEL = "claude-sonnet-4-6"
 REASONING_EFFORT_CHOICES: tuple[str, ...] = ("low", "medium", "high")
 DEFAULT_REASONING_EFFORT = "high"
 
@@ -70,7 +70,7 @@ def _coerce_coverage_threshold(config: dict[str, Any], initial: float) -> float:
 
 
 def resolve_model_choice(model_arg: Optional[str] = None, *, validate: bool = True) -> str:
-    """Resolve the Codex model to use.
+    """Resolve the Claude model to use.
 
     Args:
         model_arg: Model specified via CLI argument
@@ -85,12 +85,12 @@ def resolve_model_choice(model_arg: Optional[str] = None, *, validate: bool = Tr
     """
     candidate = model_arg
     if not candidate:
-        candidate = os.environ.get("OPENAI_MODEL")
+        candidate = os.environ.get("CI_MODEL")
     if not candidate:
         raise ModelSelectionAbort.unsupported_model(received="(none)", required=REQUIRED_MODEL)
     if validate and candidate != REQUIRED_MODEL:
         raise ModelSelectionAbort.unsupported_model(received=candidate, required=REQUIRED_MODEL)
-    os.environ["OPENAI_MODEL"] = candidate
+    os.environ["CI_MODEL"] = candidate
     return candidate
 
 
@@ -110,14 +110,14 @@ def resolve_reasoning_choice(reasoning_arg: Optional[str] = None, *, validate: b
     """
     candidate = reasoning_arg
     if not candidate:
-        env_reasoning = os.environ.get("OPENAI_REASONING_EFFORT")
+        env_reasoning = os.environ.get("CI_REASONING_EFFORT")
         if env_reasoning:
             candidate = env_reasoning.lower()
     if not candidate:
         raise ReasoningEffortAbort.unsupported_choice(received="(none)", allowed=REASONING_EFFORT_CHOICES)
     if validate and candidate not in REASONING_EFFORT_CHOICES:
         raise ReasoningEffortAbort.unsupported_choice(received=candidate, allowed=REASONING_EFFORT_CHOICES)
-    os.environ["OPENAI_REASONING_EFFORT"] = candidate
+    os.environ["CI_REASONING_EFFORT"] = candidate
     return candidate
 
 

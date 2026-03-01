@@ -1,10 +1,10 @@
-"""Public API for the Codex CI runtime package."""
+"""Public API for the Claude CI runtime package."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from . import codex as _codex
+from . import claude_cli as _claude_cli
 from . import coverage as _coverage
 from . import failures as _failures
 from . import messaging as _messaging
@@ -15,14 +15,14 @@ from . import workflow as _workflow
 from .models import PatchPrompt
 
 if TYPE_CHECKING:  # pragma: no cover - type checking helper block
-    build_codex_command = _codex.build_codex_command
-    extract_unified_diff = _codex.extract_unified_diff
-    has_unified_diff_header = _codex.has_unified_diff_header
-    invoke_codex = _codex.invoke_codex
-    request_codex_patch = _codex.request_codex_patch
-    risky_pattern_in_diff = _codex.risky_pattern_in_diff
-    truncate_diff_summary = _codex.truncate_diff_summary
-    truncate_error = _codex.truncate_error
+    build_claude_command = _claude_cli.build_claude_command
+    extract_unified_diff = _claude_cli.extract_unified_diff
+    has_unified_diff_header = _claude_cli.has_unified_diff_header
+    invoke_claude = _claude_cli.invoke_claude
+    request_claude_patch = _claude_cli.request_claude_patch
+    risky_pattern_in_diff = _claude_cli.risky_pattern_in_diff
+    truncate_diff_summary = _claude_cli.truncate_diff_summary
+    truncate_error = _claude_cli.truncate_error
     extract_coverage_deficits = _coverage.extract_coverage_deficits
     build_failure_context = _failures.build_failure_context
     commit_and_push = _messaging.commit_and_push
@@ -34,7 +34,7 @@ if TYPE_CHECKING:  # pragma: no cover - type checking helper block
     gather_git_diff = _process.gather_git_diff
     gather_git_diff_limited = _process.gather_git_diff_limited
     gather_git_status = _process.gather_git_status
-    log_codex_interaction = _process.log_codex_interaction
+    log_cli_interaction = _process.log_cli_interaction
     run_command = _process.run_command
     tail_text = _process.tail_text
     configure_runtime = _workflow.configure_runtime
@@ -44,7 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover - type checking helper block
     run_repair_iterations = _workflow.run_repair_iterations
 
 _MODULE_EXPORTS = [
-    (_codex, _codex.__all__),
+    (_claude_cli, _claude_cli.__all__),
     (_coverage, _coverage.__all__),
     (_failures, _failures.__all__),
     (_messaging, _messaging.__all__),
@@ -58,12 +58,12 @@ _MODULE_EXPORTS = [
 __all__ = [
     # ---- models ----
     "PatchPrompt",
-    # ---- codex module exports ----
-    "build_codex_command",
+    # ---- claude_cli module exports ----
+    "build_claude_command",
     "extract_unified_diff",
     "has_unified_diff_header",
-    "invoke_codex",
-    "request_codex_patch",
+    "invoke_claude",
+    "request_claude_patch",
     "risky_pattern_in_diff",
     "truncate_diff_summary",
     "truncate_error",
@@ -84,7 +84,7 @@ __all__ = [
     "gather_git_diff",
     "gather_git_diff_limited",
     "gather_git_status",
-    "log_codex_interaction",
+    "log_cli_interaction",
     "run_command",
     "tail_text",
     # ---- workflow ----

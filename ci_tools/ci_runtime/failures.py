@@ -48,7 +48,7 @@ def build_failure_context(
     result: CommandResult,
     coverage_report: Optional[CoverageCheckResult],
 ) -> FailureContext:
-    """Compile the information Codex needs to produce a follow-up patch."""
+    """Compile the information Claude needs to produce a follow-up patch."""
     if coverage_report is not None:
         summary, log_excerpt, implicated = _render_coverage_context(coverage_report)
         print(
@@ -56,7 +56,7 @@ def build_failure_context(
             f"{coverage_report.threshold:.0f}% detected for: "
             + ", ".join(f"{item.path} ({item.coverage:.1f}%)" for item in coverage_report.deficits)
         )
-        print("[loop] Consulting Codex for additional tests to lift coverage.")
+        print("[loop] Consulting Claude for additional tests to lift coverage.")
     else:
         log_excerpt = tail_text(result.combined_output, args.log_tail)
         summary, implicated = summarize_failure(log_excerpt)
@@ -72,7 +72,7 @@ def build_failure_context(
         if attribute_error_hint:
             print(f"[guard] {attribute_error_hint}", file=sys.stderr)
             raise CiAbort(detail="Manual intervention required")
-        print(f"[loop] CI failed with exit code {result.returncode}. Consulting Codex...")
+        print(f"[loop] CI failed with exit code {result.returncode}. Consulting Claude...")
     focused_diff = _gather_focused_diff(implicated)
     return FailureContext(
         log_excerpt=log_excerpt,

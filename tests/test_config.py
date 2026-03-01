@@ -70,7 +70,7 @@ class TestConstants:
 
     def test_required_model(self):
         """Test REQUIRED_MODEL is set."""
-        assert REQUIRED_MODEL == "gpt-5-codex"
+        assert REQUIRED_MODEL == "claude-sonnet-4-6"
 
     def test_reasoning_effort_choices(self):
         """Test REASONING_EFFORT_CHOICES contains expected values."""

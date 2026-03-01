@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helper invoked by ci.sh to request commit messages from Codex."""
+"""Helper invoked by ci.sh to request commit messages from Claude."""
 
 from __future__ import annotations
 
@@ -78,8 +78,8 @@ def _resolve_reasoning_arg(cli_arg: str | None, config: dict[str, Any]) -> str |
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for commit message generation."""
-    parser = argparse.ArgumentParser(description="Generate a commit message via Codex")
-    parser.add_argument("--model", help="Model name to pass to Codex")
+    parser = argparse.ArgumentParser(description="Generate a commit message via Claude")
+    parser.add_argument("--model", help="Model name to pass to Claude CLI")
     parser.add_argument(
         "--reasoning",
         help="Reasoning effort to request (low/medium/high)",
@@ -213,7 +213,7 @@ def _chunk_diff(
     max_chunk_lines: int,
     max_chunks: int,
 ) -> list[str]:
-    """Split the staged diff into manageable chunks for Codex."""
+    """Split the staged diff into manageable chunks for Claude."""
     sanitized_max_lines = max(0, max_chunk_lines)
     sanitized_max_chunks = max(1, max_chunks)
     total_lines = diff_text.count("\n") + 1
@@ -237,7 +237,7 @@ def _chunk_diff(
 def _build_chunk_summary_diff(
     chunk_results: Sequence[Tuple[str, Sequence[str]]],
 ) -> str:
-    """Create a synthetic diff from chunk-level summaries for the final Codex pass."""
+    """Create a synthetic diff from chunk-level summaries for the final Claude pass."""
     lines: list[str] = []
     for index, (summary, body_lines) in enumerate(chunk_results, start=1):
         lines.append(f"diff --git a/chunk_{index} b/chunk_{index}")
@@ -264,11 +264,11 @@ def _request_with_chunking(
     reasoning_effort: str,
     detailed: bool,
 ) -> tuple[str, list[str]]:
-    """Run multiple Codex requests across diff chunks and synthesize the final message."""
+    """Run multiple Claude requests across diff chunks and synthesize the final message."""
     total_chunks = len(chunks)
     approx_lines = sum(chunk.count("\n") + 1 for chunk in chunks) // max(total_chunks, 1)
     print(
-        ("[ci_shared] Large staged diff detected; splitting into " f"{total_chunks} Codex prompts (~{approx_lines} lines each)."),
+        ("[ci_shared] Large staged diff detected; splitting into " f"{total_chunks} Claude prompts (~{approx_lines} lines each)."),
         file=sys.stderr,
     )
     chunk_summaries: list[tuple[str, list[str]]] = []
@@ -365,8 +365,8 @@ def main(argv: list[str] | None = None) -> int:
         print("No staged diff available for commit message generation.", file=sys.stderr)
         return 1
 
-    max_chunk_lines = _get_config_int(commit_config, "chunk_line_limit", "CI_CODEX_COMMIT_CHUNK_LINE_LIMIT")
-    max_chunks = _get_config_int(commit_config, "max_chunks", "CI_CODEX_COMMIT_MAX_CHUNKS")
+    max_chunk_lines = _get_config_int(commit_config, "chunk_line_limit", "CI_COMMIT_CHUNK_LINE_LIMIT")
+    max_chunks = _get_config_int(commit_config, "max_chunks", "CI_COMMIT_MAX_CHUNKS")
     chunks = _chunk_diff(staged_diff, max_chunk_lines, max_chunks)
 
     summary, body_lines = _generate_commit_message(
@@ -379,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summary = summary.strip()
     if not summary:
-        print("Codex commit message response was empty.", file=sys.stderr)
+        print("Commit message response was empty.", file=sys.stderr)
         return 1
 
     payload = _prepare_payload(summary, body_lines)

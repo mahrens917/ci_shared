@@ -8,7 +8,7 @@ import subprocess
 import textwrap
 from typing import List
 
-from .codex import invoke_codex
+from .claude_cli import invoke_claude
 from .models import CommitMessageError, GitCommandAbort
 from .process import run_command
 
@@ -79,7 +79,7 @@ def _build_commit_prompt(
     detailed: bool,
     invalid_reason: str | None = None,
 ) -> str:
-    """Construct the Codex prompt for commit message generation."""
+    """Construct the Claude prompt for commit message generation."""
     effort_display = reasoning_effort
     if detailed:
         instructions = textwrap.dedent(
@@ -149,8 +149,8 @@ def _invoke_commit_prompt(
     model: str,
     reasoning_effort: str,
 ) -> tuple[str, List[str]]:
-    """Call Codex with the provided prompt and parse the response."""
-    response = invoke_codex(
+    """Call Claude with the provided prompt and parse the response."""
+    response = invoke_claude(
         prompt,
         model=model,
         description="commit message suggestion",
@@ -174,7 +174,7 @@ def request_commit_message(
     extra_context: str,
     detailed: bool = False,
 ) -> tuple[str, List[str]]:
-    """Ask Codex to produce a commit message for the staged diff."""
+    """Ask Claude to produce a commit message for the staged diff."""
     prompt = _build_commit_prompt(
         model=model,
         reasoning_effort=reasoning_effort,

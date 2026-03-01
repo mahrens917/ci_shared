@@ -20,13 +20,13 @@ from ci_tools.ci_runtime.models import (
 class TestRequestCommitMessage:
     """Tests for request_commit_message function."""
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_simple_commit_message(self, mock_invoke):
         """Test generating a simple single-line commit message."""
         mock_invoke.return_value = "Fixed authentication bug"
 
         summary, body_lines = request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff content",
             extra_context="",
@@ -37,7 +37,7 @@ class TestRequestCommitMessage:
         assert not body_lines
         mock_invoke.assert_called_once()
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_detailed_commit_message(self, mock_invoke):
         """Test generating a detailed commit message with body."""
         response = """Updated user authentication system
@@ -48,7 +48,7 @@ class TestRequestCommitMessage:
         mock_invoke.return_value = response
 
         summary, body_lines = request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="medium",
             staged_diff="diff content",
             extra_context="",
@@ -60,13 +60,13 @@ class TestRequestCommitMessage:
         assert len(body_lines) >= 3
         assert "JWT token" in "\n".join(body_lines)
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_commit_message_with_extra_context(self, mock_invoke):
         """Test commit message generation with extra context."""
         mock_invoke.return_value = "Added new feature"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="low",
             staged_diff="diff content",
             extra_context="This fixes issue #123",
@@ -77,13 +77,13 @@ class TestRequestCommitMessage:
         prompt = call_args[0][0]
         assert "This fixes issue #123" in prompt
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_commit_message_includes_model_config(self, mock_invoke):
         """Test that prompt includes model configuration."""
         mock_invoke.return_value = "Fixed bug"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -92,16 +92,16 @@ class TestRequestCommitMessage:
 
         call_args = mock_invoke.call_args
         prompt = call_args[0][0]
-        assert "gpt-5-codex" in prompt
+        assert "claude-sonnet-4-6" in prompt
         assert "high" in prompt
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_commit_message_with_medium_reasoning_effort(self, mock_invoke):
         """Test commit message with medium reasoning effort."""
         mock_invoke.return_value = "Fixed bug"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="medium",
             staged_diff="diff",
             extra_context="",
@@ -112,42 +112,42 @@ class TestRequestCommitMessage:
         prompt = call_args[0][0]
         assert "medium" in prompt
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_empty_response_raises_error(self, mock_invoke):
         """Test that empty response raises CommitMessageError."""
         mock_invoke.return_value = ""
 
         with pytest.raises(CommitMessageError):
             request_commit_message(
-                model="gpt-5-codex",
+                model="claude-sonnet-4-6",
                 reasoning_effort="high",
                 staged_diff="diff",
                 extra_context="",
                 detailed=False,
             )
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_whitespace_only_response_raises_error(self, mock_invoke):
         """Test that whitespace-only response raises error."""
         mock_invoke.return_value = "   \n  \n  "
 
         with pytest.raises(CommitMessageError):
             request_commit_message(
-                model="gpt-5-codex",
+                model="claude-sonnet-4-6",
                 reasoning_effort="high",
                 staged_diff="diff",
                 extra_context="",
                 detailed=False,
             )
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_strips_trailing_whitespace_from_lines(self, mock_invoke):
         """Test that trailing whitespace is stripped from lines."""
         response = "Fixed bug  \n  \n- Detail line   \n- Another detail  "
         mock_invoke.return_value = response
 
         summary, body_lines = request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -157,14 +157,14 @@ class TestRequestCommitMessage:
         assert summary == "Fixed bug"
         assert all(not line.endswith(" ") for line in body_lines if line)
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_removes_leading_blank_lines_from_body(self, mock_invoke):
         """Test that leading blank lines are removed from body."""
         response = "Summary\n\n\n\n- First bullet"
         mock_invoke.return_value = response
 
         summary, body_lines = request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -176,13 +176,13 @@ class TestRequestCommitMessage:
         assert body_lines[0] == "- First bullet"
         assert "- First bullet" in body_lines
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_detailed_prompt_includes_instructions(self, mock_invoke):
         """Test that detailed prompt includes specific instructions."""
         mock_invoke.return_value = "Summary"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -194,13 +194,13 @@ class TestRequestCommitMessage:
         assert "bullet" in prompt.lower()
         assert "72" in prompt  # character limit
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_simple_prompt_avoids_shell_commands(self, mock_invoke):
         """Test that prompt warns against running shell commands."""
         mock_invoke.return_value = "Summary"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -211,7 +211,7 @@ class TestRequestCommitMessage:
         prompt = call_args[0][0]
         assert "diff --git" in prompt  # Warning about not using this command
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_retries_when_summary_is_meta(self, mock_invoke):
         """Test that meta responses trigger a guarded retry."""
         mock_invoke.side_effect = [
@@ -220,7 +220,7 @@ class TestRequestCommitMessage:
         ]
 
         summary, _ = request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="diff",
             extra_context="",
@@ -232,7 +232,7 @@ class TestRequestCommitMessage:
         retry_prompt = mock_invoke.call_args_list[1][0][0]
         assert "rejected" in retry_prompt.lower()
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_invalid_retry_raises_error(self, mock_invoke):
         """Test that a second invalid summary raises an error."""
         mock_invoke.side_effect = [
@@ -242,7 +242,7 @@ class TestRequestCommitMessage:
 
         with pytest.raises(CommitMessageError):
             request_commit_message(
-                model="gpt-5-codex",
+                model="claude-sonnet-4-6",
                 reasoning_effort="high",
                 staged_diff="diff",
                 extra_context="",
@@ -251,14 +251,14 @@ class TestRequestCommitMessage:
 
         assert mock_invoke.call_count == 2
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_passes_staged_diff_to_prompt(self, mock_invoke):
         """Test that staged diff is included in prompt."""
         mock_invoke.return_value = "Summary"
         diff = "--- a/file.py\n+++ b/file.py"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff=diff,
             extra_context="",
@@ -269,13 +269,13 @@ class TestRequestCommitMessage:
         prompt = call_args[0][0]
         assert diff in prompt
 
-    @patch("ci_tools.ci_runtime.messaging.invoke_codex")
+    @patch("ci_tools.ci_runtime.messaging.invoke_claude")
     def test_handles_empty_staged_diff(self, mock_invoke):
         """Test handling of empty staged diff."""
         mock_invoke.return_value = "Summary"
 
         request_commit_message(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="",
             extra_context="",

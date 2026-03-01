@@ -64,7 +64,7 @@ def stream_pipe(pipe, collector: list[str], target=None) -> None:
     """Collect text from a pipe, optionally forwarding to a stream.
 
     This consolidates duplicate stream processing logic used across
-    process.py and codex.py modules.
+    process.py and claude_cli.py modules.
 
     Args:
         pipe: File-like object to read from
@@ -293,12 +293,12 @@ def get_commit_message(ref: str = "HEAD", cwd: Optional[Path] = None) -> str:
     return result.stdout.strip()
 
 
-def log_codex_interaction(kind: str, prompt: str, response: str) -> None:
-    """Append the interaction to ci_shared/logs/codex_ci.log for later auditing."""
+def log_cli_interaction(kind: str, prompt: str, response: str) -> None:
+    """Append the interaction to ci_shared/logs/claude_ci.log for later auditing."""
     ci_shared_root = Path(__file__).resolve().parents[2]
     log_dir = ci_shared_root / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "codex_ci.log"
+    log_path = log_dir / "claude_ci.log"
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(f"--- {kind} ---\n")
         handle.write("Prompt:\n")
@@ -316,5 +316,5 @@ __all__ = [
     "gather_file_diff",
     "get_current_branch",
     "get_commit_message",
-    "log_codex_interaction",
+    "log_cli_interaction",
 ]

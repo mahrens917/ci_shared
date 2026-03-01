@@ -1,7 +1,7 @@
 # Development Guide
 
 This guide covers local development workflows, recommended tooling, and release
-considerations for maintainers of codex-ci-tools.
+considerations for maintainers of claude-ci-tools.
 
 ## Repository Layout
 - `ci_tools/` – Python package containing the automation loop, guard modules, and vendor shims
@@ -41,7 +41,7 @@ python -m pip install radon pytest pytest-cov coverage pyright pylint ruff codes
 
 ## Packaging and Release
 1. Update version in `pyproject.toml`
-2. Regenerate `codex_ci_tools.egg-info` via `python -m build` if packaging locally
+2. Regenerate `claude_ci_tools.egg-info` via `python -m build` if packaging locally
 3. Tag releases with `vX.Y.Z` and publish to the internal package index as needed
 
 ## Working with Vendored Dependencies

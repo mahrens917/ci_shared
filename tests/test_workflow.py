@@ -43,22 +43,22 @@ class TestResolveModelChoice:
 
     def test_accepts_required_model(self):
         """Test accepting the required model."""
-        result = resolve_model_choice("gpt-5-codex", validate=True)
-        assert result == "gpt-5-codex"
-        assert os.environ["OPENAI_MODEL"] == "gpt-5-codex"
+        result = resolve_model_choice("claude-sonnet-4-6", validate=True)
+        assert result == "claude-sonnet-4-6"
+        assert os.environ["CI_MODEL"] == "claude-sonnet-4-6"
 
     def test_rejects_unsupported_model(self):
         """Test rejecting unsupported model."""
         with pytest.raises(ModelSelectionAbort) as exc_info:
-            resolve_model_choice("gpt-4", validate=True)
+            resolve_model_choice("invalid-model", validate=True)
         assert "requires" in str(exc_info.value)
-        assert "gpt-5-codex" in str(exc_info.value)
+        assert "claude-sonnet-4-6" in str(exc_info.value)
 
     def test_uses_env_var_when_no_arg(self):
-        """Test using OPENAI_MODEL env var when no argument provided."""
-        with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-5-codex"}):
+        """Test using CI_MODEL env var when no argument provided."""
+        with patch.dict(os.environ, {"CI_MODEL": "claude-sonnet-4-6"}):
             result = resolve_model_choice(None, validate=True)
-            assert result == "gpt-5-codex"
+            assert result == "claude-sonnet-4-6"
 
     def test_raises_when_no_model_provided(self):
         """Test raising exception when no model is provided."""
@@ -68,7 +68,7 @@ class TestResolveModelChoice:
 
     def test_rejects_env_var_with_wrong_model(self):
         """Test rejecting wrong model from environment variable."""
-        with patch.dict(os.environ, {"OPENAI_MODEL": "gpt-3.5-turbo"}):
+        with patch.dict(os.environ, {"CI_MODEL": "invalid-model"}):
             with pytest.raises(ModelSelectionAbort):
                 resolve_model_choice(None, validate=True)
 
@@ -80,7 +80,7 @@ class TestResolveReasoningChoice:
         """Test accepting 'low' reasoning effort."""
         result = resolve_reasoning_choice("low", validate=True)
         assert result == "low"
-        assert os.environ["OPENAI_REASONING_EFFORT"] == "low"
+        assert os.environ["CI_REASONING_EFFORT"] == "low"
 
     def test_accepts_valid_medium(self):
         """Test accepting 'medium' reasoning effort."""
@@ -99,8 +99,8 @@ class TestResolveReasoningChoice:
         assert "expected one of" in str(exc_info.value)
 
     def test_uses_env_var_when_no_arg(self):
-        """Test using OPENAI_REASONING_EFFORT env var."""
-        with patch.dict(os.environ, {"OPENAI_REASONING_EFFORT": "MEDIUM"}):
+        """Test using CI_REASONING_EFFORT env var."""
+        with patch.dict(os.environ, {"CI_REASONING_EFFORT": "MEDIUM"}):
             result = resolve_reasoning_choice(None, validate=True)
             assert result == "medium"
 
@@ -112,7 +112,7 @@ class TestResolveReasoningChoice:
 
     def test_case_insensitive_env_var(self):
         """Test environment variable is case-insensitive."""
-        with patch.dict(os.environ, {"OPENAI_REASONING_EFFORT": "LOW"}):
+        with patch.dict(os.environ, {"CI_REASONING_EFFORT": "LOW"}):
             result = resolve_reasoning_choice(None, validate=True)
             assert result == "low"
 
@@ -202,13 +202,13 @@ class TestConfigureRuntime:
     @patch("ci_tools.ci_runtime.config.resolve_reasoning_choice")
     def test_creates_runtime_options(self, mock_reasoning, mock_model, mock_load_env):
         """Test creating RuntimeOptions from parsed args."""
-        mock_model.return_value = "gpt-5-codex"
+        mock_model.return_value = "claude-sonnet-4-6"
         mock_reasoning.return_value = "high"
 
         args = Mock(
             command="./scripts/ci.sh",
             env_file="~/.env",
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             patch_approval_mode="prompt",
             auto_stage=False,
@@ -219,7 +219,7 @@ class TestConfigureRuntime:
 
         assert isinstance(options, RuntimeOptions)
         assert options.command_tokens == ["./scripts/ci.sh"]
-        assert options.model_name == "gpt-5-codex"
+        assert options.model_name == "claude-sonnet-4-6"
         assert options.reasoning_effort == "high"
         assert options.patch_approval_mode == "prompt"
         mock_load_env.assert_called_once_with("~/.env")
@@ -229,7 +229,7 @@ class TestConfigureRuntime:
     @patch("ci_tools.ci_runtime.config.resolve_reasoning_choice")
     def test_handles_automation_mode(self, mock_reasoning, mock_model, _mock_load_env):
         """Test automation mode flags are set correctly."""
-        mock_model.return_value = "gpt-5-codex"
+        mock_model.return_value = "claude-sonnet-4-6"
         mock_reasoning.return_value = "high"
 
         args = Mock(
@@ -254,7 +254,7 @@ class TestConfigureRuntime:
     @patch("ci_tools.ci_runtime.config.resolve_reasoning_choice")
     def test_parses_command_with_spaces(self, mock_reasoning, mock_model, _mock_load_env):
         """Test parsing command with spaces and arguments."""
-        mock_model.return_value = "gpt-5-codex"
+        mock_model.return_value = "claude-sonnet-4-6"
         mock_reasoning.return_value = "medium"
 
         args = Mock(
@@ -392,7 +392,7 @@ class TestMaybeRequestCommitMessage:
         mock_request.return_value = ("feat: add feature", ["Details here"])
         options = Mock(
             commit_message_enabled=True,
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             auto_push_enabled=False,
         )
@@ -402,7 +402,7 @@ class TestMaybeRequestCommitMessage:
         assert summary == "feat: add feature"
         assert body == ["Details here"]
         mock_request.assert_called_once_with(
-            model="gpt-5-codex",
+            model="claude-sonnet-4-6",
             reasoning_effort="high",
             staged_diff="staged diff",
             extra_context="extra context",
@@ -424,7 +424,7 @@ class TestMaybeRequestCommitMessage:
         mock_request.return_value = ("commit", [])
         options = Mock(
             commit_message_enabled=True,
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             auto_push_enabled=True,
         )
@@ -515,7 +515,7 @@ class TestFinalizeWorktree:
         options = Mock(
             auto_stage_enabled=False,
             commit_message_enabled=True,
-            model_name="gpt-5-codex",
+            model_name="claude-sonnet-4-6",
             reasoning_effort="high",
             auto_push_enabled=False,
         )
@@ -663,9 +663,9 @@ class TestParseArgs:
 
     def test_model_argument(self):
         """Test model argument."""
-        args = parse_args(["--model", "gpt-5-codex"])
+        args = parse_args(["--model", "claude-sonnet-4-6"])
 
-        assert args.model == "gpt-5-codex"
+        assert args.model == "claude-sonnet-4-6"
 
     def test_reasoning_effort_choices(self):
         """Test reasoning effort choices."""

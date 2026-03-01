@@ -1,7 +1,7 @@
-# codex-ci-tools
+# claude-ci-tools
 
 Shared continuous-integration toolkit used across all trading system repositories (api, zeus, monitor, aws, common, signals, analytics, cfb, deribit, kalshi, pdf, tracker, weather, poly). This package provides:
-- **Automated CI repair loops** powered by Codex that fix failing checks
+- **Automated CI repair loops** powered by Claude that fix failing checks
 - **Comprehensive guard suite** enforcing code quality, security, and complexity standards
 - **Shared CI pipeline** with consistent tooling across all consuming repositories
 - **Intelligent commit message generation** with automatic diff chunking for large changes
@@ -10,7 +10,7 @@ Shared continuous-integration toolkit used across all trading system repositorie
 
 `ci_shared` standardizes continuous integration across multiple projects by providing:
 
-1. **Automated Fix Loops**: When CI fails, Codex analyzes the errors and generates patches to fix them
+1. **Automated Fix Loops**: When CI fails, Claude analyzes the errors and generates patches to fix them
 2. **Quality Guards**: Enforces strict standards for code complexity, structure, documentation, and security
 3. **Unified Pipeline**: Ensures all consuming repositories use identical linter/formatter/test configurations
 4. **Auto-Propagation**: Updates to `ci_shared` automatically sync to consuming repositories
@@ -35,7 +35,7 @@ This makes `ci_tools` scripts available on your `PYTHONPATH`.
 
 - Python 3.10+
 - Git repository
-- Codex CLI (`codex` command) for AI-powered features
+- Claude CLI (`claude` command) for AI-powered features
 - Optional: `gitleaks` for secret scanning
 
 ## How to Use
@@ -46,9 +46,9 @@ Run the full CI pipeline with automated fixes:
 
 ```bash
 # Basic usage - runs CI and fixes failures automatically
-python -m ci_tools.ci --model gpt-5-codex --reasoning-effort high
+python -m ci_tools.ci --model claude-sonnet-4-6 --reasoning-effort high
 
-# Dry run - just run CI once without Codex
+# Dry run - just run CI once without Claude
 python -m ci_tools.ci --dry-run
 
 # Custom CI command
@@ -59,12 +59,12 @@ python -m ci_tools.ci --auto-stage --commit-message
 ```
 
 **Common Options:**
-- `--model`: Codex model to use (default: `gpt-5-codex`)
+- `--model`: Claude model to use (default: `claude-sonnet-4-6`)
 - `--reasoning-effort`: `low`, `medium`, or `high` (default: `high`)
 - `--max-iterations`: Max fix attempts (default: 5)
 - `--patch-approval-mode`: `prompt` (ask before applying) or `auto`
 - `--auto-stage`: Run `git add -A` after CI passes
-- `--commit-message`: Request commit message from Codex
+- `--commit-message`: Request commit message from Claude
 
 ### Option 2: Shared CI Script
 
@@ -101,7 +101,7 @@ make policy   # Run policy guards only
 
 ### Automated CI Repair Loop
 - Runs CI command and captures failures
-- Sends error logs to Codex for patch generation
+- Sends error logs to Claude for patch generation
 - Applies patches with safety validation
 - Loops until CI passes or max iterations reached
 - Handles coverage deficits with targeted test generation
@@ -115,9 +115,9 @@ make policy   # Run policy guards only
 
 **Environment Variables:**
 ```bash
-CI_CODEX_COMMIT_CHUNK_LINE_LIMIT=6000  # Lines per chunk
-CI_CODEX_COMMIT_MAX_CHUNKS=4           # Max chunks
-CI_COMMIT_MODEL=gpt-5-codex            # Model override
+CI_COMMIT_CHUNK_LINE_LIMIT=6000  # Lines per chunk
+CI_COMMIT_MAX_CHUNKS=4           # Max chunks
+CI_COMMIT_MODEL=claude-sonnet-4-6            # Model override
 CI_COMMIT_REASONING=high               # Reasoning effort
 ```
 
@@ -146,8 +146,8 @@ When you push changes to `ci_shared`:
 - `ci_shared.config.json` supplies repository context, protected path prefixes,
   coverage thresholds, **and the `consuming_repositories` list** that drives
   config sync + propagation into all consuming repositories.
-- Environment variables such as `OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, and
-  `GIT_REMOTE` customize Codex behavior and push targets.
+- Environment variables such as `CI_MODEL`, `CI_REASONING_EFFORT`, and
+  `GIT_REMOTE` customize Claude CLI behavior and push targets.
 
 ## Guard Suite
 Key guard scripts live under `ci_tools/scripts/` and `scripts/`:
@@ -176,8 +176,8 @@ make check
 
 ### Fixing CI Failures Automatically
 ```bash
-# Let Codex fix failures automatically
-python -m ci_tools.ci --model gpt-5-codex --reasoning-effort high
+# Let Claude fix failures automatically
+python -m ci_tools.ci --model claude-sonnet-4-6 --reasoning-effort high
 
 # Or with automatic patch application
 python -m ci_tools.ci --patch-approval-mode auto --max-iterations 10

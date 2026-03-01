@@ -69,9 +69,8 @@
     }
   ],
   "commit_message": {
-    "model": "gpt-5-codex",
+    "model": "claude-sonnet-4-6",
     "reasoning": "medium",
-    "fallback_model": "claude-sonnet-4-20250514",
     "chunk_line_limit": 6000,
     "max_chunks": 4
   }

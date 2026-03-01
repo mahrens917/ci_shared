@@ -1,6 +1,6 @@
 # Guard Suite
 
-codex-ci-tools ships a collection of guard scripts designed to enforce
+claude-ci-tools ships a collection of guard scripts designed to enforce
 consistency and code quality across repositories. Each guard is a standalone
 module that can be executed directly (`python -m ci_tools.scripts.<name>`) or
 via the shared Makefile target `shared-checks` in `ci_shared.mk`.
@@ -27,7 +27,7 @@ via the shared Makefile target `shared-checks` in `ci_shared.mk`.
 ### Related Helpers
 - `ci_tools/scripts/ci.sh` – Primary CI script that wraps `make check`, installs missing test deps, and orchestrates commit/push when automation succeeds. Used directly by consuming repos and ci_shared itself.
 - `scripts/ci.sh` – Repository-level wrapper that delegates to `ci_tools/scripts/ci.sh`. Ensures consistent CI flow across all repositories.
-- `ci_tools/scripts/generate_commit_message.py` – Shared helper that asks Codex for a commit summary/body given the staged diff.
+- `ci_tools/scripts/generate_commit_message.py` – Shared helper that asks Claude for a commit summary/body given the staged diff.
 
 ## Makefile Integration
 

@@ -151,7 +151,7 @@ def test_validate_repo_state_clean(tmp_path):
 
 @patch("ci_tools.scripts.propagate_ci_shared.run_command")
 def test_request_commit_message_success(mock_run):
-    """Test _request_commit_message succeeds when Codex returns content."""
+    """Test _request_commit_message succeeds when CLI returns content."""
     repo_path = Path("/tmp/repo")
     mock_run.return_value = CommandResult(
         returncode=0,
@@ -168,10 +168,10 @@ def test_request_commit_message_success(mock_run):
 
 @patch("ci_tools.scripts.propagate_ci_shared.run_command")
 def test_request_commit_message_fallback_to_claude(mock_run):
-    """Test fallback to Claude when the Codex attempt fails."""
+    """Test retry with Claude when the first attempt fails."""
     repo_path = Path("/tmp/repo")
     mock_run.side_effect = [
-        CommandResult(returncode=1, stdout="", stderr="codex missing"),
+        CommandResult(returncode=1, stdout="", stderr="cli missing"),
         CommandResult(returncode=0, stdout="Add docs\n- Document change\n", stderr=""),
     ]
 

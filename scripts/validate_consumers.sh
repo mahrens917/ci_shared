@@ -63,8 +63,8 @@ run_llm_with_dns_retry() {
             echo "  Running: python claude_pty_wrapper.py ..."
             timeout "${LLM_BACKSTOP_TIMEOUT}" python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" 2>&1 | tee "${temp_output}" || true
         else
-            echo "  Running: codex exec ..."
-            codex exec "$(cat "${prompt_file}")" -m "${model}" --dangerously-bypass-approvals-and-sandbox 2>&1 | tee "${temp_output}" || true
+            echo "  Running: claude -p - ..."
+            claude -p - --model "${model}" < "${prompt_file}" 2>&1 | tee "${temp_output}" || true
         fi
 
         local output_size
@@ -100,7 +100,7 @@ if [[ ! -f "${XCI_CONFIG}" ]]; then
     echo "ERROR: xci.config.json not found at ${XCI_CONFIG}" >&2
     exit 1
 fi
-LLM_CLI=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['codex_cli'])")
+LLM_CLI=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['cli'])")
 LLM_MODEL=$(python -c "import json; print(json.load(open('${XCI_CONFIG}'))['model'])")
 
 # Calculate parallelism: 50% of available cores, minimum 1
@@ -644,11 +644,11 @@ while true; do
     fail_repos=("${saved_fail_repos[@]}")
     timeout_repos=("${saved_timeout_repos[@]}")
 
-    # If no repos are fixable by LLM, sleep before next check
+    # If no repos are fixable by LLM, exit — nothing more we can do
     if [ "${#fixable_fail_repos[@]}" -eq 0 ] && [ "${#fixable_timeout_repos[@]}" -eq 0 ]; then
         echo ""
-        echo "All failing repos exhausted LLM fix attempts. Sleeping ${LOOP_SLEEP}s..."
-        sleep "${LOOP_SLEEP}"
+        echo "All failing repos exhausted LLM fix attempts (${MAX_FIX_ATTEMPTS}). Exiting."
+        exit 1
     fi
     continue
 done

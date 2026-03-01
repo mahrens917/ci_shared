@@ -165,23 +165,15 @@ fi
 
 COMMIT_BODY=""
 if [ -z "${COMMIT_MESSAGE}" ]; then
-  # Prefer Claude CLI if available, fall back to Codex
   if command -v claude >/dev/null 2>&1; then
     CLI_NAME="Claude"
     export CI_CLI_TYPE=claude
-  elif command -v codex >/dev/null 2>&1; then
-    CLI_NAME="Codex"
-    export CI_CLI_TYPE=codex
   else
     CLI_NAME=""
   fi
 
   if [ -n "${CLI_NAME}" ]; then
-    if [ "${CI_CLI_TYPE}" = "claude" ]; then
-      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-claude-sonnet-4-6}"
-    else
-      export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-gpt-5.1-codex-mini}"
-    fi
+    export CI_COMMIT_MODEL="${CI_COMMIT_MODEL:-claude-sonnet-4-6}"
     export CI_COMMIT_REASONING="${CI_COMMIT_REASONING:-medium}"
 
     echo "Requesting commit message from ${CLI_NAME} (model: ${CI_COMMIT_MODEL})..."

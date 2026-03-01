@@ -19,7 +19,7 @@ from ci_tools.ci_runtime.process import (
     gather_git_status,
     get_commit_message,
     get_current_branch,
-    log_codex_interaction,
+    log_cli_interaction,
     run_command,
     stream_pipe,
     tail_text,
@@ -363,8 +363,8 @@ class TestGatherFileDiff:
             mock_run.assert_called_once()
 
 
-class TestLogCodexInteraction:
-    """Tests for log_codex_interaction function."""
+class TestLogCliInteraction:
+    """Tests for log_cli_interaction function."""
 
     @staticmethod
     def _fake_file(tmp_path):
@@ -378,15 +378,15 @@ class TestLogCodexInteraction:
     def test_creates_log_directory(self, tmp_path, monkeypatch):
         """Test creates logs directory if it doesn't exist."""
         monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
-        log_codex_interaction("test", "prompt text", "response text")
+        log_cli_interaction("test", "prompt text", "response text")
         assert (tmp_path / "logs").is_dir()
 
     def test_appends_interaction_to_log(self, tmp_path, monkeypatch):
         """Test appends interaction to log file."""
         monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
-        log_path = tmp_path / "logs" / "codex_ci.log"
+        log_path = tmp_path / "logs" / "claude_ci.log"
 
-        log_codex_interaction("patch request", "fix this", "here's the patch")
+        log_cli_interaction("patch request", "fix this", "here's the patch")
 
         assert log_path.exists()
         content = log_path.read_text(encoding="utf-8")
@@ -399,9 +399,9 @@ class TestLogCodexInteraction:
     def test_strips_whitespace_from_content(self, tmp_path, monkeypatch):
         """Test strips leading/trailing whitespace from logged content."""
         monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
-        log_path = tmp_path / "logs" / "codex_ci.log"
+        log_path = tmp_path / "logs" / "claude_ci.log"
 
-        log_codex_interaction("test", "  prompt  \n", "  response  \n")
+        log_cli_interaction("test", "  prompt  \n", "  response  \n")
 
         content = log_path.read_text(encoding="utf-8")
         assert "prompt  \n" not in content
@@ -410,10 +410,10 @@ class TestLogCodexInteraction:
     def test_multiple_interactions_appended(self, tmp_path, monkeypatch):
         """Test multiple interactions are appended to same file."""
         monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
-        log_path = tmp_path / "logs" / "codex_ci.log"
+        log_path = tmp_path / "logs" / "claude_ci.log"
 
-        log_codex_interaction("first", "prompt1", "response1")
-        log_codex_interaction("second", "prompt2", "response2")
+        log_cli_interaction("first", "prompt1", "response1")
+        log_cli_interaction("second", "prompt2", "response2")
 
         content = log_path.read_text(encoding="utf-8")
         assert "--- first ---" in content
@@ -424,9 +424,9 @@ class TestLogCodexInteraction:
     def test_handles_empty_strings(self, tmp_path, monkeypatch):
         """Test handles empty prompt or response strings."""
         monkeypatch.setattr("ci_tools.ci_runtime.process.__file__", self._fake_file(tmp_path))
-        log_path = tmp_path / "logs" / "codex_ci.log"
+        log_path = tmp_path / "logs" / "claude_ci.log"
 
-        log_codex_interaction("empty", "", "")
+        log_cli_interaction("empty", "", "")
 
         assert log_path.exists()
         content = log_path.read_text(encoding="utf-8")
