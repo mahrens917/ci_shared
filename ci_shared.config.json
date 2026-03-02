@@ -71,7 +71,7 @@
   "commit_message": {
     "model": "claude-sonnet-4-6",
     "reasoning": "medium",
-    "chunk_line_limit": 6000,
-    "max_chunks": 4
+    "chunk_line_limit": 2000,
+    "max_chunks": 12
   }
 }
