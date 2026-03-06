@@ -28,6 +28,7 @@ MIN_PRINTABLE_CHARS = 10
 MIN_RAW_BYTES_HEURISTIC = 20
 PRINTABLE_LOW = 32
 ASCII_HIGH = 127
+OUTPUT_FORMAT = "stream-json"
 HEARTBEAT_INTERVAL = 5
 TERM_WAIT_SECONDS = 5
 KILL_WAIT_SECONDS = 3
@@ -214,8 +215,20 @@ def cleanup_process(proc: subprocess.Popen, master_fd: int, slave_fd: int) -> No
 
 def spawn_claude(prompt: str, model: str, slave_fd: int) -> subprocess.Popen:
     """Spawn the Claude CLI process attached to the given PTY slave."""
-    cmd = [CLAUDE_BIN, "--print", prompt, "--model", model, "--dangerously-skip-permissions", "--no-session-persistence"]
-    diag(f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --dangerously-skip-permissions --no-session-persistence")
+    cmd = [
+        CLAUDE_BIN,
+        "--print",
+        prompt,
+        "--model",
+        model,
+        "--output-format",
+        OUTPUT_FORMAT,
+        "--dangerously-skip-permissions",
+        "--no-session-persistence",
+    ]
+    diag(
+        f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --output-format {OUTPUT_FORMAT} --dangerously-skip-permissions --no-session-persistence"
+    )
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     diag("ANTHROPIC_API_KEY stripped from subprocess env (using Max plan auth)")
     proc = subprocess.Popen(cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True, env=env)

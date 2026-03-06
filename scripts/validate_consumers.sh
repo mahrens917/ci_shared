@@ -711,13 +711,21 @@ display_results() {
 
 # Parse flags
 FIX_ONLY=false
+FORCE=false
 for arg in "$@"; do
     case "${arg}" in
         --fix-only)
             FIX_ONLY=true
             ;;
+        --force)
+            FORCE=true
+            ;;
     esac
 done
+
+if [ "${FORCE}" = true ]; then
+    export CI_FORCE=1
+fi
 
 # --fix-only: skip CI, load results from most recent logs, run one fix pass
 if [ "${FIX_ONLY}" = true ]; then

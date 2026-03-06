@@ -116,7 +116,7 @@ fi
 MARKER_FILE="${PROJECT_ROOT}/.ci_check_marker"
 CURRENT_COMMIT=$(git rev-parse HEAD)
 
-if [[ -f "${MARKER_FILE}" ]]; then
+if [[ -f "${MARKER_FILE}" ]] && [[ -z "${CI_FORCE:-}" ]]; then
   STORED_COMMIT=$(cat "${MARKER_FILE}")
   WORKING_TREE_DIRTY=$(git status --porcelain | grep -v "^.. \.ci_check_marker$" || true)
   if [[ "${CURRENT_COMMIT}" == "${STORED_COMMIT}" ]] && [[ -z "${WORKING_TREE_DIRTY}" ]]; then
