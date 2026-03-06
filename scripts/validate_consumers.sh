@@ -28,7 +28,7 @@ set -euo pipefail
 
 
 # Kill background jobs on Ctrl-C or termination
-trap 'kill $(jobs -p) 2>/dev/null; exit 130' INT TERM
+trap 'trap - INT TERM; kill 0; exit 130' INT TERM
 
 # Fix Node.js DNS resolution issue (IPv6 causes "Invalid DNS result order" errors)
 export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4first"
@@ -40,12 +40,15 @@ LLM_BACKSTOP_TIMEOUT=3600  # 60 min absolute ceiling
 
 # Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
 # Args: repo_dir prompt_file output_log cli model
+# Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
+# Args: repo_name repo_dir prompt_file output_log cli model
 run_llm_with_dns_retry() {
-    local repo_dir="$1"
-    local prompt_file="$2"
-    local output_log="$3"
-    local cli="$4"
-    local model="$5"
+    local repo_name="$1"
+    local repo_dir="$2"
+    local prompt_file="$3"
+    local output_log="$4"
+    local cli="$5"
+    local model="$6"
     local max_attempts=3
     local attempt=1
     local delay=2
@@ -60,20 +63,20 @@ run_llm_with_dns_retry() {
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
             # Use PTY wrapper to avoid Bun hanging without a terminal (AVX issue)
-            echo "  Running: python claude_pty_wrapper.py ..."
-            timeout "${LLM_BACKSTOP_TIMEOUT}" python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" 2>&1 | tee "${temp_output}" || true
+            echo "  [${repo_name}] Running claude_pty_wrapper.py ..."
+            timeout "${LLM_BACKSTOP_TIMEOUT}" python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>&1 || true
         else
-            echo "  Running: claude -p - ..."
-            claude -p - --model "${model}" < "${prompt_file}" 2>&1 | tee "${temp_output}" || true
+            echo "  [${repo_name}] Running claude -p - ..."
+            claude -p - --model "${model}" < "${prompt_file}" > "${temp_output}" 2>&1 || true
         fi
 
         local output_size
         output_size=$(wc -c < "${temp_output}" 2>/dev/null || echo 0)
-        echo "  [DEBUG] ${cli} output: ${output_size} bytes"
+        echo "  [${repo_name}] Output: ${output_size} bytes"
 
         # Check for DNS error
         if grep -q "Invalid DNS result order" "${temp_output}"; then
-            echo "  [RETRY] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
+            echo "  [${repo_name}] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
             rm -f "${temp_output}"
             sleep ${delay}
             ((attempt++))
@@ -86,7 +89,7 @@ run_llm_with_dns_retry() {
         fi
     done
 
-    echo "  [ERROR] DNS errors persisted after ${max_attempts} attempts"
+    echo "  [${repo_name}] DNS errors persisted after ${max_attempts} attempts"
     return 1
 }
 
@@ -312,39 +315,77 @@ get_repo_dir() {
     return 1
 }
 
-# Attempt to auto-fix failed repos using Claude
-attempt_auto_fixes() {
-    echo ""
-    echo "============================================"
-    echo "AUTO-FIX: ${#fail_repos[@]} failed repo(s)"
-    echo "============================================"
-    echo ""
+# Monitor LLM output log sizes for running jobs (runs in background)
+# Args: interval_seconds log_suffix repo_names...
+monitor_llm_progress() {
+    local interval="$1"
+    local log_suffix="$2"
+    local logs_dir="$3"
+    shift 3
+    local repos=("$@")
 
-    for repo_name in "${fail_repos[@]}"; do
-        local repo_dir
-        repo_dir=$(get_repo_dir "${repo_name}")
-
-        if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
-            echo "  [SKIP] ${repo_name} - directory not found"
-            continue
+    while true; do
+        sleep "${interval}"
+        local parts=()
+        for repo in "${repos[@]}"; do
+            # Skip repos that have finished
+            [ -f "${logs_dir}/${repo}.llm_done" ] && continue
+            local log_file="${logs_dir}/${repo}.${log_suffix}"
+            if [ -f "${log_file}" ]; then
+                local size
+                size=$(wc -c < "${log_file}" 2>/dev/null || echo 0)
+                if [ "${size}" -ge 1048576 ]; then
+                    parts+=("${repo}: $((size / 1048576))MB")
+                elif [ "${size}" -ge 1024 ]; then
+                    parts+=("${repo}: $((size / 1024))KB")
+                else
+                    parts+=("${repo}: ${size}B")
+                fi
+            fi
+        done
+        if [ "${#parts[@]}" -gt 0 ]; then
+            local joined=""
+            for i in "${!parts[@]}"; do
+                if [ "$i" -gt 0 ]; then
+                    joined+=" | "
+                fi
+                joined+="${parts[$i]}"
+            done
+            echo "  [progress] ${joined}"
         fi
+    done
+}
 
-        local log_file="${LOGS_DIR}/${repo_name}.log"
-        if [ ! -f "${log_file}" ]; then
-            echo "  [SKIP] ${repo_name} - no log file"
-            continue
-        fi
+# Fix a single failed repo (designed to run in a subshell)
+fix_repo_worker() {
+    local repo_name="$1"
+    local repo_dir="$2"
+    local logs_dir="$3"
+    local cli="$4"
+    local model="$5"
 
-        echo "  [FIXING] ${repo_name}..."
+    local log_file="${logs_dir}/${repo_name}.log"
+    local llm_output_log="${logs_dir}/${repo_name}.llm_output.log"
+    local prompt_file="${logs_dir}/${repo_name}.llm_prompt.txt"
 
-        # Filter out progress/noise lines from the log
-        local errors
-        errors=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
+    if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
+        echo "  [SKIP] ${repo_name} - directory not found"
+        return 0
+    fi
 
-        # Create a temp file with the prompt to avoid escaping issues
-        local prompt_file
-        prompt_file=$(mktemp)
-        cat > "${prompt_file}" << 'PROMPT_EOF'
+    if [ ! -f "${log_file}" ]; then
+        echo "  [SKIP] ${repo_name} - no log file"
+        return 0
+    fi
+
+    echo "  [FIXING] ${repo_name}..."
+    local start_time
+    start_time=$(date +%s)
+
+    local errors
+    errors=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
+
+    cat > "${prompt_file}" << 'PROMPT_EOF'
 Implement fixes for all CI errors below. Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation, do NOT use the plan skill. Edit the files immediately.
 
 Rules:
@@ -354,63 +395,96 @@ Rules:
 - Focus on fixing the actual code issues
 
 PROMPT_EOF
-        echo "Errors:" >> "${prompt_file}"
-        echo "${errors}" >> "${prompt_file}"
+    echo "Errors:" >> "${prompt_file}"
+    echo "${errors}" >> "${prompt_file}"
 
-        # Display the prompt being sent to the LLM
-        echo ""
-        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}) ━━━━━━━━━━━━━━━━━━━━━━"
-        cat "${prompt_file}"
-        echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        local start_time
-        start_time=$(date +%s)
-        echo "━━━ LLM OUTPUT (started $(date '+%H:%M:%S')) ━━━━━━━━━━━━━━━━━━"
+    (
+        run_llm_with_dns_retry "${repo_name}" "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${cli}" "${model}" || true
+    ) || echo "  [WARN] ${cli} invocation failed for ${repo_name}"
 
-        # Run LLM CLI with timeout (5 minutes max), retry on DNS errors
-        local llm_output_log="${LOGS_DIR}/${repo_name}.llm_output.log"
-        # Protect subshell so failures don't exit the main script
-        (
-            run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
-        ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
-        local elapsed=$(( $(date +%s) - start_time ))
-        echo "━━━ END LLM OUTPUT (${elapsed}s elapsed) ━━━━━━━━━━━━━━━━━━━━━"
-
-        rm -f "${prompt_file}"
-        echo "  [DONE] ${repo_name}"
-    done
+    local elapsed=$(( $(date +%s) - start_time ))
+    touch "${logs_dir}/${repo_name}.llm_done"
+    echo "  [DONE] ${repo_name} (${elapsed}s)"
 }
 
-# Attempt to fix timeout (hanging) repos using Claude
-attempt_fix_timeouts() {
+# Attempt to auto-fix failed repos using Claude (parallel)
+attempt_auto_fixes() {
     echo ""
     echo "============================================"
-    echo "FIX TIMEOUTS: ${#timeout_repos[@]} hung repo(s)"
+    echo "AUTO-FIX: ${#fail_repos[@]} failed repo(s) (${PARALLEL_JOBS} parallel)"
     echo "============================================"
     echo ""
 
-    for repo_name in "${timeout_repos[@]}"; do
+    # Start progress monitor
+    monitor_llm_progress 10 "llm_output.log" "${LOGS_DIR}" "${fail_repos[@]}" &
+    local monitor_pid=$!
+
+    local job_pids=()
+    local job_names=()
+
+    for repo_name in "${fail_repos[@]}"; do
         local repo_dir
         repo_dir=$(get_repo_dir "${repo_name}")
 
-        if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
-            echo "  [SKIP] ${repo_name} - directory not found"
-            continue
-        fi
+        # Wait if we have max jobs running
+        while [ "${#job_pids[@]}" -ge "${PARALLEL_JOBS}" ]; do
+            local new_pids=()
+            local new_names=()
+            for i in "${!job_pids[@]}"; do
+                if kill -0 "${job_pids[$i]}" 2>/dev/null; then
+                    new_pids+=("${job_pids[$i]}")
+                    new_names+=("${job_names[$i]}")
+                fi
+            done
+            job_pids=("${new_pids[@]}")
+            job_names=("${new_names[@]}")
+            if [ "${#job_pids[@]}" -ge "${PARALLEL_JOBS}" ]; then
+                sleep 0.05
+            fi
+        done
 
-        echo "  [FIXING HANG] ${repo_name}..."
+        fix_repo_worker "${repo_name}" "${repo_dir}" "${LOGS_DIR}" "${LLM_CLI}" "${LLM_MODEL}" &
+        job_pids+=("$!")
+        job_names+=("${repo_name}")
+    done
 
-        local log_file="${LOGS_DIR}/${repo_name}.log"
-        local log_content=""
-        if [ -f "${log_file}" ]; then
-            # Filter out progress/noise lines from the log
-            log_content=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
-        fi
+    # Wait for all remaining jobs
+    for i in "${!job_pids[@]}"; do
+        wait "${job_pids[$i]}" 2>/dev/null || true
+    done
 
-        # Create a temp file with the prompt focused on fixing hangs
-        local prompt_file
-        prompt_file=$(mktemp)
-        cat > "${prompt_file}" << 'PROMPT_EOF'
+    # Stop progress monitor
+    kill "${monitor_pid}" 2>/dev/null || true
+    wait "${monitor_pid}" 2>/dev/null || true
+}
+
+# Fix a single timeout repo (designed to run in a subshell)
+fix_timeout_worker() {
+    local repo_name="$1"
+    local repo_dir="$2"
+    local logs_dir="$3"
+    local cli="$4"
+    local model="$5"
+
+    local llm_output_log="${logs_dir}/${repo_name}.llm_timeout_fix.log"
+    local prompt_file="${logs_dir}/${repo_name}.llm_timeout_prompt.txt"
+
+    if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
+        echo "  [SKIP] ${repo_name} - directory not found"
+        return 0
+    fi
+
+    echo "  [FIXING HANG] ${repo_name}..."
+    local start_time
+    start_time=$(date +%s)
+
+    local log_file="${logs_dir}/${repo_name}.log"
+    local log_content=""
+    if [ -f "${log_file}" ]; then
+        log_content=$(grep -v -E 'PASSED|^\s*\.\.\.|^\s*(src|tests)/[^ ]+\s+[0-9]+\s+[0-9]+\s+[0-9]+%|\[\s*[0-9]+%\]|^tests/.*::' "${log_file}" || true)
+    fi
+
+    cat > "${prompt_file}" << 'PROMPT_EOF'
 CRITICAL: This repository's CI/tests are HANGING (timing out after 30 minutes). Fix the hang issue FIRST.
 
 Common causes of CI hangs:
@@ -436,31 +510,68 @@ Rules:
 - Ensure event loops and connections are forcibly closed
 
 PROMPT_EOF
-        echo "=== PARTIAL CI LOG (before timeout) ===" >> "${prompt_file}"
-        echo "${log_content}" >> "${prompt_file}"
-        echo "=== END LOG ===" >> "${prompt_file}"
+    echo "=== PARTIAL CI LOG (before timeout) ===" >> "${prompt_file}"
+    echo "${log_content}" >> "${prompt_file}"
+    echo "=== END LOG ===" >> "${prompt_file}"
 
-        # Display the prompt being sent to the LLM
-        echo ""
-        echo "━━━ LLM INPUT (${LLM_CLI} ${LLM_MODEL}) ━━━━━━━━━━━━━━━━━━━━━━"
-        cat "${prompt_file}"
-        echo "━━━ END INPUT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        local start_time
-        start_time=$(date +%s)
-        echo "━━━ LLM OUTPUT (started $(date '+%H:%M:%S')) ━━━━━━━━━━━━━━━━━━"
+    (
+        run_llm_with_dns_retry "${repo_name}" "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${cli}" "${model}" || true
+    ) || echo "  [WARN] ${cli} invocation failed for ${repo_name}"
 
-        # Run LLM CLI
-        local llm_output_log="${LOGS_DIR}/${repo_name}.llm_timeout_fix.log"
-        (
-            run_llm_with_dns_retry "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${LLM_CLI}" "${LLM_MODEL}" || true
-        ) || echo "  [WARN] ${LLM_CLI} invocation failed for ${repo_name}"
-        local elapsed=$(( $(date +%s) - start_time ))
-        echo "━━━ END LLM OUTPUT (${elapsed}s elapsed) ━━━━━━━━━━━━━━━━━━━━━"
+    local elapsed=$(( $(date +%s) - start_time ))
+    touch "${logs_dir}/${repo_name}.llm_done"
+    echo "  [DONE] ${repo_name} (${elapsed}s)"
+}
 
-        rm -f "${prompt_file}"
-        echo "  [DONE] ${repo_name}"
+# Attempt to fix timeout (hanging) repos using Claude (parallel)
+attempt_fix_timeouts() {
+    echo ""
+    echo "============================================"
+    echo "FIX TIMEOUTS: ${#timeout_repos[@]} hung repo(s) (${PARALLEL_JOBS} parallel)"
+    echo "============================================"
+    echo ""
+
+    # Start progress monitor
+    monitor_llm_progress 10 "llm_timeout_fix.log" "${LOGS_DIR}" "${timeout_repos[@]}" &
+    local monitor_pid=$!
+
+    local job_pids=()
+    local job_names=()
+
+    for repo_name in "${timeout_repos[@]}"; do
+        local repo_dir
+        repo_dir=$(get_repo_dir "${repo_name}")
+
+        # Wait if we have max jobs running
+        while [ "${#job_pids[@]}" -ge "${PARALLEL_JOBS}" ]; do
+            local new_pids=()
+            local new_names=()
+            for i in "${!job_pids[@]}"; do
+                if kill -0 "${job_pids[$i]}" 2>/dev/null; then
+                    new_pids+=("${job_pids[$i]}")
+                    new_names+=("${job_names[$i]}")
+                fi
+            done
+            job_pids=("${new_pids[@]}")
+            job_names=("${new_names[@]}")
+            if [ "${#job_pids[@]}" -ge "${PARALLEL_JOBS}" ]; then
+                sleep 0.05
+            fi
+        done
+
+        fix_timeout_worker "${repo_name}" "${repo_dir}" "${LOGS_DIR}" "${LLM_CLI}" "${LLM_MODEL}" &
+        job_pids+=("$!")
+        job_names+=("${repo_name}")
     done
+
+    # Wait for all remaining jobs
+    for i in "${!job_pids[@]}"; do
+        wait "${job_pids[$i]}" 2>/dev/null || true
+    done
+
+    # Stop progress monitor
+    kill "${monitor_pid}" 2>/dev/null || true
+    wait "${monitor_pid}" 2>/dev/null || true
 }
 
 # Display results summary
@@ -522,6 +633,70 @@ display_results() {
 # Main execution
 # ============================================================================
 
+# Parse flags
+FIX_ONLY=false
+for arg in "$@"; do
+    case "${arg}" in
+        --fix-only)
+            FIX_ONLY=true
+            ;;
+    esac
+done
+
+# --fix-only: skip CI, load results from most recent logs, run one fix pass
+if [ "${FIX_ONLY}" = true ]; then
+    LATEST_LOGS=$(find "${PROJECT_ROOT}/logs" -maxdepth 1 -type d -name "validate_consumers_*" | sort | tail -1)
+    if [ -z "${LATEST_LOGS}" ]; then
+        echo "ERROR: No previous logs found in ${PROJECT_ROOT}/logs/" >&2
+        exit 1
+    fi
+    LOGS_DIR="${LATEST_LOGS}"
+    export LOGS_DIR
+    echo "Fix-only mode: using logs from ${LOGS_DIR}"
+    echo ""
+
+    # Populate fail/timeout arrays from existing status files
+    fail_repos=()
+    timeout_repos=()
+    fail_count=0
+    timeout_count=0
+
+    for repo_dir in "${CONSUMER_DIRS[@]}"; do
+        repo_name=$(basename "${repo_dir}")
+        status_file="${LOGS_DIR}/${repo_name}.status"
+        [ ! -f "${status_file}" ] && continue
+        status=$(cat "${status_file}" 2>/dev/null)
+        case "${status}" in
+            FAIL)
+                fail_repos+=("${repo_name}")
+                ((fail_count++)) || true
+                ;;
+            TIMEOUT)
+                timeout_repos+=("${repo_name}")
+                ((timeout_count++)) || true
+                ;;
+        esac
+    done
+
+    if [ "${fail_count}" -eq 0 ] && [ "${timeout_count}" -eq 0 ]; then
+        echo "No failed or timed-out repos in ${LOGS_DIR}. Nothing to fix."
+        exit 0
+    fi
+
+    echo "Found ${fail_count} failed, ${timeout_count} timed-out repos"
+
+    if [ "${#timeout_repos[@]}" -gt 0 ]; then
+        attempt_fix_timeouts
+    fi
+    if [ "${#fail_repos[@]}" -gt 0 ]; then
+        attempt_auto_fixes
+    fi
+
+    echo ""
+    echo "Fix-only pass complete. Re-run without --fix-only to validate."
+    exit 0
+fi
+
 echo "Validating ${#CONSUMER_DIRS[@]} repos in parallel (${PARALLEL_JOBS} jobs, ${NUM_CORES} cores)"
 echo "Logs: ${LOGS_DIR}"
 echo ""
@@ -538,7 +713,7 @@ fi
 
 # Consecutive LLM fix attempt tracking per repo
 declare -A repo_fix_counts
-MAX_FIX_ATTEMPTS=3
+MAX_FIX_ATTEMPTS=5
 LOOP_SLEEP=300
 
 loop_iteration=0

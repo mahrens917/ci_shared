@@ -17,7 +17,6 @@ from ci_tools.scripts.generate_commit_message import (
     _chunk_diff,
     _get_config_int,
     _prepare_payload,
-    _read_staged_diff,
     _request_with_chunking,
     _split_diff_sections,
     _write_payload,
@@ -107,14 +106,6 @@ def test_get_commit_config_falls_back_to_shared(monkeypatch, tmp_path):
         == "medium"
     )
 
-
-@patch("ci_tools.scripts.generate_commit_message.gather_git_diff")
-def test_read_staged_diff(mock_gather_git_diff):
-    """Test _read_staged_diff calls gather_git_diff."""
-    mock_gather_git_diff.return_value = "diff content"
-    result = _read_staged_diff()
-    assert result == "diff content"
-    mock_gather_git_diff.assert_called_once_with(staged=True)
 
 
 def test_prepare_payload_summary_only():

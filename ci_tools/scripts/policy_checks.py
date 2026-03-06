@@ -19,6 +19,7 @@ from .policy_rules import (
     _check_legacy_artifacts,
     _check_literal_fallbacks,
     _check_silent_handlers,
+    _check_simple_namespace,
     _check_suppressions,
     _check_sync_calls,
     purge_bytecode_artifacts,
@@ -41,6 +42,7 @@ def main() -> int:
     _check_legacy_artifacts()
     _check_sync_calls()
     _check_suppressions()
+    _check_simple_namespace()
     _check_duplicate_functions()
     _check_bytecode_artifacts()
     return 0

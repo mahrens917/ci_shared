@@ -16,6 +16,7 @@ SUSPICIOUS_PATTERNS: Tuple[str, ...] = (
     "_temp",
     "_v2",
     "_2",
+    "_module_references",
 )
 
 FALSE_POSITIVE_RULES: Dict[str, Tuple[str, ...]] = {

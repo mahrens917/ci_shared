@@ -98,10 +98,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _read_staged_diff() -> str:
-    return gather_git_diff(staged=True)
-
-
 def _prepare_payload(summary: str, body_lines: list[str]) -> str:
     body = "\n".join(line.rstrip() for line in body_lines).strip()
     payload_lines = [summary.strip()]
@@ -360,7 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     model = resolve_model_choice(model_arg, validate=False)
     reasoning = resolve_reasoning_choice(reasoning_arg, validate=False)
 
-    staged_diff = _read_staged_diff()
+    staged_diff = gather_git_diff(staged=True)
     if not staged_diff.strip():
         print("No staged diff available for commit message generation.", file=sys.stderr)
         return 1

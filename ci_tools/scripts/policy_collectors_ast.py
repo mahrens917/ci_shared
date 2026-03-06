@@ -9,6 +9,7 @@ from typing import Dict, Iterable, Iterator, List, Tuple
 
 from ci_tools.scripts.guard_common import relative_path
 
+from . import policy_context
 from .policy_context import (
     ROOT,
     FunctionEntry,
@@ -24,6 +25,7 @@ from .policy_visitors import (
     LegacyVisitor,
     LiteralFallbackVisitor,
     SilentHandlerVisitor,
+    SimpleNamespaceVisitor,
     SyncCallVisitor,
 )
 
@@ -207,6 +209,14 @@ def collect_duplicate_functions(min_length: int = 6) -> List[List[FunctionEntry]
     return duplicates
 
 
+def collect_simple_namespace_usage() -> List[Tuple[str, int]]:
+    """Collect SimpleNamespace usage in src/ code."""
+    records: List[Tuple[str, int]] = []
+    for ctx in iter_non_init_modules((policy_context.ROOT / "src",)):
+        SimpleNamespaceVisitor(ctx.rel_path, records).visit(ctx.tree)
+    return records
+
+
 def collect_bytecode_artifacts() -> List[str]:
     """Collect bytecode artifacts (.pyc files and __pycache__ directories)."""
     offenders: List[str] = []
@@ -243,6 +253,7 @@ __all__ = [
     "collect_conditional_literal_returns",
     "collect_backward_compat_blocks",
     "collect_forbidden_sync_calls",
+    "collect_simple_namespace_usage",
     "collect_duplicate_functions",
     "collect_bytecode_artifacts",
     "purge_bytecode_artifacts",

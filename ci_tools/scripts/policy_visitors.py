@@ -276,3 +276,18 @@ class SyncCallVisitor(ast.NodeVisitor):
                 )
                 break
         self.generic_visit(node)
+
+
+class SimpleNamespaceVisitor(ast.NodeVisitor):
+    """AST visitor to detect SimpleNamespace usage as fallback stubs."""
+
+    def __init__(self, rel_path: str, records: List[Tuple[str, int]]) -> None:
+        self.rel_path = rel_path
+        self.records = records
+
+    def visit_Call(self, node: ast.Call) -> None:
+        """Check Call nodes for SimpleNamespace usage."""
+        qualname = get_call_qualname(node.func)
+        if qualname in {"SimpleNamespace", "types.SimpleNamespace"}:
+            self.records.append((self.rel_path, node.lineno))
+        self.generic_visit(node)

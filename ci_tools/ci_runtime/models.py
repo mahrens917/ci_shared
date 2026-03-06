@@ -6,7 +6,12 @@ import subprocess
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-from .._messages import format_default_message
+
+def _format_default_message(default_message: str, detail: Optional[str]) -> str:
+    """Return default_message, appending detail with a colon separator if present."""
+    if detail is None:
+        return default_message
+    return f"{default_message}: {detail}"
 
 
 def _normalize_output(*sources: Optional[str]) -> str:
@@ -50,7 +55,7 @@ class CiError(RuntimeError):
     def __init__(self, *, detail: Optional[str] = None) -> None:
         """Initialise the exception with an optional detail string."""
         self.detail = detail
-        message = format_default_message(self.default_message, detail)
+        message = _format_default_message(self.default_message, detail)
         super().__init__(message)
 
 
@@ -92,7 +97,7 @@ class CiAbort(SystemExit):
         """Initialise the abort with a user-facing detail string."""
         self.detail = detail
         self.exit_code = code
-        message = format_default_message(self.default_message, detail)
+        message = _format_default_message(self.default_message, detail)
         super().__init__(message)
         self.code = code
 

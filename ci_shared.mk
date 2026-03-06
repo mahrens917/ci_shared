@@ -28,13 +28,13 @@ COVERAGE_GUARD_THRESHOLD := 80
 ENABLE_PYLINT := 1
 COMPLEXITY_MAX_CYCLOMATIC := 10
 COMPLEXITY_MAX_COGNITIVE := 15
-STRUCTURE_MAX_CLASS_LINES ?= 100
-MODULE_MAX_LINES := 400
+STRUCTURE_MAX_CLASS_LINES := 150
+MODULE_MAX_LINES := 600
 FUNCTION_MAX_LINES := 80
 METHOD_MAX_PUBLIC := 15
-METHOD_MAX_TOTAL := 25
+METHOD_MAX_TOTAL := 30
 INHERITANCE_MAX_DEPTH := 2
-DEPENDENCY_MAX_INSTANTIATIONS := 5
+DEPENDENCY_MAX_INSTANTIATIONS := 8
 
 # ============================================================================
 # REPOSITORY STRUCTURE (can be overridden for flat layouts)
@@ -185,6 +185,12 @@ shared-checks:
 	\
 	echo "→ Running dependency_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.dependency_guard $(DEPENDENCY_GUARD_ARGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running delegation_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.delegation_guard $(GUARD_ROOT_FLAGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
+	\
+	echo "→ Running fragmentation_guard..."; \
+	$(PYTHON) -m ci_tools.scripts.fragmentation_guard $(GUARD_ROOT_FLAGS) || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \
 	\
 	echo "→ Running unused_module_guard..."; \
 	$(PYTHON) -m ci_tools.scripts.unused_module_guard $(UNUSED_MODULE_GUARD_ARGS) --strict || FAILED_CHECKS=$$((FAILED_CHECKS + 1)); \

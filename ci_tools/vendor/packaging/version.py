@@ -6,8 +6,6 @@ import re
 from functools import total_ordering
 from typing import Tuple
 
-from ..._messages import format_default_message
-
 _VERSION_PATTERN = re.compile(r"^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?")
 
 
@@ -18,7 +16,7 @@ class InvalidVersion(ValueError):
 
     def __init__(self, *, detail: str | None = None) -> None:
         """Initialise the exception with optional extra detail."""
-        message = format_default_message(self.default_message, detail)
+        message = self.default_message if detail is None else f"{self.default_message}: {detail}"
         super().__init__(message)
 
     @classmethod

@@ -16,6 +16,7 @@ from .policy_collectors_ast import (
     collect_literal_fallbacks,
     collect_long_functions,
     collect_silent_handlers,
+    collect_simple_namespace_usage,
     purge_bytecode_artifacts,
 )
 from .policy_collectors_text import (
@@ -170,6 +171,11 @@ def _check_duplicate_functions() -> None:
     enforce_duplicate_functions(duplicates)
 
 
+def _check_simple_namespace() -> None:
+    found = collect_simple_namespace_usage()
+    enforce_occurrences(found, "SimpleNamespace used as fallback stub")
+
+
 def _check_bytecode_artifacts() -> None:
     offenders = collect_bytecode_artifacts()
     if offenders:
@@ -192,6 +198,7 @@ __all__ = [
     "_check_legacy_artifacts",
     "_check_sync_calls",
     "_check_suppressions",
+    "_check_simple_namespace",
     "_check_duplicate_functions",
     "_check_bytecode_artifacts",
 ]

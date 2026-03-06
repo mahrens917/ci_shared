@@ -9,7 +9,7 @@ from ci_tools.ci_runtime.coverage import (
     extract_coverage_deficits,
 )
 from ci_tools.ci_runtime.models import CoverageCheckResult, CoverageDeficit
-from ci_tools.test_constants import get_constant
+from tests.test_constants import get_constant
 
 COVERAGE_CONSTANTS = get_constant("coverage")
 

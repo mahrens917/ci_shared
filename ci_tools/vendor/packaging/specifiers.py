@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from operator import eq, ge, gt, le, lt, ne
 from typing import Iterable, Iterator, List, TypeVar
 
-from ..._messages import format_default_message
 from .version import InvalidVersion, Version
 
 _SPEC_PATTERN = re.compile(r"\s*(===|==|!=|~=|>=|<=|>|<)\s*(.+)\s*$")
@@ -21,7 +20,7 @@ class InvalidSpecifier(ValueError):
 
     def __init__(self, *, detail: str | None = None) -> None:
         """Initialise the error with an optional detail string."""
-        message = format_default_message(self.default_message, detail)
+        message = self.default_message if detail is None else f"{self.default_message}: {detail}"
         super().__init__(message)
 
     @classmethod

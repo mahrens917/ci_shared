@@ -33,7 +33,7 @@ from ci_tools.ci_runtime.models import (
     ReasoningEffortAbort,
     RuntimeOptions,
 )
-from ci_tools.test_constants import get_constant
+from tests.test_constants import get_constant
 
 WORKFLOW_CONSTANTS = get_constant("workflow")
 
