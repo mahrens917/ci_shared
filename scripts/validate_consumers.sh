@@ -37,9 +37,11 @@ export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4fir
 # The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 1800s).
 # This backstop is a last resort in case idle detection fails.
 LLM_BACKSTOP_TIMEOUT=3600  # 60 min absolute ceiling
+export LLM_IDLE_TIMEOUT=300  # 5 min idle timeout (PTY wrapper reads this)
 
-# Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
-# Args: repo_dir prompt_file output_log cli model
+# Timestamped log line
+tlog() { echo "  $(date '+%H:%M:%S') $*"; }
+
 # Run LLM CLI with retry on DNS errors (Bun doesn't respect NODE_OPTIONS)
 # Args: repo_name repo_dir prompt_file output_log cli model
 run_llm_with_dns_retry() {
@@ -63,20 +65,20 @@ run_llm_with_dns_retry() {
         # Build and run CLI command based on which CLI we're using
         if [[ "${cli}" == "claude" ]]; then
             # Use PTY wrapper to avoid Bun hanging without a terminal (AVX issue)
-            echo "  [${repo_name}] Running claude_pty_wrapper.py ..."
+            tlog "[${repo_name}] Running claude_pty_wrapper.py ..."
             timeout "${LLM_BACKSTOP_TIMEOUT}" python "${CI_SHARED_ROOT}/scripts/claude_pty_wrapper.py" "${prompt_file}" "${model}" > "${temp_output}" 2>&1 || true
         else
-            echo "  [${repo_name}] Running claude -p - ..."
+            tlog "[${repo_name}] Running claude -p - ..."
             claude -p - --model "${model}" < "${prompt_file}" > "${temp_output}" 2>&1 || true
         fi
 
         local output_size
         output_size=$(wc -c < "${temp_output}" 2>/dev/null || echo 0)
-        echo "  [${repo_name}] Output: ${output_size} bytes"
+        tlog "[${repo_name}] Output: ${output_size} bytes"
 
         # Check for DNS error
         if grep -q "Invalid DNS result order" "${temp_output}"; then
-            echo "  [${repo_name}] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
+            tlog "[${repo_name}] DNS error on attempt ${attempt}/${max_attempts}, waiting ${delay}s..."
             rm -f "${temp_output}"
             sleep ${delay}
             ((attempt++))
@@ -89,7 +91,7 @@ run_llm_with_dns_retry() {
         fi
     done
 
-    echo "  [${repo_name}] DNS errors persisted after ${max_attempts} attempts"
+    tlog "[${repo_name}] DNS errors persisted after ${max_attempts} attempts"
     return 1
 }
 
@@ -369,16 +371,16 @@ fix_repo_worker() {
     local prompt_file="${logs_dir}/${repo_name}.llm_prompt.txt"
 
     if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
-        echo "  [SKIP] ${repo_name} - directory not found"
+        tlog "[SKIP] ${repo_name} - directory not found"
         return 0
     fi
 
     if [ ! -f "${log_file}" ]; then
-        echo "  [SKIP] ${repo_name} - no log file"
+        tlog "[SKIP] ${repo_name} - no log file"
         return 0
     fi
 
-    echo "  [FIXING] ${repo_name}..."
+    tlog "[FIXING] ${repo_name}..."
     local start_time
     start_time=$(date +%s)
 
@@ -388,23 +390,60 @@ fix_repo_worker() {
     cat > "${prompt_file}" << 'PROMPT_EOF'
 Implement fixes for all CI errors below. Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation, do NOT use the plan skill. Edit the files immediately.
 
+You have full permission to create, modify, and delete files. If a file needs to be
+removed, use the Bash tool to run rm. Do NOT ask for approval -- all tool calls are
+pre-authorized.
+
 Rules:
 - Do NOT modify CI config, Makefiles, or pyproject.toml
 - Do NOT add noqa, pylint:disable, type:ignore, or similar bypass comments
 - Do NOT add fallbacks or backwards-compatibility shims
 - Focus on fixing the actual code issues
+- Verify that your fixes do not introduce new violations
+
+CI Limits (all enforced, cannot be changed):
+- Functions: max 80 lines, max 7 arguments (ruff PLR0913)
+- Classes: max 150 lines, max 15 public / 30 total methods
+- Modules: max 600 lines
+- Cyclomatic complexity: max 10, cognitive: max 15
+- Max branches: 10, max statements: 50
+- Inheritance depth: max 2
+- When reducing complexity, bundle parameters in a dataclass or existing object
+  instead of adding individual arguments
 
 PROMPT_EOF
     echo "Errors:" >> "${prompt_file}"
     echo "${errors}" >> "${prompt_file}"
 
+    # Append previous attempt context if available
+    if [ -n "${PREV_LOGS_DIR}" ]; then
+        local prev_log="${PREV_LOGS_DIR}/${repo_name}.llm_output.log"
+        if [ -f "${prev_log}" ]; then
+            local prev_size
+            prev_size=$(wc -c < "${prev_log}" 2>/dev/null || echo 0)
+            if [ "${prev_size}" -gt 500 ]; then
+                echo "" >> "${prompt_file}"
+                echo "=== PREVIOUS FIX ATTEMPT (failed - do NOT repeat the same approach) ===" >> "${prompt_file}"
+                tail -c 10240 "${prev_log}" >> "${prompt_file}"
+                echo "" >> "${prompt_file}"
+                echo "=== END PREVIOUS ATTEMPT ===" >> "${prompt_file}"
+            fi
+        fi
+    fi
+
     (
         run_llm_with_dns_retry "${repo_name}" "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${cli}" "${model}" || true
-    ) || echo "  [WARN] ${cli} invocation failed for ${repo_name}"
+    ) || tlog "[WARN] ${cli} invocation failed for ${repo_name}"
+
+    # Detect non-start (idle timeout with no useful output)
+    if grep -q "idle timeout.*exceeded" "${llm_output_log}" 2>/dev/null; then
+        tlog "[NON-START] ${repo_name} - LLM idle timeout with no output"
+        touch "${logs_dir}/${repo_name}.llm_nonstart"
+    fi
 
     local elapsed=$(( $(date +%s) - start_time ))
     touch "${logs_dir}/${repo_name}.llm_done"
-    echo "  [DONE] ${repo_name} (${elapsed}s)"
+    tlog "[DONE] ${repo_name} (${elapsed}s)"
 }
 
 # Attempt to auto-fix failed repos using Claude (parallel)
@@ -470,11 +509,11 @@ fix_timeout_worker() {
     local prompt_file="${logs_dir}/${repo_name}.llm_timeout_prompt.txt"
 
     if [ -z "${repo_dir}" ] || [ ! -d "${repo_dir}" ]; then
-        echo "  [SKIP] ${repo_name} - directory not found"
+        tlog "[SKIP] ${repo_name} - directory not found"
         return 0
     fi
 
-    echo "  [FIXING HANG] ${repo_name}..."
+    tlog "[FIXING HANG] ${repo_name}..."
     local start_time
     start_time=$(date +%s)
 
@@ -503,24 +542,61 @@ The partial CI log (before timeout) is below. Look for clues about what was runn
 
 Write the code changes directly to disk. Do NOT plan, do NOT ask for confirmation. Edit the files immediately.
 
+You have full permission to create, modify, and delete files. If a file needs to be
+removed, use the Bash tool to run rm. Do NOT ask for approval -- all tool calls are
+pre-authorized.
+
 Rules:
 - Do NOT modify CI config, Makefiles, or pyproject.toml
 - Focus on fixing the HANG issue in test fixtures/conftest
 - Add timeouts to cleanup code if needed
 - Ensure event loops and connections are forcibly closed
+- Verify that your fixes do not introduce new violations
+
+CI Limits (all enforced, cannot be changed):
+- Functions: max 80 lines, max 7 arguments (ruff PLR0913)
+- Classes: max 150 lines, max 15 public / 30 total methods
+- Modules: max 600 lines
+- Cyclomatic complexity: max 10, cognitive: max 15
+- Max branches: 10, max statements: 50
+- Inheritance depth: max 2
+- When reducing complexity, bundle parameters in a dataclass or existing object
+  instead of adding individual arguments
 
 PROMPT_EOF
     echo "=== PARTIAL CI LOG (before timeout) ===" >> "${prompt_file}"
     echo "${log_content}" >> "${prompt_file}"
     echo "=== END LOG ===" >> "${prompt_file}"
 
+    # Append previous attempt context if available
+    if [ -n "${PREV_LOGS_DIR}" ]; then
+        local prev_log="${PREV_LOGS_DIR}/${repo_name}.llm_timeout_fix.log"
+        if [ -f "${prev_log}" ]; then
+            local prev_size
+            prev_size=$(wc -c < "${prev_log}" 2>/dev/null || echo 0)
+            if [ "${prev_size}" -gt 500 ]; then
+                echo "" >> "${prompt_file}"
+                echo "=== PREVIOUS FIX ATTEMPT (failed - do NOT repeat the same approach) ===" >> "${prompt_file}"
+                tail -c 10240 "${prev_log}" >> "${prompt_file}"
+                echo "" >> "${prompt_file}"
+                echo "=== END PREVIOUS ATTEMPT ===" >> "${prompt_file}"
+            fi
+        fi
+    fi
+
     (
         run_llm_with_dns_retry "${repo_name}" "${repo_dir}" "${prompt_file}" "${llm_output_log}" "${cli}" "${model}" || true
-    ) || echo "  [WARN] ${cli} invocation failed for ${repo_name}"
+    ) || tlog "[WARN] ${cli} invocation failed for ${repo_name}"
+
+    # Detect non-start (idle timeout with no useful output)
+    if grep -q "idle timeout.*exceeded" "${llm_output_log}" 2>/dev/null; then
+        tlog "[NON-START] ${repo_name} - LLM idle timeout with no output"
+        touch "${logs_dir}/${repo_name}.llm_nonstart"
+    fi
 
     local elapsed=$(( $(date +%s) - start_time ))
     touch "${logs_dir}/${repo_name}.llm_done"
-    echo "  [DONE] ${repo_name} (${elapsed}s)"
+    tlog "[DONE] ${repo_name} (${elapsed}s)"
 }
 
 # Attempt to fix timeout (hanging) repos using Claude (parallel)
@@ -715,6 +791,8 @@ fi
 declare -A repo_fix_counts
 MAX_FIX_ATTEMPTS=5
 LOOP_SLEEP=300
+PREV_LOGS_DIR=""
+export PREV_LOGS_DIR
 
 loop_iteration=0
 
@@ -723,6 +801,7 @@ while true; do
 
     # Fresh logs directory for each iteration after the first
     if [ "${loop_iteration}" -gt 1 ]; then
+        PREV_LOGS_DIR="${LOGS_DIR}"
         LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
         export LOGS_DIR
         mkdir -p "${LOGS_DIR}"
@@ -807,12 +886,20 @@ while true; do
         attempt_auto_fixes
     fi
 
-    # Increment fix counts for repos we just attempted
+    # Increment fix counts for repos we just attempted (skip non-starts)
     for repo in "${timeout_repos[@]}"; do
-        repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+        if [ -f "${LOGS_DIR}/${repo}.llm_nonstart" ]; then
+            tlog "[NON-START] ${repo} - not counting toward fix attempts"
+        else
+            repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+        fi
     done
     for repo in "${fail_repos[@]}"; do
-        repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+        if [ -f "${LOGS_DIR}/${repo}.llm_nonstart" ]; then
+            tlog "[NON-START] ${repo} - not counting toward fix attempts"
+        else
+            repo_fix_counts["${repo}"]=$(( ${repo_fix_counts["${repo}"]:-0} + 1 ))
+        fi
     done
 
     # Restore original arrays
