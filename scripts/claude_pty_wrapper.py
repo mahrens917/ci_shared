@@ -221,13 +221,14 @@ def spawn_claude(prompt: str, model: str, slave_fd: int) -> subprocess.Popen:
         prompt,
         "--model",
         model,
+        "--verbose",
         "--output-format",
         OUTPUT_FORMAT,
         "--dangerously-skip-permissions",
         "--no-session-persistence",
     ]
     diag(
-        f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --output-format {OUTPUT_FORMAT} --dangerously-skip-permissions --no-session-persistence"
+        f"spawning: {CLAUDE_BIN} --print <prompt> --model {model} --verbose --output-format {OUTPUT_FORMAT} --dangerously-skip-permissions --no-session-persistence"
     )
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     diag("ANTHROPIC_API_KEY stripped from subprocess env (using Max plan auth)")
