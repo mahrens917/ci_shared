@@ -1,6 +1,6 @@
 """Fail the build when packages contain too many tiny modules.
 
-Flags packages where >50% of modules are under 30 significant lines,
+Flags packages where >=50% of modules are under 40 significant lines,
 catching the "one function per file" anti-pattern that fragments logic
 across many small files.
 """
@@ -19,9 +19,9 @@ from ci_tools.scripts.guard_common import (
     relative_path,
 )
 
-_DEFAULT_MIN_LINES = 30
+_DEFAULT_MIN_LINES = 40
 _DEFAULT_MAX_TINY_RATIO = 0.5
-_DEFAULT_MIN_MODULES = 3
+_DEFAULT_MIN_MODULES = 2
 
 
 def _count_significant_lines(path: Path) -> int:
@@ -64,7 +64,7 @@ def _find_fragmented_packages(
             continue
         tiny_count = sum(1 for m in modules if _count_significant_lines(m) < min_lines)
         ratio = tiny_count / total
-        if ratio > max_tiny_ratio:
+        if ratio >= max_tiny_ratio:
             violations.append((str(pkg_dir), total, tiny_count))
 
     return violations
@@ -137,7 +137,7 @@ class FragmentationGuard(GuardRunner):
     def get_violations_header(self, args: argparse.Namespace) -> str:
         """Get the header for violations report."""
         pct = int(args.max_tiny_ratio * 100)
-        return f"Over-fragmented packages detected (>{pct}% tiny modules):"
+        return f"Over-fragmented packages detected (>={pct}% tiny modules):"
 
     def get_violations_footer(self, args: argparse.Namespace) -> str:
         return "Fix: consolidate small modules into their parent module or a fewer, larger files."

@@ -73,3 +73,6 @@ __all__ = [
     "truncate_error",
     "PatchPrompt",
 ]
+
+if __name__ == "__main__":
+    raise SystemExit(main())

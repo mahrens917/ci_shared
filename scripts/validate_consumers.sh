@@ -37,7 +37,7 @@ export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--dns-result-order=ipv4fir
 # The PTY wrapper handles idle detection internally (LLM_IDLE_TIMEOUT, default 1800s).
 # This backstop is a last resort in case idle detection fails.
 LLM_BACKSTOP_TIMEOUT=3600  # 60 min absolute ceiling
-export LLM_IDLE_TIMEOUT=300  # 5 min idle timeout (PTY wrapper reads this)
+export LLM_IDLE_TIMEOUT=1800  # 30 min idle timeout (PTY wrapper reads this)
 
 # Timestamped log line
 tlog() { echo "  $(date '+%H:%M:%S') $*"; }

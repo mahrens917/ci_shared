@@ -14,9 +14,9 @@ def test_parse_args_defaults():
     guard = FragmentationGuard()
     args = guard.parse_args([])
     assert args.root is None
-    assert args.min_lines == 30
+    assert args.min_lines == 40
     assert args.max_tiny_ratio == 0.5
-    assert args.min_modules == 3
+    assert args.min_modules == 2
 
 
 def test_parse_args_custom_values():
@@ -85,8 +85,8 @@ def test_passes_healthy_package(tmp_path: Path):
     assert result == 0
 
 
-def test_skips_package_below_min_modules(tmp_path: Path):
-    """Package with only 2 modules is below min_modules=3 threshold."""
+def test_catches_two_module_package(tmp_path: Path):
+    """Package with 2 tiny modules is fragmented (min_modules=2)."""
     pkg = tmp_path / "src" / "small"
     pkg.mkdir(parents=True)
     write_module(pkg / "__init__.py", "")
@@ -96,11 +96,24 @@ def test_skips_package_below_min_modules(tmp_path: Path):
     guard = FragmentationGuard()
     guard.repo_root = tmp_path
     result = guard.run(["--root", str(tmp_path / "src")])
+    assert result == 1
+
+
+def test_skips_single_module_package(tmp_path: Path):
+    """Package with only 1 module is below min_modules=2 threshold."""
+    pkg = tmp_path / "src" / "solo"
+    pkg.mkdir(parents=True)
+    write_module(pkg / "__init__.py", "")
+    _make_tiny_module(pkg / "a.py")
+
+    guard = FragmentationGuard()
+    guard.repo_root = tmp_path
+    result = guard.run(["--root", str(tmp_path / "src")])
     assert result == 0
 
 
-def test_exactly_at_threshold(tmp_path: Path):
-    """Package with exactly 50% tiny modules should pass (not >50%)."""
+def test_exactly_at_threshold_fails(tmp_path: Path):
+    """Package with exactly 50% tiny modules should fail (>=50%)."""
     pkg = tmp_path / "src" / "balanced"
     pkg.mkdir(parents=True)
     write_module(pkg / "__init__.py", "")
@@ -112,7 +125,7 @@ def test_exactly_at_threshold(tmp_path: Path):
     guard = FragmentationGuard()
     guard.repo_root = tmp_path
     result = guard.run(["--root", str(tmp_path / "src")])
-    assert result == 0
+    assert result == 1
 
 
 def test_all_large_modules(tmp_path: Path):
