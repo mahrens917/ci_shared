@@ -790,7 +790,7 @@ echo "Pushing config to consuming repositories..."
 
 # Push config to all repos (once, before loop)
 if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
-    if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}"; then
+    if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}" > /dev/null; then
         echo "⚠️  Config sync encountered issues (see above)" >&2
     fi
 fi

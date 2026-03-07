@@ -27,8 +27,6 @@ REQUIRED_MODEL = "claude-sonnet-4-6"
 REASONING_EFFORT_CHOICES: tuple[str, ...] = ("low", "medium", "high")
 DEFAULT_REASONING_EFFORT = "high"
 
-_EMPTY_CONFIG: dict[str, Any] = {}
-
 
 def load_repo_config(repo_root: Path) -> dict[str, Any]:
     """Load shared CI configuration when available.
@@ -39,7 +37,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     try:
         return load_json_config(repo_root, CONFIG_CANDIDATES)
     except FileNotFoundError:
-        return _EMPTY_CONFIG
+        return {}
 
 
 def _coerce_repo_context(config: dict[str, Any], initial: str) -> str:
@@ -87,9 +85,9 @@ def resolve_model_choice(model_arg: Optional[str] = None, *, validate: bool = Tr
     if not candidate:
         candidate = os.environ.get("CI_MODEL")
     if not candidate:
-        raise ModelSelectionAbort.unsupported_model(received="(none)", required=REQUIRED_MODEL)
+        raise ModelSelectionAbort(detail=f"requires `{REQUIRED_MODEL}` but received `(none)`")
     if validate and candidate != REQUIRED_MODEL:
-        raise ModelSelectionAbort.unsupported_model(received=candidate, required=REQUIRED_MODEL)
+        raise ModelSelectionAbort(detail=f"requires `{REQUIRED_MODEL}` but received `{candidate}`")
     os.environ["CI_MODEL"] = candidate
     return candidate
 

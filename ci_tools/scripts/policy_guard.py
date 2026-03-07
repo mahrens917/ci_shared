@@ -10,16 +10,10 @@ from .policy_checks import (
 )
 from .policy_checks import (
     PolicyViolation,
+    main,
 )
-from .policy_checks import main as _run_policy_checks
 
 __all__ = ["PolicyViolation", "purge_bytecode_artifacts", "main"]
-
-
-def main() -> int:  # pragma: no cover - thin wrapper
-    """Run policy checks and return exit code."""
-    return _run_policy_checks()
-
 
 if __name__ == "__main__":  # pragma: no cover
     try:

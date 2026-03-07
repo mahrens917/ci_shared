@@ -193,16 +193,9 @@ def tail_text(text: str, lines: int) -> str:
     return "\n".join(text.splitlines()[-lines:])
 
 
-def _build_git_diff_args(staged: bool) -> list[str]:
-    """Build git diff command arguments."""
-    if staged:
-        return ["git", "diff", "--cached"]
-    return ["git", "diff"]
-
-
 def gather_git_diff(*, staged: bool = False) -> str:
     """Return the git diff for staged or unstaged changes."""
-    args = _build_git_diff_args(staged)
+    args = ["git", "diff", "--cached"] if staged else ["git", "diff"]
     result = run_command(args)
     return result.stdout
 

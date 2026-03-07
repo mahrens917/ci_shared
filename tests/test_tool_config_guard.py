@@ -15,12 +15,8 @@ from ci_tools.scripts.tool_config_guard import (
     _format_toml_list,
     _format_toml_value,
     _handle_config_mismatch,
-    _print_toml_list,
-    _print_toml_value,
-    _print_tool_section,
     _validate_paths,
     compare_configs,
-    extract_tool_config,
     format_toml_tool_section,
     load_toml,
     main,
@@ -36,24 +32,6 @@ def test_load_toml(tmp_path):
     result = load_toml(toml_file)
     assert "tool" in result
     assert result["tool"]["ruff"]["line-length"] == 100
-
-
-def test_extract_tool_config():
-    """Test extract_tool_config extracts tool section."""
-    data = {
-        "project": {"name": "test"},
-        "tool": {"ruff": {"line-length": 100}},
-    }
-    result = extract_tool_config(data)
-    assert "tool" in result
-    assert "project" not in result
-
-
-def test_extract_tool_config_no_tool():
-    """Test extract_tool_config with no tool section."""
-    data = {"project": {"name": "test"}}
-    result = extract_tool_config(data)
-    assert not result
 
 
 def test_compare_configs_match():
@@ -209,44 +187,6 @@ def test_format_toml_tool_section_quotes_special_keys():
     data = {"tests/**": ["TRY002"]}
     result = format_toml_tool_section(data)
     assert '"tests/**"' in result
-
-
-def test_print_toml_value_string(capsys):
-    """Test _print_toml_value with string."""
-    _print_toml_value("name", "test")
-    captured = capsys.readouterr()
-    assert 'name = "test"' in captured.out
-
-
-def test_print_toml_value_bool(capsys):
-    """Test _print_toml_value with boolean."""
-    _print_toml_value("enabled", True)
-    captured = capsys.readouterr()
-    assert "enabled = true" in captured.out
-
-
-def test_print_toml_value_list(capsys):
-    """Test _print_toml_value with list."""
-    _print_toml_value("items", ["a", "b"])
-    captured = capsys.readouterr()
-    assert "items = [" in captured.out
-
-
-def test_print_toml_list_strings(capsys):
-    """Test _print_toml_list with string list."""
-    _print_toml_list("select", ["E", "F"])
-    captured = capsys.readouterr()
-    assert "select = [" in captured.out
-    assert '"E"' in captured.out
-
-
-def test_print_tool_section(capsys):
-    """Test _print_tool_section prints tool config."""
-    config = {"line-length": 100, "lint": {"select": ["E"]}}
-    _print_tool_section("ruff", config)
-    captured = capsys.readouterr()
-    assert "[tool.ruff]" in captured.out
-    assert "line-length = 100" in captured.out
 
 
 def test_print_tool_config_diff(capsys):

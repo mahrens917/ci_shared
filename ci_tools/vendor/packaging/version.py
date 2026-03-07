@@ -19,11 +19,6 @@ class InvalidVersion(ValueError):
         message = self.default_message if detail is None else f"{self.default_message}: {detail}"
         super().__init__(message)
 
-    @classmethod
-    def for_value(cls, version: str) -> "InvalidVersion":
-        """Return an error describing the invalid version string."""
-        return cls(detail=f"unable to parse {version!r}")
-
 
 @total_ordering
 class Version:
@@ -32,7 +27,7 @@ class Version:
     def __init__(self, version: str) -> None:
         match = _VERSION_PATTERN.match(version)
         if not match:
-            raise InvalidVersion.for_value(version)
+            raise InvalidVersion(detail=f"unable to parse {version!r}")
         groups = match.groups()
         release = [int(groups[0])]
         if groups[1] is not None:

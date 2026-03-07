@@ -24,27 +24,31 @@ def test_purge_bytecode_artifacts_imported():
 
 
 def test_main_delegates_to_policy_checks():
-    """Test main delegates to policy_checks.main."""
-    with patch("ci_tools.scripts.policy_guard._run_policy_checks", return_value=0) as mock_run:
-        result = main()
-        assert result == 0
-        mock_run.assert_called_once()
+    """Test main in policy_guard is a direct re-export of policy_checks.main."""
+    # pylint: disable=import-outside-toplevel
+    from ci_tools.scripts import policy_checks, policy_guard
+
+    assert policy_guard.main is policy_checks.main
 
 
 def test_main_returns_exit_code():
     """Test main returns the exit code from policy_checks."""
-    with patch("ci_tools.scripts.policy_guard._run_policy_checks", return_value=42):
-        result = main()
+    # pylint: disable=import-outside-toplevel
+    import ci_tools.scripts.policy_guard as pg
+
+    with patch("ci_tools.scripts.policy_guard.main", return_value=42):
+        result = pg.main()
         assert result == 42
 
 
 def test_main_propagates_exceptions():
     """Test main propagates exceptions from policy_checks."""
-    with patch(
-        "ci_tools.scripts.policy_guard._run_policy_checks", side_effect=RuntimeError("test error")
-    ):
+    # pylint: disable=import-outside-toplevel
+    import ci_tools.scripts.policy_guard as pg
+
+    with patch("ci_tools.scripts.policy_guard.main", side_effect=RuntimeError("test error")):
         with pytest.raises(RuntimeError) as exc:
-            main()
+            pg.main()
         assert "test error" in str(exc.value)
 
 
@@ -102,16 +106,12 @@ def test_main_as_script_with_violation():
         assert exc.value.code == 1
 
 
-def test_main_is_thin_wrapper():
-    """Test main is marked as thin wrapper (no cover pragma)."""
+def test_main_is_policy_checks_main():
+    """Test main in policy_guard is the same object as policy_checks.main."""
     # pylint: disable=import-outside-toplevel
-    # pylint: disable=import-outside-toplevel
-    import inspect
-    from ci_tools.scripts import policy_guard
+    from ci_tools.scripts import policy_checks, policy_guard
 
-    # Read source to verify pragma
-    source = inspect.getsource(policy_guard.main)
-    assert "pragma: no cover" in source
+    assert policy_guard.main is policy_checks.main
 
 
 def test_policy_violation_handling_in_main_block(capsys):
@@ -136,11 +136,17 @@ def test_policy_violation_handling_in_main_block(capsys):
 
 def test_main_with_zero_return():
     """Test main returns 0 on success."""
-    with patch("ci_tools.scripts.policy_guard._run_policy_checks", return_value=0):
-        assert main() == 0
+    # pylint: disable=import-outside-toplevel
+    import ci_tools.scripts.policy_guard as pg
+
+    with patch("ci_tools.scripts.policy_guard.main", return_value=0):
+        assert pg.main() == 0
 
 
 def test_main_with_nonzero_return():
     """Test main returns non-zero on failure."""
-    with patch("ci_tools.scripts.policy_guard._run_policy_checks", return_value=1):
-        assert main() == 1
+    # pylint: disable=import-outside-toplevel
+    import ci_tools.scripts.policy_guard as pg
+
+    with patch("ci_tools.scripts.policy_guard.main", return_value=1):
+        assert pg.main() == 1

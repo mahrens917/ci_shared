@@ -15,10 +15,7 @@ from ci_tools.ci_runtime.workflow import (
     _derive_runtime_flags,
     configure_runtime,
     perform_dry_run,
-    _collect_worktree_diffs,
-    _worktree_is_clean,
     _stage_if_needed,
-    _warn_missing_staged_changes,
     _maybe_request_commit_message,
     _maybe_push_or_notify,
     finalize_worktree,
@@ -308,44 +305,6 @@ class TestPerformDryRun:
         assert result is None
 
 
-# pylint: disable=too-few-public-methods
-class TestCollectWorktreeDiffs:
-    """Tests for _collect_worktree_diffs function."""
-
-    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
-    def test_collects_unstaged_and_staged_diffs(self, mock_gather):
-        """Test collecting both unstaged and staged diffs."""
-        mock_gather.side_effect = ["unstaged content", "staged content"]
-
-        unstaged, staged = _collect_worktree_diffs()
-
-        assert unstaged == "unstaged content"
-        assert staged == "staged content"
-        assert mock_gather.call_count == WORKFLOW_CONSTANTS["diff_call_count"]
-        mock_gather.assert_any_call(staged=False)
-        mock_gather.assert_any_call(staged=True)
-
-
-class TestWorktreeIsClean:
-    """Tests for _worktree_is_clean function."""
-
-    def test_clean_when_no_diffs(self):
-        """Test worktree is clean with no diffs."""
-        assert _worktree_is_clean("", "") is True
-
-    def test_not_clean_with_unstaged_diff(self):
-        """Test worktree not clean with unstaged changes."""
-        assert _worktree_is_clean("diff content", "") is False
-
-    def test_not_clean_with_staged_diff(self):
-        """Test worktree not clean with staged changes."""
-        assert _worktree_is_clean("", "diff content") is False
-
-    def test_not_clean_with_both_diffs(self):
-        """Test worktree not clean with both types of changes."""
-        assert _worktree_is_clean("unstaged", "staged") is False
-
-
 class TestStageIfNeeded:
     """Tests for _stage_if_needed function."""
 
@@ -368,19 +327,6 @@ class TestStageIfNeeded:
         result = _stage_if_needed(options, "existing diff")
 
         assert result == "existing diff"
-
-# pylint: disable=too-few-public-methods
-
-class TestWarnMissingStagedChanges:
-    """Tests for _warn_missing_staged_changes function."""
-
-    def test_prints_warning_to_stderr(self, capsys):
-        """Test warning is printed to stderr."""
-        _warn_missing_staged_changes()
-
-        captured = capsys.readouterr()
-        assert "No staged changes detected" in captured.err
-        assert "Stage files before requesting a commit message" in captured.err
 
 
 class TestMaybeRequestCommitMessage:
@@ -476,10 +422,10 @@ class TestMaybePushOrNotify:
 class TestFinalizeWorktree:
     """Tests for finalize_worktree function."""
 
-    @patch("ci_tools.ci_runtime.workflow._collect_worktree_diffs")
-    def test_returns_zero_when_worktree_clean(self, mock_collect):
+    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
+    def test_returns_zero_when_worktree_clean(self, mock_gather):
         """Test returning 0 when worktree is clean."""
-        mock_collect.return_value = ("", "")
+        mock_gather.return_value = ""
         args = Mock()
         options = Mock()
 
@@ -487,11 +433,11 @@ class TestFinalizeWorktree:
 
         assert result == 0
 
-    @patch("ci_tools.ci_runtime.workflow._collect_worktree_diffs")
+    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.workflow._stage_if_needed")
-    def test_warns_when_no_staged_changes_after_staging(self, mock_stage, mock_collect):
+    def test_warns_when_no_staged_changes_after_staging(self, mock_stage, mock_gather):
         """Test warning when no staged changes after staging."""
-        mock_collect.return_value = ("unstaged", "")
+        mock_gather.side_effect = ["unstaged", ""]
         mock_stage.return_value = ""
         args = Mock(commit_extra_context="")
         options = Mock(auto_stage_enabled=True, commit_message_enabled=False)
@@ -500,15 +446,15 @@ class TestFinalizeWorktree:
 
         assert result == 0
 
-    @patch("ci_tools.ci_runtime.workflow._collect_worktree_diffs")
+    @patch("ci_tools.ci_runtime.workflow.gather_git_diff_limited")
     @patch("ci_tools.ci_runtime.workflow._stage_if_needed")
     @patch("ci_tools.ci_runtime.workflow._maybe_request_commit_message")
     @patch("ci_tools.ci_runtime.workflow._maybe_push_or_notify")
     def test_complete_workflow_with_staged_changes(
-        self, mock_push, mock_request, mock_stage, mock_collect
+        self, mock_push, mock_request, mock_stage, mock_gather
     ):
         """Test complete finalization workflow with staged changes."""
-        mock_collect.return_value = ("", "staged diff")
+        mock_gather.side_effect = ["", "staged diff"]
         mock_stage.return_value = "staged diff"
         mock_request.return_value = ("summary", ["body"])
         args = Mock(commit_extra_context="context")

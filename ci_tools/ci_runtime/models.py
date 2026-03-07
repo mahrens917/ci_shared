@@ -136,21 +136,11 @@ class RepositoryStateAbort(CiAbort):
 
     default_message = "Repository state invalid"
 
-    @classmethod
-    def detached_head(cls) -> "RepositoryStateAbort":
-        """Factory raised when running outside a branch (detached HEAD)."""
-        return cls(detail="detached HEAD detected; checkout a branch before running ci.py")
-
 
 class ModelSelectionAbort(CiAbort):
     """Raised when an unsupported model is provided to the CI workflow."""
 
     default_message = "Unsupported model configuration"
-
-    @classmethod
-    def unsupported_model(cls, *, received: str, required: str) -> "ModelSelectionAbort":
-        """Factory when a CLI caller passes an unsupported model."""
-        return cls(detail=f"requires `{required}` but received `{received}`")
 
 
 class ReasoningEffortAbort(CiAbort):
@@ -211,84 +201,18 @@ class CommandResult:
 
 
 @dataclass
-class CommandConfig:
-    """Command execution configuration."""
+class RuntimeOptions:
+    """Configuration flags governing how the CI workflow runs."""
 
-    tokens: list[str]
-    env: dict[str, str]
-
-
-@dataclass
-class WorkflowConfig:
-    """Workflow behavior configuration."""
-
+    command_tokens: list[str]
+    command_env: dict[str, str]
     patch_approval_mode: str
     automation_mode: bool
     auto_stage_enabled: bool
     commit_message_enabled: bool
     auto_push_enabled: bool
-
-
-@dataclass
-class ModelConfig:
-    """Model configuration."""
-
-    name: str
+    model_name: str
     reasoning_effort: str
-
-
-@dataclass
-class RuntimeOptions:
-    """Configuration flags governing how the CI workflow runs."""
-
-    command: CommandConfig
-    workflow: WorkflowConfig
-    model: ModelConfig
-
-    @property
-    def command_tokens(self) -> list[str]:
-        """Command tokens for execution."""
-        return self.command.tokens
-
-    @property
-    def command_env(self) -> dict[str, str]:
-        """Command environment variables."""
-        return self.command.env
-
-    @property
-    def patch_approval_mode(self) -> str:
-        """Patch approval mode."""
-        return self.workflow.patch_approval_mode
-
-    @property
-    def automation_mode(self) -> bool:
-        """Whether automation mode is enabled."""
-        return self.workflow.automation_mode
-
-    @property
-    def auto_stage_enabled(self) -> bool:
-        """Whether auto staging is enabled."""
-        return self.workflow.auto_stage_enabled
-
-    @property
-    def commit_message_enabled(self) -> bool:
-        """Whether commit message generation is enabled."""
-        return self.workflow.commit_message_enabled
-
-    @property
-    def auto_push_enabled(self) -> bool:
-        """Whether auto push is enabled."""
-        return self.workflow.auto_push_enabled
-
-    @property
-    def model_name(self) -> str:
-        """Model name."""
-        return self.model.name
-
-    @property
-    def reasoning_effort(self) -> str:
-        """Reasoning effort level."""
-        return self.model.reasoning_effort
 
 
 @dataclass
@@ -403,9 +327,6 @@ __all__ = [
     "PatchLifecycleAbort",
     "PatchApplyError",
     "CommandResult",
-    "CommandConfig",
-    "WorkflowConfig",
-    "ModelConfig",
     "RuntimeOptions",
     "FailureContext",
     "PatchAttemptState",

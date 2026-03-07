@@ -21,11 +21,8 @@ from .failures import build_failure_context
 from .messaging import commit_and_push, request_commit_message
 from .models import (
     CiAbort,
-    CommandConfig,
-    ModelConfig,
     PatchLifecycleAbort,
     RuntimeOptions,
-    WorkflowConfig,
 )
 from .patch_cycle import request_and_apply_patches
 from .process import gather_git_diff_limited, run_command
@@ -68,15 +65,15 @@ def configure_runtime(args: argparse.Namespace) -> RuntimeOptions:
     ) = _derive_runtime_flags(args, command_tokens)
 
     return RuntimeOptions(
-        command=CommandConfig(tokens=command_tokens, env=command_env),
-        workflow=WorkflowConfig(
-            patch_approval_mode=args.patch_approval_mode,
-            automation_mode=automation_mode,
-            auto_stage_enabled=auto_stage_enabled,
-            commit_message_enabled=commit_message_enabled,
-            auto_push_enabled=auto_push_enabled,
-        ),
-        model=ModelConfig(name=model_name, reasoning_effort=reasoning_effort),
+        command_tokens=command_tokens,
+        command_env=command_env,
+        patch_approval_mode=args.patch_approval_mode,
+        automation_mode=automation_mode,
+        auto_stage_enabled=auto_stage_enabled,
+        commit_message_enabled=commit_message_enabled,
+        auto_push_enabled=auto_push_enabled,
+        model_name=model_name,
+        reasoning_effort=reasoning_effort,
     )
 
 
@@ -89,16 +86,6 @@ def perform_dry_run(args: argparse.Namespace, options: RuntimeOptions) -> Option
     return result.returncode
 
 
-def _collect_worktree_diffs() -> tuple[str, str]:
-    """Return both unstaged and staged git diffs."""
-    return gather_git_diff_limited(staged=False), gather_git_diff_limited(staged=True)
-
-
-def _worktree_is_clean(unstaged_diff: str, staged_diff: str) -> bool:
-    """Return True when there are no staged or unstaged changes."""
-    return not unstaged_diff and not staged_diff
-
-
 def _stage_if_needed(options: RuntimeOptions, staged_diff: str) -> str:
     """Stage all changes when auto-stage is enabled and return the staged diff."""
     if not options.auto_stage_enabled:
@@ -106,14 +93,6 @@ def _stage_if_needed(options: RuntimeOptions, staged_diff: str) -> str:
     print("[info] Staging all changes (`git add -A`).")
     run_command(["git", "add", "-A"], check=True)
     return gather_git_diff_limited(staged=True)
-
-
-def _warn_missing_staged_changes() -> None:
-    """Warn when a commit message was requested without staged changes."""
-    print(
-        "[warn] No staged changes detected. Stage files before requesting a commit message.",
-        file=sys.stderr,
-    )
 
 
 def _maybe_request_commit_message(
@@ -161,14 +140,15 @@ def _maybe_push_or_notify(
 
 def finalize_worktree(args: argparse.Namespace, options: RuntimeOptions) -> int:
     """Stage, commit, and optionally push once CI passes."""
-    unstaged_diff, staged_diff = _collect_worktree_diffs()
-    if _worktree_is_clean(unstaged_diff, staged_diff):
+    unstaged_diff = gather_git_diff_limited(staged=False)
+    staged_diff = gather_git_diff_limited(staged=True)
+    if not unstaged_diff and not staged_diff:
         print("[info] Working tree clean. Nothing to stage or commit.")
         return 0
 
     staged_diff = _stage_if_needed(options, staged_diff)
     if not staged_diff:
-        _warn_missing_staged_changes()
+        print("[warn] No staged changes detected. Stage files before requesting a commit message.", file=sys.stderr)
         return 0
 
     summary, body_lines = _maybe_request_commit_message(options, staged_diff, args.commit_extra_context)

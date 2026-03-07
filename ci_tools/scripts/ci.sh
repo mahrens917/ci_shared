@@ -218,60 +218,12 @@ CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 echo "Pushing to ${GIT_REMOTE}/${CURRENT_BRANCH}..."
 git push "${GIT_REMOTE}" "${CURRENT_BRANCH}"
 
-# Sync shared config files into consuming repositories when running inside ci_shared.
-if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
-  echo ""
-  echo "Syncing shared config files into consuming repositories..."
-
-  CONSUMER_DIRS=()
-  if CONSUMER_OUTPUT=$(python "${CI_SHARED_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
-    mapfile -t CONSUMER_DIRS <<< "${CONSUMER_OUTPUT}"
-  else
-    echo "⚠️  Failed to resolve consuming repositories; skipping sync." >&2
-  fi
-
-  if [ "${#CONSUMER_DIRS[@]}" -eq 0 ]; then
-    echo "No consuming repositories configured; update ci_shared.config.json if needed."
-  else
-    if python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}"; then
-      echo "✓ Config sync complete"
-    else
-      echo "⚠️  Config sync encountered issues (see above)" >&2
-    fi
-
-    echo ""
-    echo "Running shared tool-config sync in consuming repositories..."
-    TOOL_SYNC_ERRORS=0
-    for repo_dir in "${CONSUMER_DIRS[@]}"; do
-      if [ ! -d "${repo_dir}" ]; then
-        echo "  • Skipping missing repo: ${repo_dir}" >&2
-        TOOL_SYNC_ERRORS=1
-        continue
-      fi
-
-      echo "  • ${repo_dir}"
-      if python -m ci_tools.scripts.tool_config_guard --repo-root "${repo_dir}" --sync; then
-        echo "    ✓ tool configuration synced"
-      else
-        echo "    ⚠️  tool_config_guard failed for ${repo_dir}" >&2
-        TOOL_SYNC_ERRORS=1
-      fi
-    done
-
-    if [ "${TOOL_SYNC_ERRORS}" -ne 0 ]; then
-      echo "⚠️  One or more repositories failed tool-config sync; review logs above." >&2
-    else
-      echo "✓ Tool-config sync complete across consuming repositories."
-    fi
-  fi
-
-  echo ""
-  echo "Propagating ci_shared updates into consuming repositories..."
-  if python -m ci_tools.scripts.propagate_ci_shared; then
-    echo "✓ Propagation complete"
-  else
-    echo "⚠️  Propagation encountered issues (see above)" >&2
-  fi
+echo ""
+echo "Propagating ci_shared updates into consuming repositories..."
+if python -m ci_tools.scripts.propagate_ci_shared; then
+  echo "✓ Propagation complete"
+else
+  echo "⚠️  Propagation encountered issues (see above)" >&2
 fi
 
 echo "Done."

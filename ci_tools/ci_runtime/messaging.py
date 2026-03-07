@@ -13,13 +13,6 @@ from .models import CommitMessageError, GitCommandAbort
 from .process import run_command
 
 
-def _format_staged_diff(staged_diff: str) -> str:
-    """Format staged diff for display."""
-    if staged_diff:
-        return staged_diff
-    return "/* no staged diff */"
-
-
 def _commit_summary_issue(summary: str) -> str | None:
     """Return a description of any formatting issue detected in the commit summary."""
     trimmed = summary.strip()
@@ -120,7 +113,7 @@ def _build_commit_prompt(
     extra_parts = [part for part in (extra_context.strip(), retry_block) if part]
     extra_block = "\n\n".join(extra_parts)
 
-    diff_display = _format_staged_diff(staged_diff)
+    diff_display = staged_diff if staged_diff else "/* no staged diff */"
     prompt = textwrap.dedent(
         f"""\
         You write high-quality git commit messages.

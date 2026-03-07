@@ -81,36 +81,76 @@ def _has_dataclass_decorator(class_node: ast.ClassDef) -> bool:
     return False
 
 
+def _body_without_docstring(body: List[ast.stmt]) -> List[ast.stmt]:
+    """Return function body with a leading docstring stripped, if present."""
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        return body[1:]
+    return body
+
+
 def _is_single_return_call(body: List[ast.stmt]) -> bool:
-    """Check if a function body is a single return statement containing a call."""
-    if len(body) != 1:
+    """Check if a function body is a single return statement containing a call.
+
+    Leading docstrings are ignored so documented pass-throughs are still caught.
+    """
+    stmts = _body_without_docstring(body)
+    if len(stmts) != 1:
         return False
-    stmt = body[0]
-    if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call):
-        return True
-    return False
+    stmt = stmts[0]
+    return isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call)
 
 
 def _get_param_names(func_node: ast.FunctionDef | ast.AsyncFunctionDef) -> List[str]:
-    """Extract parameter names from a function definition, excluding 'self' and 'cls'."""
+    """Extract parameter names from a function definition, excluding 'self' and 'cls'.
+
+    Includes both positional args and keyword-only args (after *).
+    """
     names: List[str] = []
     for arg in func_node.args.args:
         if arg.arg not in ("self", "cls"):
             names.append(arg.arg)
+    for arg in func_node.args.kwonlyargs:
+        names.append(arg.arg)
     return names
 
 
-def _call_forwards_params(call: ast.Call, param_names: List[str]) -> bool:
-    """Check if a call forwards the exact same args as the function's parameters."""
-    if not param_names:
-        return True
-    call_arg_names: List[str] = []
+def _extract_positional_names(call: ast.Call) -> List[str] | None:
+    """Return positional arg names from a call, or None if any arg is not a plain Name."""
+    names: List[str] = []
     for arg in call.args:
-        if isinstance(arg, ast.Name):
-            call_arg_names.append(arg.id)
-        else:
+        if not isinstance(arg, ast.Name):
+            return None
+        names.append(arg.id)
+    return names
+
+
+def _keywords_match_params(keywords: List[ast.keyword], param_names: List[str]) -> bool:
+    """Check that all keyword args are param→param forwarding and present in param_names."""
+    for kw in keywords:
+        if kw.arg is None:
             return False
-    return call_arg_names == param_names
+        if not isinstance(kw.value, ast.Name) or kw.value.id != kw.arg:
+            return False
+        if kw.arg not in param_names:
+            return False
+    return True
+
+
+def _call_forwards_params(call: ast.Call, param_names: List[str]) -> bool:
+    """Check if a call forwards the exact same args as the function's parameters.
+
+    Returns False if the call adds keyword arguments not present in the function's params,
+    since that indicates the function is specializing behavior rather than delegating.
+    """
+    call_arg_names = _extract_positional_names(call)
+    if call_arg_names is None:
+        return False
+    if call_arg_names != param_names[: len(call_arg_names)]:
+        return False
+    if not _keywords_match_params(call.keywords, param_names):
+        return False
+    forwarded = set(call_arg_names) | {kw.arg for kw in call.keywords if kw.arg is not None}
+    return forwarded == set(param_names)
 
 
 def _check_module_scope_setattr(tree: ast.Module) -> List[int]:
@@ -168,7 +208,8 @@ def _check_passthrough_functions(tree: ast.Module) -> List[tuple[int, str]]:
         if not _is_single_return_call(node.body):
             continue
         param_names = _get_param_names(node)
-        call = node.body[0].value  # type: ignore[union-attr]
+        return_stmt = _body_without_docstring(node.body)[0]
+        call = return_stmt.value  # type: ignore[union-attr]
         assert isinstance(call, ast.Call)
         if _call_forwards_params(call, param_names) and _get_callee_name(call.func) != node.name:
             violations.append((node.lineno, node.name))

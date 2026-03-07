@@ -10,14 +10,12 @@ from ci_tools.ci_runtime.models import (
     CiAbort,
     CiError,
     CliError,
-    CommandConfig,
     CommandResult,
     CommitMessageError,
     CoverageCheckResult,
     CoverageDeficit,
     FailureContext,
     GitCommandAbort,
-    ModelConfig,
     ModelSelectionAbort,
     PatchApplyError,
     PatchAttemptState,
@@ -26,7 +24,6 @@ from ci_tools.ci_runtime.models import (
     ReasoningEffortAbort,
     RepositoryStateAbort,
     RuntimeOptions,
-    WorkflowConfig,
 )
 
 
@@ -160,9 +157,9 @@ class TestGitCommandAbort:
 class TestRepositoryStateAbort:
     """Tests for RepositoryStateAbort exception."""
 
-    def test_detached_head_factory(self):
-        """Test detached_head factory method."""
-        abort = RepositoryStateAbort.detached_head()
+    def test_detached_head(self):
+        """Test detached HEAD state error."""
+        abort = RepositoryStateAbort(detail="detached HEAD detected; checkout a branch before running ci.py")
         assert "detached HEAD detected" in str(abort)
         assert "checkout a branch" in str(abort)
 # pylint: disable=too-few-public-methods
@@ -171,9 +168,9 @@ class TestRepositoryStateAbort:
 class TestModelSelectionAbort:
     """Tests for ModelSelectionAbort exception."""
 
-    def test_unsupported_model_factory(self):
-        """Test unsupported_model factory method."""
-        abort = ModelSelectionAbort.unsupported_model(received="invalid-model", required="claude-sonnet-4-6")
+    def test_unsupported_model(self):
+        """Test unsupported model error."""
+        abort = ModelSelectionAbort(detail="requires `claude-sonnet-4-6` but received `invalid-model`")
         assert "claude-sonnet-4-6" in str(abort)
 # pylint: disable=too-few-public-methods
         assert "invalid-model" in str(abort)
@@ -247,15 +244,15 @@ class TestRuntimeOptions:
     def test_creation_with_all_fields(self):
         """Test RuntimeOptions with all fields."""
         options = RuntimeOptions(
-            command=CommandConfig(tokens=["make", "test"], env={"FOO": "bar"}),
-            workflow=WorkflowConfig(
-                patch_approval_mode="prompt",
-                automation_mode=True,
-                auto_stage_enabled=False,
-                commit_message_enabled=True,
-                auto_push_enabled=False,
-            ),
-            model=ModelConfig(name="claude-sonnet-4-6", reasoning_effort="high"),
+            command_tokens=["make", "test"],
+            command_env={"FOO": "bar"},
+            patch_approval_mode="prompt",
+            automation_mode=True,
+            auto_stage_enabled=False,
+            commit_message_enabled=True,
+            auto_push_enabled=False,
+            model_name="claude-sonnet-4-6",
+            reasoning_effort="high",
         )
         assert options.command_tokens == ["make", "test"]
         assert options.command_env == {"FOO": "bar"}

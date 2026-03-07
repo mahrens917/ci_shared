@@ -42,11 +42,6 @@ def load_toml(path: Path) -> dict[str, Any]:
         return tomllib.load(f)
 
 
-def extract_tool_config(data: dict[str, Any]) -> dict[str, Any]:
-    """Extract [tool.*] sections from pyproject.toml data."""
-    return {k: v for k, v in data.items() if k == "tool"}
-
-
 def compare_configs(shared: dict[str, Any], repo: dict[str, Any]) -> tuple[bool, list[str]]:
     """
     Compare tool configurations.
@@ -170,69 +165,16 @@ def format_toml_tool_section(data: dict[str, Any], indent: int = 0) -> str:
     return "\n".join(lines)
 
 
-def _print_toml_value(key: str, value: Any) -> None:
-    """Print a single TOML value."""
-    formatted_key = _format_toml_key(key)
-    if isinstance(value, str):
-        print(f'{formatted_key} = "{value}"')
-    elif isinstance(value, bool):
-        if value:
-            bool_str = "true"
-        else:
-            bool_str = "false"
-        print(f"{formatted_key} = {bool_str}")
-    elif isinstance(value, list):
-        _print_toml_list(key, value)
-    else:
-        print(f"{formatted_key} = {value}")
-
-
-def _print_toml_list(key: str, value: list) -> None:
-    """Print a list value as TOML."""
-    formatted_key = _format_toml_key(key)
-    if all(isinstance(x, str) for x in value):
-        print(f"{formatted_key} = [")
-        for item in value:
-            print(f'    "{item}",')
-        print("]")
-    else:
-        print(f"{formatted_key} = {value}")
-
-
-def _print_tool_section(tool_name: str, tool_config: dict[str, Any]) -> None:
-    """Print a single tool section with all its values."""
-    print(f"[tool.{tool_name}]")
-
-    # Print non-dict values first
-    for key, value in sorted(tool_config.items()):
-        if not isinstance(value, dict):
-            _print_toml_value(key, value)
-
-    # Print subsections
-    for key, value in sorted(tool_config.items()):
-        if isinstance(value, dict):
-            print(f"\n[tool.{tool_name}.{key}]")
-            print(format_toml_tool_section(value))
-
-    print()  # Blank line between tools
-
-
 def print_tool_config_diff(
     shared_data: dict[str, Any],
     repo_data: dict[str, Any],
 ) -> None:
     """Print the tool configuration that should be in pyproject.toml."""
-    _ = repo_data  # Reserved for future diff display
+    _ = repo_data
     print("\n" + "=" * 70)
     print("Expected tool configuration (copy to pyproject.toml):")
     print("=" * 70 + "\n")
-
-    if "tool" not in shared_data:
-        return
-
-    shared_tools = shared_data["tool"]
-    for tool_name in sorted(shared_tools.keys()):
-        _print_tool_section(tool_name, shared_tools[tool_name])
+    print(_generate_tool_config_text(shared_data))
 
 
 def _remove_tool_sections(pyproject_text: str, managed_tools: set[str]) -> str:

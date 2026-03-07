@@ -71,33 +71,18 @@ def parse_python_ast(path: Path, *, raise_on_error: bool = True) -> ast.AST | No
         return None
 
 
-def _find_repo_root_via_walk() -> Path | None:
-    """Walk up directory tree looking for .git directory."""
+def detect_repo_root() -> Path:
+    """Detect the repository root directory by walking up from cwd.
+
+    Returns:
+        Path to repository root (directory containing .git), or current
+        working directory if not found
+    """
     current = Path.cwd().resolve()
     while current != current.parent:
         if (current / ".git").exists():
             return current
         current = current.parent
-    return None
-
-
-def detect_repo_root() -> Path:
-    """Detect the repository root directory.
-
-    Walks the directory tree looking for a .git directory.
-
-    Returns:
-        Path to repository root (directory containing .git), or current
-        working directory if not found
-
-    Example:
-        >>> root = detect_repo_root()
-        >>> assert (root / ".git").exists() or root == Path.cwd()
-    """
-    walk_root = _find_repo_root_via_walk()
-    if walk_root is not None:
-        return walk_root
-
     return Path.cwd().resolve()
 
 
