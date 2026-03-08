@@ -21,7 +21,7 @@ from ci_tools.scripts.guard_common import (
 
 _DEFAULT_MIN_LINES = 40
 _DEFAULT_MAX_TINY_RATIO = 0.5
-_DEFAULT_MIN_MODULES = 2
+_DEFAULT_MIN_MODULES = 1
 
 
 def _count_significant_lines(path: Path) -> int:

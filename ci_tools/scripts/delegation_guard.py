@@ -22,6 +22,8 @@ from ci_tools.scripts.guard_common import (
     relative_path,
 )
 
+_MIN_DELEGATION_METHODS = 2
+
 DUNDER_METHODS = frozenset(
     {
         "__init__",
@@ -91,13 +93,19 @@ def _body_without_docstring(body: List[ast.stmt]) -> List[ast.stmt]:
 def _is_single_return_call(body: List[ast.stmt]) -> bool:
     """Check if a function body is a single return statement containing a call.
 
+    Handles both sync and async delegation: `return f()` and `return await f()`.
     Leading docstrings are ignored so documented pass-throughs are still caught.
     """
     stmts = _body_without_docstring(body)
     if len(stmts) != 1:
         return False
     stmt = stmts[0]
-    return isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call)
+    if not isinstance(stmt, ast.Return):
+        return False
+    value = stmt.value
+    if isinstance(value, ast.Await):
+        value = value.value
+    return isinstance(value, ast.Call)
 
 
 def _get_param_names(func_node: ast.FunctionDef | ast.AsyncFunctionDef) -> List[str]:
@@ -199,6 +207,57 @@ def _get_callee_name(func: ast.AST) -> str:
     return ""
 
 
+def _has_decorator(method: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> bool:
+    """Return True if the method has a decorator with the given name."""
+    return any(
+        (isinstance(d, ast.Name) and d.id == name) or (isinstance(d, ast.Attribute) and d.attr == name) for d in method.decorator_list
+    )
+
+
+def _is_factory_method(method: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Return True if this method is a named constructor or factory — not delegation.
+
+    Covers:
+    - ``@classmethod`` where body is ``return cls(...)``
+    - ``@staticmethod`` (no ``self``/``cls`` — cannot delegate to a sub-object)
+    """
+    if _has_decorator(method, "staticmethod"):
+        return True
+    if not _has_decorator(method, "classmethod"):
+        return False
+    stmts = _body_without_docstring(method.body)
+    if len(stmts) != 1 or not isinstance(stmts[0], ast.Return):
+        return False
+    value = stmts[0].value
+    if isinstance(value, ast.Await):
+        value = value.value
+    return isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == "cls"
+
+
+def _check_all_method_delegation(tree: ast.Module) -> List[tuple[int, str]]:
+    """Detect non-dataclasses where every non-dunder method is a single delegation call.
+
+    Catches coordinator classes with 2+ methods that all forward to sub-objects,
+    which the single-method wrapper check misses. Named-constructor classmethods
+    (``return cls(...)``) and ``@staticmethod`` methods are excluded since they
+    cannot delegate to a sub-object.
+    """
+    violations: List[tuple[int, str]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if _has_dataclass_decorator(node):
+            continue
+        methods = _get_non_dunder_methods(node)
+        # Exclude factory methods — they cannot delegate to self/cls sub-objects
+        delegation_methods = [m for m in methods if not _is_factory_method(m)]
+        if len(delegation_methods) < _MIN_DELEGATION_METHODS:  # single-method case already handled
+            continue
+        if all(_is_single_return_call(m.body) for m in delegation_methods):
+            violations.append((node.lineno, node.name))
+    return violations
+
+
 def _check_passthrough_functions(tree: ast.Module) -> List[tuple[int, str]]:
     """Detect module-level functions that just forward args to another function."""
     violations: List[tuple[int, str]] = []
@@ -209,9 +268,12 @@ def _check_passthrough_functions(tree: ast.Module) -> List[tuple[int, str]]:
             continue
         param_names = _get_param_names(node)
         return_stmt = _body_without_docstring(node.body)[0]
-        call = return_stmt.value  # type: ignore[union-attr]
-        assert isinstance(call, ast.Call)
-        if _call_forwards_params(call, param_names) and _get_callee_name(call.func) != node.name:
+        value = return_stmt.value  # type: ignore[union-attr]
+        if isinstance(value, ast.Await):
+            value = value.value
+        if not isinstance(value, ast.Call):
+            continue
+        if _call_forwards_params(value, param_names) and _get_callee_name(value.func) != node.name:
             violations.append((node.lineno, node.name))
     return violations
 
@@ -264,6 +326,9 @@ class DelegationGuard(GuardRunner):
 
         for lineno, class_name in _check_single_method_wrappers(tree):
             violations.append(f"{rel}:{lineno} class {class_name} is a single-method wrapper that delegates to another function")
+
+        for lineno, class_name in _check_all_method_delegation(tree):
+            violations.append(f"{rel}:{lineno} class {class_name} is a full delegation class where every method forwards to a sub-object")
 
         for lineno, func_name in _check_passthrough_functions(tree):
             violations.append(f"{rel}:{lineno} function {func_name} is a pass-through that forwards all arguments")

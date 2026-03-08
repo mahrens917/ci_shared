@@ -16,7 +16,7 @@ def test_parse_args_defaults():
     assert args.root is None
     assert args.min_lines == 40
     assert args.max_tiny_ratio == 0.5
-    assert args.min_modules == 2
+    assert args.min_modules == 1
 
 
 def test_parse_args_custom_values():
@@ -99,12 +99,25 @@ def test_catches_two_module_package(tmp_path: Path):
     assert result == 1
 
 
-def test_skips_single_module_package(tmp_path: Path):
-    """Package with only 1 module is below min_modules=2 threshold."""
+def test_flags_single_tiny_module_package(tmp_path: Path):
+    """Package with only 1 tiny module is flagged (min_modules=1)."""
     pkg = tmp_path / "src" / "solo"
     pkg.mkdir(parents=True)
     write_module(pkg / "__init__.py", "")
     _make_tiny_module(pkg / "a.py")
+
+    guard = FragmentationGuard()
+    guard.repo_root = tmp_path
+    result = guard.run(["--root", str(tmp_path / "src")])
+    assert result == 1
+
+
+def test_skips_single_large_module_package(tmp_path: Path):
+    """Package with only 1 large module passes."""
+    pkg = tmp_path / "src" / "solo"
+    pkg.mkdir(parents=True)
+    write_module(pkg / "__init__.py", "")
+    _make_large_module(pkg / "a.py")
 
     guard = FragmentationGuard()
     guard.repo_root = tmp_path

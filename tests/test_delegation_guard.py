@@ -123,7 +123,7 @@ def test_ignores_dataclass(tmp_path: Path):
     assert len(violations) == 0
 
 
-def test_ignores_class_with_multiple_methods(tmp_path: Path):
+def test_detects_full_delegation_class(tmp_path: Path):
     py_file = tmp_path / "service.py"
     write_module(
         py_file,
@@ -140,7 +140,72 @@ def test_ignores_class_with_multiple_methods(tmp_path: Path):
     guard.repo_root = tmp_path
     args = argparse.Namespace()
     violations = guard.scan_file(py_file, args)
+    assert len(violations) == 1
+    assert "Service" in violations[0]
+    assert "full delegation" in violations[0]
+
+
+def test_ignores_class_with_mixed_methods(tmp_path: Path):
+    py_file = tmp_path / "service.py"
+    write_module(
+        py_file,
+        """
+        class Service:
+            def start(self):
+                return run_start()
+
+            def stop(self):
+                result = run_stop()
+                cleanup()
+                return result
+        """,
+    )
+    guard = DelegationGuard()
+    guard.repo_root = tmp_path
+    args = argparse.Namespace()
+    violations = guard.scan_file(py_file, args)
     assert len(violations) == 0
+
+
+def test_detects_async_full_delegation_class(tmp_path: Path):
+    py_file = tmp_path / "handler.py"
+    write_module(
+        py_file,
+        """
+        class Handler:
+            async def start(self):
+                return await self._impl.start()
+
+            async def stop(self):
+                return await self._impl.stop()
+        """,
+    )
+    guard = DelegationGuard()
+    guard.repo_root = tmp_path
+    args = argparse.Namespace()
+    violations = guard.scan_file(py_file, args)
+    assert len(violations) == 1
+    assert "Handler" in violations[0]
+    assert "full delegation" in violations[0]
+
+
+def test_detects_async_single_method_wrapper(tmp_path: Path):
+    py_file = tmp_path / "async_wrapper.py"
+    write_module(
+        py_file,
+        """
+        class AsyncWrapper:
+            async def run(self):
+                return await self._impl.run()
+        """,
+    )
+    guard = DelegationGuard()
+    guard.repo_root = tmp_path
+    args = argparse.Namespace()
+    violations = guard.scan_file(py_file, args)
+    assert len(violations) == 1
+    assert "AsyncWrapper" in violations[0]
+    assert "single-method wrapper" in violations[0]
 
 
 def test_ignores_class_with_non_delegating_method(tmp_path: Path):
