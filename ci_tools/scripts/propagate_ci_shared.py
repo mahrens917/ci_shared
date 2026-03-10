@@ -361,12 +361,9 @@ def _print_summary(updated: list[str], skipped: list[str], failed: list[str]) ->
 
 def main() -> int:
     """Main entry point."""
-    # Verify we're in ci_shared repository
     cwd = Path.cwd()
 
-    # Check if this is the ci_shared repo
-    if not (cwd / "ci_tools").exists() or not (cwd / "ci_shared.mk").exists():
-        print("⚠️  Not running from ci_shared repository, skipping propagation")
+    if not (cwd / "ci_tools").is_dir() or not (cwd / "ci_shared.mk").exists():
         return 0
 
     print("\n" + "=" * 70)

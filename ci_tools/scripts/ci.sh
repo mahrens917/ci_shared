@@ -218,12 +218,14 @@ CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 echo "Pushing to ${GIT_REMOTE}/${CURRENT_BRANCH}..."
 git push "${GIT_REMOTE}" "${CURRENT_BRANCH}"
 
-echo ""
-echo "Propagating ci_shared updates into consuming repositories..."
-if python -m ci_tools.scripts.propagate_ci_shared; then
-  echo "✓ Propagation complete"
-else
-  echo "⚠️  Propagation encountered issues (see above)" >&2
+if [[ -f "ci_tools/scripts/propagate_ci_shared.py" ]]; then
+  echo ""
+  echo "Propagating ci_shared updates into consuming repositories..."
+  if python -m ci_tools.scripts.propagate_ci_shared; then
+    echo "✓ Propagation complete"
+  else
+    echo "⚠️  Propagation encountered issues (see above)" >&2
+  fi
 fi
 
 echo "Done."

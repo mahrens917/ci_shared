@@ -118,20 +118,18 @@ LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
 export LOGS_DIR
 mkdir -p "${LOGS_DIR}"
 
-# Load consuming repos (ci_shared first, then consumers from config)
-CONSUMER_DIRS=("${PROJECT_ROOT}")
+# Load consuming repos (ci_shared separate from consumers)
+CI_SHARED_DIR="${PROJECT_ROOT}"
+CONSUMER_ONLY_DIRS=()
 if CONSUMER_OUTPUT=$(python "${PROJECT_ROOT}/scripts/list_consumers.py" "${PROJECT_ROOT}" 2>&1); then
-    mapfile -t EXTRA_DIRS <<< "${CONSUMER_OUTPUT}"
-    CONSUMER_DIRS+=("${EXTRA_DIRS[@]}")
+    mapfile -t CONSUMER_ONLY_DIRS <<< "${CONSUMER_OUTPUT}"
 else
     echo "Failed to load consuming repositories: ${CONSUMER_OUTPUT}" >&2
     exit 1
 fi
 
-if [ "${#CONSUMER_DIRS[@]}" -eq 0 ]; then
-    echo "No repositories to validate."
-    exit 0
-fi
+# CONSUMER_DIRS includes all repos (used by --fix-only and display_results)
+CONSUMER_DIRS=("${CI_SHARED_DIR}" "${CONSUMER_ONLY_DIRS[@]}")
 
 # Global arrays for tracking results (populated by run_validation)
 declare -a pass_repos
@@ -745,7 +743,8 @@ if [ "${FIX_ONLY}" = true ]; then
     fail_count=0
     timeout_count=0
 
-    for repo_dir in "${CONSUMER_DIRS[@]}"; do
+    all_dirs=("${CI_SHARED_DIR}" "${CONSUMER_ONLY_DIRS[@]}")
+    for repo_dir in "${all_dirs[@]}"; do
         repo_name=$(basename "${repo_dir}")
         status_file="${LOGS_DIR}/${repo_name}.status"
         [ ! -f "${status_file}" ] && continue
@@ -781,20 +780,6 @@ if [ "${FIX_ONLY}" = true ]; then
     exit 0
 fi
 
-echo "Validating ${#CONSUMER_DIRS[@]} repos in parallel (${PARALLEL_JOBS} jobs, ${NUM_CORES} cores)"
-echo "Logs: ${LOGS_DIR}"
-echo ""
-
-
-echo "Pushing config to consuming repositories..."
-
-# Push config to all repos (once, before loop)
-if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
-    if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_DIRS[@]}" > /dev/null; then
-        echo "⚠️  Config sync encountered issues (see above)" >&2
-    fi
-fi
-
 # Consecutive LLM fix attempt tracking per repo
 declare -A repo_fix_counts
 MAX_FIX_ATTEMPTS=5
@@ -802,24 +787,113 @@ LOOP_SLEEP=300
 PREV_LOGS_DIR=""
 export PREV_LOGS_DIR
 
-loop_iteration=0
+echo "Logs: ${LOGS_DIR}"
+echo ""
+
+# ============================================================================
+# Phase 1: Validate ci_shared first (must pass before propagating to consumers)
+# ============================================================================
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Phase 1: Validating ci_shared"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+CONSUMER_DIRS=("${CI_SHARED_DIR}")
+ci_shared_attempt=0
 
 while true; do
-    ((loop_iteration++)) || true
+    ((ci_shared_attempt++)) || true
 
-    # Fresh logs directory for each iteration after the first
-    if [ "${loop_iteration}" -gt 1 ]; then
+    if [ "${ci_shared_attempt}" -gt 1 ]; then
         PREV_LOGS_DIR="${LOGS_DIR}"
         LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
         export LOGS_DIR
         mkdir -p "${LOGS_DIR}"
     fi
 
-    # Run validation across all repos
+    if [ "${ci_shared_attempt}" -eq 1 ]; then
+        run_validation
+    else
+        run_validation "ci_shared fix attempt ${ci_shared_attempt}"
+    fi
+
+    display_results
+
+    # ci_shared passed or was skipped — move to phase 2
+    if [ "${fail_count}" -eq 0 ] && [ "${timeout_count}" -eq 0 ]; then
+        echo ""
+        echo "ci_shared CI passed. Proceeding to consumers."
+        break
+    fi
+
+    # Check fix attempt limit
+    ci_shared_fix_count="${repo_fix_counts["ci_shared"]:-0}"
+    if [ "${ci_shared_fix_count}" -ge "${MAX_FIX_ATTEMPTS}" ]; then
+        echo ""
+        echo "ci_shared exhausted LLM fix attempts (${MAX_FIX_ATTEMPTS}). Exiting."
+        exit 1
+    fi
+
+    # Attempt LLM fix
+    if [ "${#timeout_repos[@]}" -gt 0 ]; then
+        attempt_fix_timeouts
+    fi
+    if [ "${#fail_repos[@]}" -gt 0 ]; then
+        attempt_auto_fixes
+    fi
+
+    # Track fix count (skip non-starts)
+    if [ -f "${LOGS_DIR}/ci_shared.llm_nonstart" ]; then
+        tlog "[NON-START] ci_shared - not counting toward fix attempts"
+    else
+        repo_fix_counts["ci_shared"]=$(( ${repo_fix_counts["ci_shared"]:-0} + 1 ))
+    fi
+done
+
+# ============================================================================
+# Phase 2: Propagate configs, then validate consumers
+# ============================================================================
+if [ "${#CONSUMER_ONLY_DIRS[@]}" -eq 0 ]; then
+    echo ""
+    echo "No consumer repositories to validate."
+    exit 0
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Phase 2: Propagating configs and validating ${#CONSUMER_ONLY_DIRS[@]} consumers"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo "Pushing config to consuming repositories..."
+if [ -f "${PROJECT_ROOT}/scripts/sync_project_configs.py" ]; then
+    if ! python "${PROJECT_ROOT}/scripts/sync_project_configs.py" "${CONSUMER_ONLY_DIRS[@]}" > /dev/null; then
+        echo "Config sync encountered issues (see above)" >&2
+    fi
+fi
+
+CONSUMER_DIRS=("${CONSUMER_ONLY_DIRS[@]}")
+loop_iteration=0
+
+while true; do
+    ((loop_iteration++)) || true
+
+    # Fresh logs directory for each iteration after the first
+    if [ "${loop_iteration}" -gt 1 ] || [ "${ci_shared_attempt}" -gt 1 ]; then
+        PREV_LOGS_DIR="${LOGS_DIR}"
+        LOGS_DIR="${PROJECT_ROOT}/logs/validate_consumers_$(date +%Y%m%d_%H%M%S)"
+        export LOGS_DIR
+        mkdir -p "${LOGS_DIR}"
+    fi
+
+    echo ""
+    echo "Validating ${#CONSUMER_DIRS[@]} consumers (${PARALLEL_JOBS} parallel, ${NUM_CORES} cores)"
+
+    # Run validation across consumer repos
     if [ "${loop_iteration}" -eq 1 ]; then
         run_validation
     else
-        run_validation "Loop iteration ${loop_iteration}"
+        run_validation "Consumer loop iteration ${loop_iteration}"
     fi
 
     display_results
@@ -835,14 +909,14 @@ while true; do
     # All repos skipped — nothing left to validate, stop
     if [ "${skip_count}" -eq "${#CONSUMER_DIRS[@]}" ]; then
         echo ""
-        echo "All repos skipped (no changes). Nothing to validate."
+        echo "All consumers skipped (no changes). Nothing to validate."
         exit 0
     fi
 
     # All green — sleep and re-check
     if [ "${fail_count}" -eq 0 ] && [ "${timeout_count}" -eq 0 ]; then
         echo ""
-        echo "All repos green. Sleeping ${LOOP_SLEEP}s..."
+        echo "All consumers green. Sleeping ${LOOP_SLEEP}s..."
         sleep "${LOOP_SLEEP}"
         continue
     fi
@@ -917,7 +991,7 @@ while true; do
     # If no repos are fixable by LLM, exit — nothing more we can do
     if [ "${#fixable_fail_repos[@]}" -eq 0 ] && [ "${#fixable_timeout_repos[@]}" -eq 0 ]; then
         echo ""
-        echo "All failing repos exhausted LLM fix attempts (${MAX_FIX_ATTEMPTS}). Exiting."
+        echo "All failing consumers exhausted LLM fix attempts (${MAX_FIX_ATTEMPTS}). Exiting."
         exit 1
     fi
     continue
