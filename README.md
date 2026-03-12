@@ -91,7 +91,7 @@ For local development:
 
 ```bash
 make check    # Run full CI suite (all checks run to completion)
-make format   # Auto-format code (black, isort)
+make format   # Auto-format code (ruff)
 make lint     # Run linters only
 make test     # Run tests with coverage
 make policy   # Run policy guards only
@@ -150,12 +150,22 @@ When you push changes to `ci_shared`:
   `GIT_REMOTE` customize Claude CLI behavior and push targets.
 
 ## Guard Suite
-Key guard scripts live under `ci_tools/scripts/` and `scripts/`:
+Key guard scripts live under `ci_tools/scripts/`:
 - `policy_guard.py` – enforces banned keywords, TODO markers, and fail-fast rules
-- `module_guard.py`, `function_size_guard.py` – prevent oversize modules/functions
+- `module_guard.py` – prevents oversize modules (≤600 lines)
+- `function_size_guard.py` – enforces function length limits (≤80 lines)
+- `structure_guard.py` – enforces class size limits (≤150 lines)
+- `complexity_guard.py` – limits cyclomatic (≤10) and cognitive (≤15) complexity
+- `method_count_guard.py` – limits methods per class (≤15 public / 30 total)
+- `dependency_guard.py` – limits instantiations in `__init__`/`__post_init__` (≤8)
+- `inheritance_guard.py` – enforces inheritance depth (≤2)
+- `delegation_guard.py` – no module-scope setattr, no single-method wrappers, no pass-through functions, no empty helper packages
+- `fragmentation_guard.py` – flags packages where ≥50% of modules are under 40 significant lines
+- `unused_module_guard.py` – detects unused modules (`--strict` mode)
 - `coverage_guard.py` – enforces per-file coverage thresholds
 - `documentation_guard.py` – verifies that required docs exist
-- `scripts/complexity_guard.py` – limits cyclomatic and cognitive complexity
+- `data_guard.py` – validates data files against allowlists
+- `tool_config_guard.py` – syncs shared tool configurations across repos
 - **Security**: gitleaks (secret detection), bandit (security linting), pip-audit (dependency CVEs)
 
 See the [Guard Suite reference](docs/guard-suite.md) and [Security Guidelines](SECURITY.md) for details.

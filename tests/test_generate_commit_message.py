@@ -635,11 +635,25 @@ def test_chunk_diff_returns_original_when_max_chunks_one():
 
 
 def test_chunk_diff_falls_back_to_line_chunking():
-    """Test chunking falls back to line-based when sections produce one chunk."""
+    """Test chunking falls back to line-based when any chunk is oversized."""
     # Create a single large section that exceeds max_lines
     diff_text = "diff --git a/a b/a\n" + "\n".join(f"+line{i}" for i in range(20))
     chunks = _chunk_diff(diff_text, max_chunk_lines=5, max_chunks=10)
     assert len(chunks) > 1
+
+
+def test_chunk_diff_falls_back_to_line_chunking_multi_section():
+    """Test chunking falls back to line-based when one section is much larger than max_lines.
+
+    Section-based chunking may produce multiple chunks, but one may still be oversized
+    if a single file diff is larger than max_chunk_lines.
+    """
+    small_section = "diff --git a/small b/small\n" + "\n".join(f"+s{i}" for i in range(3))
+    big_section = "diff --git a/big b/big\n" + "\n".join(f"+b{i}" for i in range(30))
+    tiny_section = "diff --git a/tiny b/tiny\n+t0"
+    diff_text = f"{small_section}\n{big_section}\n{tiny_section}"
+    chunks = _chunk_diff(diff_text, max_chunk_lines=5, max_chunks=10)
+    assert all(c.count("\n") + 1 <= 5 for c in chunks)
 
 
 def test_build_chunk_summary_diff_empty_summary():

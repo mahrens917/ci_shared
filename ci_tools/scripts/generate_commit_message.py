@@ -221,7 +221,7 @@ def _chunk_diff(
         # This handles edge case of whitespace-only diff that passed the early return
         return [diff_text]
     chunks = _chunk_by_sections(sections, sanitized_max_lines, sanitized_max_chunks)
-    if len(chunks) == 1 and total_lines > sanitized_max_lines:
+    if any(c.count("\n") + 1 > sanitized_max_lines for c in chunks):
         chunk_target = min(
             sanitized_max_chunks,
             max(2, math.ceil(total_lines / sanitized_max_lines)),
