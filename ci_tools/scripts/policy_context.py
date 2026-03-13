@@ -65,7 +65,10 @@ FORBIDDEN_SYNC_CALLS: tuple[str, ...] = (
     "requests.get",
     "requests.post",
     "requests.put",
+    "requests.patch",
     "requests.delete",
+    "requests.head",
+    "requests.options",
     "requests.request",
 )
 LEGACY_GUARD_TOKENS: tuple[str, ...] = ("legacy", "compat", "deprecated")
