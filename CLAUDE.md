@@ -41,3 +41,11 @@ Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for 
 - Do fix the code—never bypass checks (`# noqa`, `# pylint: disable`, `# type: ignore`, `policy_guard: allow-*`, threshold changes are off-limits).
 - Do keep secrets and generated artifacts out of git; use `.gitleaks.toml`/`ci_tools/config/*` for sanctioned patterns.
 - Do keep required docs current (`README.md`, `CLAUDE.md`, `docs/README.md`, per-package READMEs) and avoid undoing user edits.
+
+## Test Isolation
+- Tests must NEVER touch production resources. All test operations must be fully isolated:
+  - **Files**: Use `tmp_path` or temporary directories — never read, write, truncate, or delete files in production paths (e.g., `logs/`, `data/`, `config/`).
+  - **Redis**: Use mocks or a dedicated test Redis database — never publish, subscribe, or modify keys in the production Redis instance.
+  - **Databases**: Use test fixtures or in-memory databases — never connect to or modify production databases.
+  - **External services**: Mock all external API calls and network requests.
+- The root cause of production log loss was tests calling `_clear_logs()` against the real `logs/` directory. Monkeypatch paths to `tmp_path` in any test that touches the filesystem.

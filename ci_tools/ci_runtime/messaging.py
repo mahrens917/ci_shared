@@ -75,8 +75,7 @@ def _build_commit_prompt(
     """Construct the Claude prompt for commit message generation."""
     effort_display = reasoning_effort
     if detailed:
-        instructions = textwrap.dedent(
-            """\
+        instructions = textwrap.dedent("""\
             Produce a git commit message consisting of:
             - A concise subject line (≤72 characters)
               that summarizes what changed using past tense.
@@ -85,37 +84,31 @@ def _build_commit_prompt(
             Avoid trailing periods on the subject line.
             Rely on the diff provided below for context instead of running shell commands.
             Avoid invoking tools such as `diff --git`.
-            """
-        )
+            """)
     else:
-        instructions = textwrap.dedent(
-            """\
+        instructions = textwrap.dedent("""\
             Provide a single-line commit message in past tense (no trailing punctuation).
             Use the diff shown above instead of running shell commands such as `diff --git`.
             Avoid prefatory phrases like "Here is your commit message"
             or commentary about the diff.
-            """
-        ).strip()
+            """).strip()
 
     retry_block = ""
     if invalid_reason:
         detail_hint = " and bullet list" if detailed else ""
-        retry_block = textwrap.dedent(
-            f"""\
+        retry_block = textwrap.dedent(f"""\
             The previous response was rejected because it violated the commit message
             rules ({invalid_reason}).
             Retry with a concise commit message that follows the instructions above.
             Do not include apologies or meta commentary.
             Respond with only the commit subject{detail_hint}.
-            """
-        ).strip()
+            """).strip()
 
     extra_parts = [part for part in (extra_context.strip(), retry_block) if part]
     extra_block = "\n\n".join(extra_parts)
 
     diff_display = staged_diff if staged_diff else "/* no staged diff */"
-    prompt = textwrap.dedent(
-        f"""\
+    prompt = textwrap.dedent(f"""\
         You write high-quality git commit messages.
 
         Model configuration:
@@ -128,8 +121,7 @@ def _build_commit_prompt(
         ```
 
         {instructions}
-        """
-    ).strip()
+        """).strip()
 
     if extra_block:
         prompt = f"{prompt}\n\n{extra_block}"

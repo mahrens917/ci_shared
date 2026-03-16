@@ -194,8 +194,7 @@ def request_claude_patch(
     focused_diff_display = _format_diff(prompt.failure_context.focused_diff, "/* no focused diff */")
     git_diff_display = _format_diff(prompt.git_diff, "/* no diff */")
 
-    prompt_text = textwrap.dedent(
-        f"""\
+    prompt_text = textwrap.dedent(f"""\
         You are currently iterating on automated CI repairs.
 
         Context:
@@ -231,8 +230,7 @@ def request_claude_patch(
         - Avoid large-scale refactors; keep the change tightly scoped to resolve the failure.
         - If no code change is appropriate, reply with `NOOP`.
         - Do not modify automation scaffolding (ci.py, ci_tools/*, scripts/ci.sh).
-        """
-    )
+        """)
     return invoke_claude(
         prompt_text,
         model=model,
