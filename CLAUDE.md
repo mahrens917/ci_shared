@@ -49,3 +49,17 @@ Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for 
   - **Databases**: Use test fixtures or in-memory databases — never connect to or modify production databases.
   - **External services**: Mock all external API calls and network requests.
 - The root cause of production log loss was tests calling `_clear_logs()` against the real `logs/` directory. Monkeypatch paths to `tmp_path` in any test that touches the filesystem.
+
+## Cross-Repo Dependency Pattern (Standard for All Repos)
+All Python repos under `~/projects/` use `sys.path` insertion (not pip local installs) for cross-repo imports. The standard pattern:
+
+- **`src/_ensure_deps.py`** (runtime): Checks `importlib.util.find_spec` for each dependency; if not found, inserts `~/projects/<pkg>/src` into `sys.path`. Called from `__main__.py` entrypoints via `from src._ensure_deps import ensure; ensure()`.
+- **`tests/conftest.py`** (tests): Unconditionally inserts `~/projects/<pkg>/src` into `sys.path` before any cross-repo imports.
+- **`src/__init__.py`**: Namespace package shim ONLY (`extend_path`). No ensure logic here.
+- Always use `Path.home() / "projects"` — never hardcode absolute paths.
+- `file://` URIs in `pyproject.toml` are for metadata/tooling only; runtime resolution is via `sys.path`.
+
+### Dependency Graph
+- **Leaf**: `common` (no deps), `api`, `aws`, `ci_shared`, `polyus`
+- **Tier 1** (depend on `common`): `zeus`, `signals`, `deribit`, `kalshi`, `tracker`, `weather`, `pdf`, `poly`, `cfb`
+- **Tier 2** (depend on `common` + services): `monitor` (common, deribit, kalshi, pdf, tracker, weather)
