@@ -1,5 +1,5 @@
 {
-  "repo_context": "Shared CI tooling for Zeus, Monitor, AWS, API, common, signals, analytics, and service repositories (cfb, deribit, kalshi, pdf, poly, polyus, tracker, weather).",
+  "repo_context": "Shared CI tooling for Zeus, Monitor, AWS, common, signals, analytics, and service repositories (cfb, deribit, kalshi, pdf, poly, polyus, tracker, weather).",
   "protected_path_prefixes": [
     "ci_tools/",
     "scripts/ci.sh",
@@ -7,10 +7,6 @@
     "shared-tool-config.toml"
   ],
   "consuming_repositories": [
-    {
-      "name": "api",
-      "path": "~/projects/api"
-    },
     {
       "name": "zeus",
       "path": "~/projects/zeus"
