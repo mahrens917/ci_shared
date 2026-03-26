@@ -1,6 +1,6 @@
 # claude-ci-tools
 
-Shared continuous-integration toolkit used across all trading system repositories (api, zeus, monitor, aws, common, signals, analytics, cfb, deribit, kalshi, pdf, tracker, weather, poly). This package provides:
+Shared continuous-integration toolkit used across all trading system repositories (api, zeus, monitor, aws, common, signals, analytics, price_feeds, deribit, kalshi, pdf, tracker, weather, poly). This package provides:
 - **Automated CI repair loops** powered by Claude that fix failing checks
 - **Comprehensive guard suite** enforcing code quality, security, and complexity standards
 - **Shared CI pipeline** with consistent tooling across all consuming repositories

@@ -1,6 +1,6 @@
 # ci_shared: Claude Guide
 
-Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for all repos (api, zeus, monitor, aws, common, signals, cfb, deribit, kalshi, tracker, weather, pdf, poly). Code in `ci_tools/`, helpers in `scripts/`, configs in `ci_shared.mk` + `shared-tool-config.toml`, tests in `tests/`, docs in `docs/`.
+Shared CI toolkit providing guards, linters, and LLM-powered auto-fix loops for all repos (api, zeus, monitor, aws, common, signals, price_feeds, deribit, kalshi, tracker, weather, pdf, poly). Code in `ci_tools/`, helpers in `scripts/`, configs in `ci_shared.mk` + `shared-tool-config.toml`, tests in `tests/`, docs in `docs/`.
 
 ## Path Portability
 - All repos live as siblings under `~/projects/` (e.g., `~/projects/monitor`, `~/projects/common`).
@@ -61,5 +61,5 @@ All Python repos under `~/projects/` use `sys.path` insertion (not pip local ins
 
 ### Dependency Graph
 - **Leaf**: `common` (no deps), `api`, `aws`, `ci_shared`, `polyus`
-- **Tier 1** (depend on `common`): `zeus`, `signals`, `deribit`, `kalshi`, `tracker`, `weather`, `pdf`, `poly`, `cfb`
+- **Tier 1** (depend on `common`): `zeus`, `signals`, `deribit`, `kalshi`, `tracker`, `weather`, `pdf`, `poly`, `price_feeds`
 - **Tier 2** (depend on `common` + services): `monitor` (common, deribit, kalshi, pdf, tracker, weather)
